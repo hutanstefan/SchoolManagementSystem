@@ -1,24 +1,71 @@
-# Nestjs specific
-/dist
-/node_modules
-/build
-/tmp
+# ---------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------
+node_modules/
+.pnpm-store/
 
+# ---------------------------------------------------------------
+# Build output and caches
+# ---------------------------------------------------------------
+dist/
+dist-ssr/
+build/
+*.tsbuildinfo
+.eslintcache
+.vite/
+*.local
+
+# ---------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------
+coverage/
+.nyc_output/
+junit.xml
+
+# ---------------------------------------------------------------
+# Generated code (recreated on `npm install`)
+# ---------------------------------------------------------------
+backend/src/generated/
+
+# ---------------------------------------------------------------
+# Runtime data
+# ---------------------------------------------------------------
+# Files uploaded through the app (Excel imports, scanned grade sheets)
+backend/uploads/
+
+# ---------------------------------------------------------------
+# Environment files (only the examples are committed)
+# ---------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------
 # Logs
-logs
+# ---------------------------------------------------------------
+logs/
 *.log
 npm-debug.log*
-pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-lerna-debug.log*
+pnpm-debug.log*
 
-# dotenv environment variable files
-.env
-.env.development
-.env.test
-.env.production
+# ---------------------------------------------------------------
+# OS files
+# ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
 
-# temp directory
-.temp
-.tmp
+# ---------------------------------------------------------------
+# Editors / IDEs (shared VS Code recommendations are kept)
+# ---------------------------------------------------------------
+.idea/
+*.swp
+.vscode/*
+!.vscode/extensions.json
+
+# ---------------------------------------------------------------
+# Local tool output
+# ---------------------------------------------------------------
+Claude outputs/
