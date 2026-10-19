@@ -1,0 +1,162 @@
+// Prisma schema for the School Management System.
+// Docs: https://www.prisma.io/docs/orm/prisma-schema
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+}
+
+/// Login identity shared by every role. Role-specific data lives in Student / Teacher.
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  student Student?
+  teacher Teacher?
+
+  @@map("users")
+}
+
+model Student {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @map("user_id") @db.Uuid
+  dateOfBirth DateTime @map("date_of_birth") @db.Date
+  classId     String?  @map("class_id") @db.Uuid
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Deleting a class keeps its students, they just become unassigned.
+  class  Class?  @relation(fields: [classId], references: [id], onDelete: SetNull)
+  grades Grade[]
+
+  @@index([classId])
+  @@map("students")
+}
+
+model Teacher {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Classes where this teacher is the homeroom teacher (diriginte).
+  homeroomClasses Class[]
+  /// Subjects this teacher teaches, per class.
+  classSubjects   ClassSubject[]
+  grades          Grade[]
+
+  @@map("teachers")
+}
+
+/// A class has one homeroom teacher (diriginte) and many students (a student belongs to one class).
+model Class {
+  id                String   @id @default(uuid()) @db.Uuid
+  name              String   @unique
+  homeroomTeacherId String?  @map("homeroom_teacher_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  /// Deleting a teacher leaves the class without a homeroom teacher.
+  homeroomTeacher Teacher?       @relation(fields: [homeroomTeacherId], references: [id], onDelete: SetNull)
+  students        Student[]
+  subjects        ClassSubject[]
+
+  @@index([homeroomTeacherId])
+  @@map("classes")
+}
+
+model Subject {
+  id            String         @id @default(uuid()) @db.Uuid
+  name          String         @unique
+  classSubjects ClassSubject[]
+  grades        Grade[]
+
+  @@map("subjects")
+}
+
+/// Teaching assignment: which subjects a class studies, who teaches each one and how many hours per week.
+/// A teacher may only grade a student in a subject they teach in that student's class.
+model ClassSubject {
+  id           String  @id @default(uuid()) @db.Uuid
+  classId      String  @map("class_id") @db.Uuid
+  subjectId    String  @map("subject_id") @db.Uuid
+  /// Null while the position is vacant (or after the teacher was deleted).
+  teacherId    String? @map("teacher_id") @db.Uuid
+  hoursPerWeek Int     @map("hours_per_week") @db.SmallInt
+
+  class            Class            @relation(fields: [classId], references: [id], onDelete: Cascade)
+  /// A subject that is still taught in some class cannot be deleted.
+  subject          Subject          @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teacher          Teacher?         @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  timetableEntries TimetableEntry[]
+
+  @@unique([classId, subjectId])
+  /// Target of the composite foreign key from timetable_entries (keeps class_id consistent).
+  @@unique([id, classId])
+  @@index([teacherId])
+  @@index([subjectId])
+  @@map("class_subjects")
+}
+
+/// One lesson in the weekly timetable: a class-subject in a given day and period (1-8).
+model TimetableEntry {
+  id             String  @id @default(uuid()) @db.Uuid
+  classSubjectId String  @map("class_subject_id") @db.Uuid
+  /// Copy of class_subjects.class_id, guaranteed consistent by the composite foreign key.
+  /// It exists so the database can enforce "one lesson per class per slot".
+  classId        String  @map("class_id") @db.Uuid
+  day            Weekday
+  period         Int     @db.SmallInt
+  room           String?
+
+  classSubject ClassSubject @relation(fields: [classSubjectId, classId], references: [id, classId], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([classId, day, period])
+  @@index([classSubjectId])
+  @@map("timetable_entries")
+}
+
+/// A single grade (1-10). The value range is also enforced by a CHECK constraint in the migration.
+model Grade {
+  id        String   @id @default(uuid()) @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  subjectId String   @map("subject_id") @db.Uuid
+  /// The teacher who gave the grade. Null if that teacher was deleted (the grade stays in history).
+  teacherId String?  @map("teacher_id") @db.Uuid
+  value     Int      @db.SmallInt
+  date      DateTime @db.Date
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  student Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /// A subject that still has grades cannot be deleted.
+  subject Subject  @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teacher Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, subjectId])
+  @@index([teacherId])
+  @@map("grades")
+}
