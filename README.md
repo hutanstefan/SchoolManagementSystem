@@ -17,27 +17,46 @@ A full-stack web application for managing students, teachers, classes and grades
 
 ```
 .
-├── backend/             NestJS REST API
+├── backend/             NestJS REST API (+ Dockerfile)
 │   ├── prisma/          Schema, migrations and seed
 │   └── src/             Feature modules (auth, students, teachers, classes, ...)
-├── frontend/            React single-page app
-│   └── src/             api (typed client), auth, components, pages
-├── docs/                Schema picture, Bruno and Postman collections
-├── docker-compose.yml   PostgreSQL for local development
+├── frontend/            React single-page app (+ Dockerfile, nginx.conf)
+│   └── src/             api (typed client), auth, components, features, pages
+├── docs/                Schema picture, OpenAPI file, Bruno and Postman collections
+├── docker-compose.yml   The whole stack, or only PostgreSQL for local development
 └── README.md
 ```
 
 ## Prerequisites
 
-- Node.js 20+ (developed on Node 24 LTS)
 - Docker Desktop
+- Node.js 20+ (developed on Node 24 LTS), only for running without Docker
 
-## Getting started
+## Quick start with Docker
+
+One command builds and starts everything: database, migrations with demo data, API and web app.
+
+```bash
+docker compose up --build
+```
+
+Open **http://localhost:8080** and log in with one of the [test accounts](#test-credentials). The API docs are at http://localhost:8080/api/docs.
+
+| Service    | What it does                                                                                                                 |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `postgres` | PostgreSQL 16, data kept in the `postgres-data` volume                                                                       |
+| `migrate`  | Runs once: applies the migrations, then seeds the demo data **only if the database is empty**, so restarts keep your changes |
+| `api`      | The NestJS API (port 3000), started once the migrations succeeded; production dependencies only, runs as a non-root user     |
+| `web`      | nginx (port 8080) serving the built React app and forwarding `/api` (REST and WebSockets) to the API                         |
+
+The services start in order: the migrations wait for a healthy database, the API for the migrations to succeed and the web app for a healthy API. The defaults work out of the box; to change ports or the JWT secret, copy `.env.example` to `.env`. To start over with fresh demo data: `docker compose down -v`.
+
+## Local development
 
 **1. Start the database**
 
 ```bash
-docker compose up -d
+docker compose up -d postgres
 ```
 
 **2. Set up and start the API** (http://localhost:3000/api)
@@ -183,6 +202,7 @@ erDiagram
 
 - **Swagger UI:** http://localhost:3000/api/docs (raw OpenAPI JSON at `/api/docs-json`). Log in with `POST /api/auth/login`, click **Authorize** and paste the `accessToken`.
 - **Bruno:** open the folder [`docs/bruno`](docs/bruno) with **Open Collection**. Run one of the **Login as ...** requests first: it saves the token, and every other request uses it automatically.
+- **OpenAPI file:** [`docs/openapi.json`](docs/openapi.json), exported with `npm run openapi` in `backend` (no database needed).
 - **Postman:** import [`docs/postman/school-management.postman_collection.json`](docs/postman/school-management.postman_collection.json). It works the same way.
 
 ### Endpoints
@@ -201,13 +221,14 @@ All endpoints are under `/api`. "Teacher (own)" means a teacher only sees the cl
 | PATCH  | `/students/:id`                     | Admin                                     | Update a student, move or unassign, reset password                     |
 | DELETE | `/students/:id`                     | Admin                                     | Delete a student and their grades                                      |
 | GET    | `/teachers`                         | Admin                                     | List teachers (paginated, search)                                      |
+| GET    | `/teachers/me`                      | Teacher                                   | My profile, homeroom classes and teaching assignments                  |
 | POST   | `/teachers`                         | Admin                                     | Create a teacher account                                               |
 | GET    | `/teachers/:id`                     | Admin                                     | Teacher details, homeroom classes and subjects                         |
 | PATCH  | `/teachers/:id`                     | Admin                                     | Update a teacher, reset password                                       |
 | DELETE | `/teachers/:id`                     | Admin                                     | Delete a teacher (their grades are kept)                               |
 | GET    | `/classes`                          | Admin, Teacher (own)                      | List classes (paginated, natural order 9A → 12A)                       |
 | POST   | `/classes`                          | Admin                                     | Create a class                                                         |
-| GET    | `/classes/:id`                      | Admin, Teacher (own)                      | Class details with subjects and teachers                               |
+| GET    | `/classes/:id`                      | Admin, Teacher (own), Student (own class) | Class details with subjects and teachers                               |
 | PATCH  | `/classes/:id`                      | Admin                                     | Rename, change homeroom teacher                                        |
 | DELETE | `/classes/:id`                      | Admin                                     | Delete a class (students become unassigned)                            |
 | GET    | `/classes/:id/students`             | Admin, Teacher (own)                      | Students enrolled in the class                                         |
@@ -269,7 +290,17 @@ The checks and the write run in one **serializable** transaction, so two admins 
 
 ## Frontend
 
-**Typed end to end.** The API client is generated from the backend's OpenAPI document (`openapi-typescript` + `openapi-fetch`). Every path, parameter, request body and response in the React app is checked against the real API, so a breaking change in the backend fails `npm run build` in the frontend. After changing the API, run `npm run api:types` (with the API running) to refresh `src/api/schema.d.ts`.
+**Typed end to end.** The API client is generated from the backend's OpenAPI document (`openapi-typescript` + `openapi-fetch`). Every path, parameter, request body and response in the React app is checked against the real API, so a breaking change in the backend fails `npm run build` in the frontend. After changing the API, run `npm run openapi` in `backend` and then `npm run api:types` in `frontend` to refresh `src/api/schema.d.ts`. Neither needs the API or the database to be running.
+
+**Pages per role**
+
+| Role    | Pages                                                                                                                                                               |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Admin   | Dashboard, students, teachers, classes (students, subjects, timetable editor, gradebook), subjects, all grades with history                                         |
+| Teacher | Dashboard (today's lessons, classes, latest grades), my classes, class page (gradebook, students, timetable), a student's report card, my timetable                 |
+| Student | Dashboard (today's lessons, latest grades, profile), my grades (report card, averages by subject), my class (homeroom teacher, subjects and teachers), my timetable |
+
+The gradebook is one component shared by the admin and the teacher. A teacher sees only their own subjects (the homeroom teacher sees every subject of their class, read-only except their own), adds grades only in their subjects and changes only the grades they gave. The API enforces the same rules; the UI only hides what would be refused.
 
 **Authentication in the browser**
 
@@ -313,22 +344,23 @@ Every grade change writes a row in `grade_history` (who, when, action, old and n
 
 ## Useful scripts
 
-| Where    | Command              | What it does                                          |
-| -------- | -------------------- | ----------------------------------------------------- |
-| backend  | `npm run start:dev`  | API with hot reload                                   |
-| backend  | `npm run db:migrate` | Apply migrations (and create new ones in dev)         |
-| backend  | `npm run db:seed`    | Reset the data to the demo dataset                    |
-| backend  | `npm run db:reset`   | Drop everything and re-run all migrations             |
-| backend  | `npm run db:studio`  | Prisma Studio, a GUI for browsing the data            |
-| backend  | `npm run lint`       | ESLint (type-aware)                                   |
-| backend  | `npm run typecheck`  | TypeScript check, no output                           |
-| backend  | `npm test`           | Unit tests                                            |
-| backend  | `npm run test:e2e`   | End-to-end tests (needs the database running)         |
-| frontend | `npm run dev`        | Vite dev server                                       |
-| frontend | `npm run lint`       | Oxlint                                                |
-| frontend | `npm run build`      | Type check + production build                         |
-| frontend | `npm test`           | Component tests (Vitest + Testing Library)            |
-| frontend | `npm run api:types`  | Regenerate the typed API client (API must be running) |
+| Where    | Command              | What it does                                             |
+| -------- | -------------------- | -------------------------------------------------------- |
+| backend  | `npm run start:dev`  | API with hot reload                                      |
+| backend  | `npm run db:migrate` | Apply migrations (and create new ones in dev)            |
+| backend  | `npm run db:seed`    | Reset the data to the demo dataset                       |
+| backend  | `npm run db:reset`   | Drop everything and re-run all migrations                |
+| backend  | `npm run db:studio`  | Prisma Studio, a GUI for browsing the data               |
+| backend  | `npm run openapi`    | Export the OpenAPI document to `docs/openapi.json`       |
+| backend  | `npm run lint`       | ESLint (type-aware)                                      |
+| backend  | `npm run typecheck`  | TypeScript check, no output                              |
+| backend  | `npm test`           | Unit tests                                               |
+| backend  | `npm run test:e2e`   | End-to-end tests (needs the database running)            |
+| frontend | `npm run dev`        | Vite dev server                                          |
+| frontend | `npm run lint`       | Oxlint                                                   |
+| frontend | `npm run build`      | Type check + production build                            |
+| frontend | `npm test`           | Component tests (Vitest + Testing Library)               |
+| frontend | `npm run api:types`  | Regenerate the typed API client from `docs/openapi.json` |
 
 ## Environment variables
 

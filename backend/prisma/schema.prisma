@@ -2,9 +2,12 @@
 // Docs: https://www.prisma.io/docs/orm/prisma-schema
 
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "cjs"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
+  // Explicit, so the output doesn't depend on whether tsconfig.json is present
+  // when the client is generated (e.g. during `npm ci` in the Docker build).
+  importFileExtension = "js"
 }
 
 datasource db {

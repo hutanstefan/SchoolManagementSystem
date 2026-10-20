@@ -1,4 +1,9 @@
+# The whole application:   docker compose up --build   ->  http://localhost:8080
+# Only the database (for local development with npm):   docker compose up -d postgres
 name: school-management
+
+x-database-url: &database-url
+  DATABASE_URL: postgresql://${POSTGRES_USER:-school}:${POSTGRES_PASSWORD:-school}@postgres:5432/${POSTGRES_DB:-school_db}?schema=public
 
 services:
   postgres:
@@ -18,6 +23,45 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Runs once: applies the migrations, then seeds the demo data if the database is empty.
+  migrate:
+    build:
+      context: ./backend
+      target: tools
+    environment:
+      <<: *database-url
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  api:
+    build:
+      context: ./backend
+      target: runtime
+    restart: unless-stopped
+    environment:
+      <<: *database-url
+      JWT_SECRET: ${JWT_SECRET:-docker-demo-secret-change-me-0123456789abcdefghij}
+      JWT_EXPIRES_IN_SECONDS: ${JWT_EXPIRES_IN_SECONDS:-3600}
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-8080}
+      # Behind nginx: rate limits use the real client IP.
+      TRUST_PROXY: 1
+    ports:
+      - '${API_PORT:-3000}:3000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - '${WEB_PORT:-8080}:8080'
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   postgres-data:

@@ -1,6 +1,9 @@
 /**
  * Development seed: wipes the database and fills it with realistic demo data.
  * Run with `npm run db:seed`. Faker is seeded, so the data is the same on every run.
+ *
+ * With `--if-empty` it only seeds a database that has no users yet (used by
+ * Docker on every start, so restarting the containers keeps your changes).
  */
 import 'dotenv/config';
 import { fakerRO as faker } from '@faker-js/faker';
@@ -235,6 +238,11 @@ async function clearDatabase(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  if (process.argv.includes('--if-empty') && (await prisma.user.count()) > 0) {
+    console.log('Database already has data, skipping the seed.');
+    return;
+  }
+
   faker.seed(2026);
   const usedEmails = new Set<string>([
     `admin@${EMAIL_DOMAIN}`,

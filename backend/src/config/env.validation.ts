@@ -23,6 +23,12 @@ export const envSchema = z.object({
         .map((origin) => origin.trim())
         .filter(Boolean),
     ),
+  /**
+   * Number of reverse proxies in front of the API (e.g. 1 behind nginx in
+   * Docker). Lets Express read the client IP from X-Forwarded-For, so rate
+   * limits apply per client and not to the proxy as a whole.
+   */
+  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
 });
 
 export type Env = z.infer<typeof envSchema>;
