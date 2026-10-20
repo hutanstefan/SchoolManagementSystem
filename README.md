@@ -18,7 +18,10 @@ A full-stack web application for managing students, teachers, classes and grades
 ```
 .
 ├── backend/             NestJS REST API
+│   ├── prisma/          Schema, migrations and seed
+│   └── src/             Feature modules (auth, health, ...)
 ├── frontend/            React single-page app
+├── docs/                Schema picture, Bruno and Postman collections
 ├── docker-compose.yml   PostgreSQL for local development
 └── README.md
 ```
@@ -160,6 +163,30 @@ erDiagram
 | Class   | Its students become unassigned, its teaching assignments and timetable are deleted     |
 | Subject | Blocked while it is taught in a class or has grades (`409 Conflict`)                   |
 
+## API documentation
+
+- **Swagger UI:** http://localhost:3000/api/docs (raw OpenAPI JSON at `/api/docs-json`). Log in with `POST /api/auth/login`, click **Authorize** and paste the `accessToken`.
+- **Bruno:** open the folder [`docs/bruno`](docs/bruno) with **Open Collection**. Run one of the **Login as ...** requests first: it saves the token, and every other request uses it automatically.
+- **Postman:** import [`docs/postman/school-management.postman_collection.json`](docs/postman/school-management.postman_collection.json). It works the same way.
+
+### Endpoints
+
+| Method | Path              | Access        | Description                                  |
+| ------ | ----------------- | ------------- | -------------------------------------------- |
+| GET    | `/api/health`     | Public        | API and database status                      |
+| POST   | `/api/auth/login` | Public        | Log in, returns a JWT (max 5 attempts/min)   |
+| GET    | `/api/auth/me`    | Any logged-in | The current user with their role and profile |
+
+## Authentication and authorization
+
+- **Login** with email and password returns a signed JWT (`Authorization: Bearer <token>`), valid for 1 hour by default. The token only contains the user id and role.
+- **Every route is protected by default.** A global guard requires a valid token everywhere; public routes are explicitly marked with `@Public()`. A new endpoint can't be left unprotected by accident.
+- **Roles** are checked by a second global guard, driven by the `@Roles(...)` decorator. Finer rules (for example "a teacher can only grade their own classes") are enforced in the services, because they depend on the data.
+- **The user is re-loaded on every request**, so deleting a user or changing their role takes effect immediately, not when the token expires.
+- **Passwords** are hashed with bcrypt (unique salt per user). Login failures always return the same message (`Invalid email or password`), and an unknown email still runs a bcrypt comparison, so neither the message nor the response time reveals which emails exist.
+- **Brute-force protection:** login is limited to 5 attempts per minute per IP (all other routes: 120 per minute).
+- **Input validation:** every request body is validated with DTOs; unknown fields are rejected.
+
 ## Useful scripts
 
 | Where    | Command              | What it does                                  |
@@ -180,3 +207,7 @@ erDiagram
 ## Environment variables
 
 The API validates its environment on startup and refuses to start if something is missing or invalid. See [`backend/.env.example`](backend/.env.example).
+
+## What I would do with more time
+
+- **Refresh tokens** in an httpOnly cookie, so the access token can be short-lived (minutes) without logging users out every hour.

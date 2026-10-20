@@ -1,0 +1,29 @@
+meta {
+  name: Login as admin
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "admin@school.test",
+    "password": "Password123!"
+  }
+}
+
+script:post-response {
+  // Store the token so every other request can use it.
+  bru.setVar("token", res.getBody().accessToken);
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

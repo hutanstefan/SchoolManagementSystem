@@ -10,6 +10,10 @@ export const envSchema = z.object({
     .default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
+  JWT_SECRET: z
+    .string()
+    .min(32, 'JWT_SECRET must be at least 32 characters long'),
+  JWT_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(3600),
   CORS_ORIGINS: z
     .string()
     .default('http://localhost:5173')

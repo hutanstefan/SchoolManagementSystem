@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "name": "School Management System API",
+  "type": "collection",
+  "ignore": ["node_modules", ".git"]
+}

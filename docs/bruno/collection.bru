@@ -1,0 +1,17 @@
+vars:pre-request {
+  baseUrl: http://localhost:3000/api
+}
+
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  Run one of the **Login as ...** requests first. It stores the JWT in the `token` variable, and every other request sends it as a Bearer token.
+
+  All seeded accounts use the password `Password123!`.
+}

@@ -1,5 +1,6 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import helmet from 'helmet';
 import { Env } from './config/env.validation';
 
 /**
@@ -10,9 +11,17 @@ export function configureApp(app: INestApplication): void {
   const config = app.get<ConfigService<Env, true>>(ConfigService);
 
   app.setGlobalPrefix('api');
+  app.use(helmet());
   app.enableCors({
     origin: config.get('CORS_ORIGINS', { infer: true }),
     credentials: true,
   });
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true, // strip properties that have no validation decorator
+      forbidNonWhitelisted: true, // ...and reject the request if any were sent
+      transform: true, // turn payloads into DTO class instances (runs @Transform)
+    }),
+  );
   app.enableShutdownHooks();
 }
