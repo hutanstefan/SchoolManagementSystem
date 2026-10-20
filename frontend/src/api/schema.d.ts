@@ -1156,19 +1156,19 @@ export interface operations {
     };
     StudentsController_findAll: {
         parameters: {
-            query: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page (max 100). */
+                pageSize?: number;
+                /** @description Sort direction. */
+                order?: "asc" | "desc";
                 /** @description Field to sort by. */
-                sort: "lastName" | "firstName" | "email" | "dateOfBirth" | "createdAt";
+                sort?: "lastName" | "firstName" | "email" | "dateOfBirth" | "createdAt";
                 /** @description Only students of this class. */
                 classId?: string;
                 /** @description Only students without a class. */
                 unassigned?: true | false;
-                /** @description 1-based page number. */
-                page: number;
-                /** @description Items per page (max 100). */
-                pageSize: number;
-                /** @description Sort direction. */
-                order: "asc" | "desc";
                 /** @description Case-insensitive text search. */
                 search?: string;
             };
@@ -1420,15 +1420,15 @@ export interface operations {
     };
     TeachersController_findAll: {
         parameters: {
-            query: {
-                /** @description Field to sort by. */
-                sort: "lastName" | "firstName" | "email" | "createdAt";
+            query?: {
                 /** @description 1-based page number. */
-                page: number;
+                page?: number;
                 /** @description Items per page (max 100). */
-                pageSize: number;
+                pageSize?: number;
                 /** @description Sort direction. */
-                order: "asc" | "desc";
+                order?: "asc" | "desc";
+                /** @description Field to sort by. */
+                sort?: "lastName" | "firstName" | "email" | "createdAt";
                 /** @description Case-insensitive text search. */
                 search?: string;
             };
@@ -1670,15 +1670,15 @@ export interface operations {
     };
     ClassesController_findAll: {
         parameters: {
-            query: {
-                /** @description Field to sort by. */
-                sort: "name" | "createdAt";
+            query?: {
                 /** @description 1-based page number. */
-                page: number;
+                page?: number;
                 /** @description Items per page (max 100). */
-                pageSize: number;
+                pageSize?: number;
                 /** @description Sort direction. */
-                order: "asc" | "desc";
+                order?: "asc" | "desc";
+                /** @description Field to sort by. */
+                sort?: "name" | "createdAt";
                 /** @description Case-insensitive text search. */
                 search?: string;
             };
@@ -2762,18 +2762,18 @@ export interface operations {
     };
     GradesController_findAll: {
         parameters: {
-            query: {
-                /** @description Field to sort by (newest first by default). */
-                sort: "date" | "value" | "createdAt";
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page (max 100). */
+                pageSize?: number;
                 /** @description Sort direction (newest first by default). */
-                order: "asc" | "desc";
+                order?: "asc" | "desc";
+                /** @description Field to sort by (newest first by default). */
+                sort?: "date" | "value" | "createdAt";
                 classId?: string;
                 subjectId?: string;
                 studentId?: string;
-                /** @description 1-based page number. */
-                page: number;
-                /** @description Items per page (max 100). */
-                pageSize: number;
                 /** @description Case-insensitive text search. */
                 search?: string;
             };

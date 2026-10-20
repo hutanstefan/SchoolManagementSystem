@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/swagger';
+import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -50,6 +50,7 @@ export const CLASS_SORT_FIELDS = ['name', 'createdAt'] as const;
 
 export class ClassQueryDto extends PaginationQueryDto {
   /** Field to sort by. */
+  @ApiPropertyOptional({ enum: CLASS_SORT_FIELDS, default: 'name' })
   @IsOptional()
   @IsIn(CLASS_SORT_FIELDS)
   sort: (typeof CLASS_SORT_FIELDS)[number] = 'name';

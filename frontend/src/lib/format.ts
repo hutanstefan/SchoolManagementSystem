@@ -1,0 +1,63 @@
+import type { Schemas } from '@/api/client'
+
+type Person = { firstName: string; lastName: string }
+
+export function fullName(person: Person | null | undefined): string {
+  return person ? `${person.firstName} ${person.lastName}` : '—'
+}
+
+/** "2026-10-20" -> "20 Oct 2026" (date-only values, no time zone shift). */
+export function formatDate(value: string | null | undefined): string {
+  if (!value) return '—'
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number)
+  return new Date(Date.UTC(year!, month! - 1, day!)).toLocaleDateString(
+    'en-GB',
+    { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' },
+  )
+}
+
+/** Two decimals, as shown in Romanian report cards: 8.5 -> "8.50". */
+export function formatAverage(value: number | null | undefined): string {
+  return value === null || value === undefined ? '—' : value.toFixed(2)
+}
+
+export type Weekday = Schemas['Weekday']
+
+export const WEEKDAYS: Weekday[] = [
+  'MONDAY',
+  'TUESDAY',
+  'WEDNESDAY',
+  'THURSDAY',
+  'FRIDAY',
+]
+
+export const WEEKDAY_LABEL: Record<Weekday, string> = {
+  MONDAY: 'Monday',
+  TUESDAY: 'Tuesday',
+  WEDNESDAY: 'Wednesday',
+  THURSDAY: 'Thursday',
+  FRIDAY: 'Friday',
+}
+
+/** Today's weekday, or null at the weekend. */
+export function todayWeekday(now: Date = new Date()): Weekday | null {
+  const index = now.getDay() // 0 = Sunday
+  return index >= 1 && index <= 5 ? WEEKDAYS[index - 1]! : null
+}
+
+/** Today's date as YYYY-MM-DD in the browser's time zone. */
+export function todayIso(now: Date = new Date()): string {
+  return now.toLocaleDateString('sv-SE')
+}
+
+export const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8] as const
+
+/**
+ * Display times for a period: lessons start at 08:00 and last 50 minutes,
+ * followed by a 10 minute break (the usual Romanian school day).
+ */
+export function periodTime(period: number): string {
+  const start = 7 + period
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${pad(start)}:00–${pad(start)}:50`
+}

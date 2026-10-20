@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Paginated, pageArgs, paginated } from '../common/dto/pagination.dto';
 import { hashPassword } from '../common/password';
 import { Prisma, Role } from '../generated/prisma/client';
+import { compareClassNames } from '../classes/classes.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import {
@@ -82,15 +83,21 @@ export class TeachersService {
     });
     if (!teacher) throw new NotFoundException('Teacher not found');
 
+    // The database sorts names as text ("10A" < "9A"); classes read better in natural order.
+    const byClassName = (a: { name: string }, b: { name: string }) =>
+      compareClassNames(a.name, b.name);
+
     return {
       ...toTeacherDto(teacher),
-      homeroomClasses: teacher.homeroomClasses,
-      teaching: teacher.classSubjects.map((cs) => ({
-        classSubjectId: cs.id,
-        class: cs.class,
-        subject: cs.subject,
-        hoursPerWeek: cs.hoursPerWeek,
-      })),
+      homeroomClasses: [...teacher.homeroomClasses].sort(byClassName),
+      teaching: [...teacher.classSubjects]
+        .sort((a, b) => byClassName(a.class, b.class))
+        .map((cs) => ({
+          classSubjectId: cs.id,
+          class: cs.class,
+          subject: cs.subject,
+          hoursPerWeek: cs.hoursPerWeek,
+        })),
     };
   }
 

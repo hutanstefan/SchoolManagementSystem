@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsIn,
@@ -18,6 +19,7 @@ export class PaginationQueryDto {
    * 1-based page number.
    * @example 1
    */
+  @ApiPropertyOptional({ default: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -28,6 +30,7 @@ export class PaginationQueryDto {
    * Items per page (max 100).
    * @example 20
    */
+  @ApiPropertyOptional({ default: 20 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -36,6 +39,7 @@ export class PaginationQueryDto {
   pageSize: number = 20;
 
   /** Sort direction. */
+  @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'asc' })
   @IsOptional()
   @IsIn(['asc', 'desc'])
   order: 'asc' | 'desc' = 'asc';

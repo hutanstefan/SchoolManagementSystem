@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/swagger';
+import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsDateString, IsIn, IsOptional, IsUUID } from 'class-validator';
 import {
   PaginationMetaDto,
@@ -37,6 +37,7 @@ export const STUDENT_SORT_FIELDS = [
 
 export class StudentQueryDto extends PaginationQueryDto {
   /** Field to sort by. */
+  @ApiPropertyOptional({ enum: STUDENT_SORT_FIELDS, default: 'lastName' })
   @IsOptional()
   @IsIn(STUDENT_SORT_FIELDS)
   sort: (typeof STUDENT_SORT_FIELDS)[number] = 'lastName';

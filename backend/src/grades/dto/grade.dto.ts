@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsDateString,
@@ -68,11 +68,13 @@ export const GRADE_SORT_FIELDS = ['date', 'value', 'createdAt'] as const;
 
 export class GradeQueryDto extends PaginationQueryDto {
   /** Field to sort by (newest first by default). */
+  @ApiPropertyOptional({ enum: GRADE_SORT_FIELDS, default: 'date' })
   @IsOptional()
   @IsIn(GRADE_SORT_FIELDS)
   sort: (typeof GRADE_SORT_FIELDS)[number] = 'date';
 
   /** Sort direction (newest first by default). */
+  @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'desc' })
   @IsOptional()
   @IsIn(['asc', 'desc'])
   override order: 'asc' | 'desc' = 'desc';
