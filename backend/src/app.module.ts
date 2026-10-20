@@ -8,6 +8,7 @@ import { ClassesModule } from './classes/classes.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { validateEnv } from './config/env.validation';
+import { GradesModule } from './grades/grades.module';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { StudentsModule } from './students/students.module';
@@ -33,6 +34,7 @@ import { TimetableModule } from './timetable/timetable.module';
     SubjectsModule,
     ClassSubjectsModule,
     TimetableModule,
+    GradesModule,
   ],
   providers: [
     // Global guards run in this order for every request:

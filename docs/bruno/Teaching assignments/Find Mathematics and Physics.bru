@@ -1,5 +1,5 @@
 meta {
-  name: Find Mathematics subject
+  name: Find Mathematics and Physics
   type: http
   seq: 1
 }
@@ -12,6 +12,7 @@ get {
 
 script:post-response {
   if (res.getStatus() < 300) bru.setVar("mathSubjectId", ((body) => body.find((s) => s.name === 'Mathematics').id)(res.getBody()));
+  if (res.getStatus() < 300) bru.setVar("physicsSubjectId", ((body) => body.find((s) => s.name === 'Physics').id)(res.getBody()));
 }
 
 tests {

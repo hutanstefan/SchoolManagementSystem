@@ -7,9 +7,11 @@ export const personSelect = {
   user: { select: { firstName: true, lastName: true } },
 } as const;
 
-export function toPerson(
-  person: { id: string; user: { firstName: string; lastName: string } } | null,
-): PersonSummaryDto | null {
+type PersonRow = { id: string; user: { firstName: string; lastName: string } };
+
+export function toPerson(person: PersonRow): PersonSummaryDto;
+export function toPerson(person: PersonRow | null): PersonSummaryDto | null;
+export function toPerson(person: PersonRow | null): PersonSummaryDto | null {
   return person
     ? {
         id: person.id,

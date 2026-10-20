@@ -7,6 +7,7 @@ import { fakerRO as faker } from '@faker-js/faker';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
 import {
+  GradeAction,
   PrismaClient,
   Role,
   Weekday,
@@ -222,6 +223,7 @@ function hashPassword(): Promise<string> {
 
 async function clearDatabase(): Promise<void> {
   // Order matters because of foreign keys.
+  await prisma.gradeHistory.deleteMany();
   await prisma.grade.deleteMany();
   await prisma.timetableEntry.deleteMany();
   await prisma.classSubject.deleteMany();
@@ -265,6 +267,7 @@ async function main(): Promise<void> {
 
   console.log('Creating teachers...');
   const teacherIds: string[] = [];
+  const userIdByTeacherId = new Map<string, string>();
   for (const [index, staff] of TEACHERS.entries()) {
     const isMainTeacher = index === 0;
     const firstName = isMainTeacher ? 'Mihai' : faker.person.firstName();
@@ -287,6 +290,7 @@ async function main(): Promise<void> {
       },
     });
     teacherIds.push(teacher.id);
+    userIdByTeacherId.set(teacher.id, teacher.userId);
     console.log(`  ${email} teaches ${staff.subject}`);
   }
 
@@ -394,7 +398,31 @@ async function main(): Promise<void> {
     }
   }
 
-  await prisma.grade.createMany({ data: grades });
+  const createdGrades = await prisma.grade.createManyAndReturn({
+    data: grades,
+    select: {
+      id: true,
+      studentId: true,
+      subjectId: true,
+      teacherId: true,
+      value: true,
+      date: true,
+    },
+  });
+  // Every grade starts with a CREATED entry in its history, like grades given through the API.
+  await prisma.gradeHistory.createMany({
+    data: createdGrades.map((grade) => ({
+      gradeId: grade.id,
+      studentId: grade.studentId,
+      subjectId: grade.subjectId,
+      action: GradeAction.CREATED,
+      newValue: grade.value,
+      newDate: grade.date,
+      changedById: grade.teacherId
+        ? userIdByTeacherId.get(grade.teacherId)
+        : null,
+    })),
+  });
 
   console.log(
     `Done: 1 admin, ${teacherIds.length} teachers, ${classIds.length} classes, ` +

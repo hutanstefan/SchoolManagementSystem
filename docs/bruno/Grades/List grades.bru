@@ -1,0 +1,23 @@
+meta {
+  name: List grades
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/grades?studentId={{gradeStudentId}}&page=1&pageSize=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  studentId: {{gradeStudentId}}
+  page: 1
+  pageSize: 20
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

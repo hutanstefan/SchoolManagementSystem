@@ -1,0 +1,32 @@
+meta {
+  name: Login as student (for My grades)
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "student@school.test",
+    "password": "Password123!"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() < 300) bru.setVar("studentToken", res.getBody().accessToken);
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Saves only studentToken, so the rest of the collection stays logged in as admin.
+}

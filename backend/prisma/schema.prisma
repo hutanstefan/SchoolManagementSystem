@@ -17,6 +17,12 @@ enum Role {
   STUDENT
 }
 
+enum GradeAction {
+  CREATED
+  UPDATED
+  DELETED
+}
+
 enum Weekday {
   MONDAY
   TUESDAY
@@ -39,8 +45,10 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  student Student?
-  teacher Teacher?
+  student      Student?
+  teacher      Teacher?
+  /// Grade changes made by this user.
+  gradeChanges GradeHistory[]
 
   @@map("users")
 }
@@ -51,10 +59,11 @@ model Student {
   dateOfBirth DateTime @map("date_of_birth") @db.Date
   classId     String?  @map("class_id") @db.Uuid
 
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// Deleting a class keeps its students, they just become unassigned.
-  class  Class?  @relation(fields: [classId], references: [id], onDelete: SetNull)
-  grades Grade[]
+  class        Class?         @relation(fields: [classId], references: [id], onDelete: SetNull)
+  grades       Grade[]
+  gradeHistory GradeHistory[]
 
   @@index([classId])
   @@map("students")
@@ -96,6 +105,8 @@ model Subject {
   name          String         @unique
   classSubjects ClassSubject[]
   grades        Grade[]
+
+  gradeHistory GradeHistory[]
 
   @@map("subjects")
 }
@@ -162,4 +173,29 @@ model Grade {
   @@index([studentId, subjectId])
   @@index([teacherId])
   @@map("grades")
+}
+
+/// Audit log of every grade change. Rows are never updated or deleted by the app.
+model GradeHistory {
+  id          String      @id @default(uuid()) @db.Uuid
+  /// Plain id, not a foreign key: the history must survive when the grade is deleted.
+  gradeId     String      @map("grade_id") @db.Uuid
+  studentId   String      @map("student_id") @db.Uuid
+  subjectId   String      @map("subject_id") @db.Uuid
+  action      GradeAction
+  oldValue    Int?        @map("old_value") @db.SmallInt
+  newValue    Int?        @map("new_value") @db.SmallInt
+  oldDate     DateTime?   @map("old_date") @db.Date
+  newDate     DateTime?   @map("new_date") @db.Date
+  /// Who made the change. Null if that account was deleted later.
+  changedById String?     @map("changed_by_id") @db.Uuid
+  changedAt   DateTime    @default(now()) @map("changed_at")
+
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  changedBy User?   @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([gradeId])
+  @@index([studentId])
+  @@map("grade_history")
 }

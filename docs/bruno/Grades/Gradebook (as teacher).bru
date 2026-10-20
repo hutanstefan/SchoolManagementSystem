@@ -1,0 +1,29 @@
+meta {
+  name: Gradebook (as teacher)
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/classes/{{classId}}/gradebook?subjectId={{mathSubjectId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+params:query {
+  subjectId: {{mathSubjectId}}
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Every student of 9A with their Mathematics grades and averages.
+}

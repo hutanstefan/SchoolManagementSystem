@@ -1,0 +1,33 @@
+meta {
+  name: Give grade in a subject not taught (403)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/grades
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+body:json {
+  {
+    "studentId": "{{gradeStudentId}}",
+    "subjectId": "{{physicsSubjectId}}",
+    "value": 10
+  }
+}
+
+tests {
+  test("Status is 403", function () {
+    expect(res.getStatus()).to.equal(403);
+  });
+}
+
+docs {
+  Rejected: You don't teach Physics in 9A.
+}

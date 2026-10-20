@@ -1,0 +1,37 @@
+meta {
+  name: Give grade (as teacher)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/grades
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+body:json {
+  {
+    "studentId": "{{gradeStudentId}}",
+    "subjectId": "{{mathSubjectId}}",
+    "value": 10
+  }
+}
+
+script:post-response {
+  if (res.getStatus() < 300) bru.setVar("gradeId", res.getBody().id);
+}
+
+tests {
+  test("Status is 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  teacher@school.test teaches Mathematics in 9A, where student@school.test is enrolled. Date defaults to today.
+}

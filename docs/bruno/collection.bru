@@ -13,7 +13,7 @@ auth:bearer {
 docs {
   Run one of the **Login as ...** requests first. It stores the JWT in the `token` variable, and every other request sends it as a Bearer token.
 
-  All seeded accounts use the password `Password123!`. Running the whole collection in order works: it ends the Auth folder logged in as admin, and requests that create data clean up after themselves.
+  All seeded accounts use the password `Password123!`. Running the whole collection in order works: it ends the Auth folder logged in as admin, and requests that create data clean up after themselves (the grade history keeps a record of the demo grade, by design).
 
   Login is rate-limited to 5 attempts per minute, so wait a minute between two full runs.
 }

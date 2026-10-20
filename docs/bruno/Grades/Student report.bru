@@ -1,0 +1,21 @@
+meta {
+  name: Student report
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/students/{{gradeStudentId}}/grades
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Grades per subject, averages rounded as in Romanian schools, and the overall average.
+}

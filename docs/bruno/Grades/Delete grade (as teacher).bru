@@ -1,0 +1,21 @@
+meta {
+  name: Delete grade (as teacher)
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{baseUrl}}/grades/{{gradeId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+tests {
+  test("Status is 204", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

@@ -1,0 +1,27 @@
+meta {
+  name: Change grade (as teacher)
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/grades/{{gradeId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+body:json {
+  {
+    "value": 9
+  }
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

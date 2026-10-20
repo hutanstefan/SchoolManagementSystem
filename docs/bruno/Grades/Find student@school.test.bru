@@ -1,0 +1,25 @@
+meta {
+  name: Find student@school.test
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/students?search=student@school.test
+  body: none
+  auth: inherit
+}
+
+params:query {
+  search: student@school.test
+}
+
+script:post-response {
+  if (res.getStatus() < 300) bru.setVar("gradeStudentId", res.getBody().data[0].id);
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
