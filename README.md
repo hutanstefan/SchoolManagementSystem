@@ -6,12 +6,12 @@ A full-stack web application for managing students, teachers, classes and grades
 
 ## Tech stack
 
-| Layer    | Technology                                             |
-| -------- | ------------------------------------------------------ |
-| Backend  | NestJS 11, TypeScript (strict)                         |
-| Frontend | React 19, Vite, TypeScript, Tailwind CSS 4, shadcn/ui  |
-| Database | PostgreSQL 16 (Docker), Prisma 7 ORM                   |
-| Tooling  | ESLint + Prettier (API), Oxlint + Prettier (web), Jest |
+| Layer    | Technology                                                                                                 |
+| -------- | ---------------------------------------------------------------------------------------------------------- |
+| Backend  | NestJS 11, TypeScript (strict)                                                                             |
+| Frontend | React 19, Vite, TypeScript, Tailwind CSS 4, shadcn/ui, React Router, TanStack Query, React Hook Form + Zod |
+| Database | PostgreSQL 16 (Docker), Prisma 7 ORM                                                                       |
+| Tooling  | ESLint + Prettier + Jest (API), Oxlint + Prettier + Vitest + Testing Library (web)                         |
 
 ## Project structure
 
@@ -21,6 +21,7 @@ A full-stack web application for managing students, teachers, classes and grades
 │   ├── prisma/          Schema, migrations and seed
 │   └── src/             Feature modules (auth, students, teachers, classes, ...)
 ├── frontend/            React single-page app
+│   └── src/             api (typed client), auth, components, pages
 ├── docs/                Schema picture, Bruno and Postman collections
 ├── docker-compose.yml   PostgreSQL for local development
 └── README.md
@@ -266,6 +267,19 @@ Every lesson added or moved is checked, and each rule has a clear `409` message:
 
 The checks and the write run in one **serializable** transaction, so two admins editing the timetable at the same moment can't both pass the checks and create a conflict; one of them gets a `409` and can retry. The class rule is also guaranteed by a unique index in the database.
 
+## Frontend
+
+**Typed end to end.** The API client is generated from the backend's OpenAPI document (`openapi-typescript` + `openapi-fetch`). Every path, parameter, request body and response in the React app is checked against the real API, so a breaking change in the backend fails `npm run build` in the frontend. After changing the API, run `npm run api:types` (with the API running) to refresh `src/api/schema.d.ts`.
+
+**Authentication in the browser**
+
+- The login page has one-click **demo account** buttons for the three seeded roles.
+- The JWT is stored in `localStorage`, so a page refresh keeps you logged in. The trade-off: a script injected into the page (XSS) could read it. The exposure is limited because tokens expire after one hour and logout revokes them on the server. An httpOnly cookie would remove the risk (see "What I would do with more time").
+- On startup the session is restored with `GET /auth/me`. If the API ever answers `401` (expired token, logout on another device, password reset), the app logs out and shows a message.
+- Routes are guarded by role (`RequireAuth`): anonymous users go to the login page and come back afterwards, other roles see an "Access denied" page. This is only for user experience; the API enforces the same rules.
+
+**Conventions:** server data goes through TanStack Query; every failed change shows the API's error message in a toast; forms use React Hook Form with Zod schemas that mirror the API validation.
+
 ## Grades and averages
 
 **Who can do what**
@@ -299,20 +313,22 @@ Every grade change writes a row in `grade_history` (who, when, action, old and n
 
 ## Useful scripts
 
-| Where    | Command              | What it does                                  |
-| -------- | -------------------- | --------------------------------------------- |
-| backend  | `npm run start:dev`  | API with hot reload                           |
-| backend  | `npm run db:migrate` | Apply migrations (and create new ones in dev) |
-| backend  | `npm run db:seed`    | Reset the data to the demo dataset            |
-| backend  | `npm run db:reset`   | Drop everything and re-run all migrations     |
-| backend  | `npm run db:studio`  | Prisma Studio, a GUI for browsing the data    |
-| backend  | `npm run lint`       | ESLint (type-aware)                           |
-| backend  | `npm run typecheck`  | TypeScript check, no output                   |
-| backend  | `npm test`           | Unit tests                                    |
-| backend  | `npm run test:e2e`   | End-to-end tests (needs the database running) |
-| frontend | `npm run dev`        | Vite dev server                               |
-| frontend | `npm run lint`       | Oxlint                                        |
-| frontend | `npm run build`      | Type check + production build                 |
+| Where    | Command              | What it does                                          |
+| -------- | -------------------- | ----------------------------------------------------- |
+| backend  | `npm run start:dev`  | API with hot reload                                   |
+| backend  | `npm run db:migrate` | Apply migrations (and create new ones in dev)         |
+| backend  | `npm run db:seed`    | Reset the data to the demo dataset                    |
+| backend  | `npm run db:reset`   | Drop everything and re-run all migrations             |
+| backend  | `npm run db:studio`  | Prisma Studio, a GUI for browsing the data            |
+| backend  | `npm run lint`       | ESLint (type-aware)                                   |
+| backend  | `npm run typecheck`  | TypeScript check, no output                           |
+| backend  | `npm test`           | Unit tests                                            |
+| backend  | `npm run test:e2e`   | End-to-end tests (needs the database running)         |
+| frontend | `npm run dev`        | Vite dev server                                       |
+| frontend | `npm run lint`       | Oxlint                                                |
+| frontend | `npm run build`      | Type check + production build                         |
+| frontend | `npm test`           | Component tests (Vitest + Testing Library)            |
+| frontend | `npm run api:types`  | Regenerate the typed API client (API must be running) |
 
 ## Environment variables
 
@@ -321,4 +337,5 @@ The API validates its environment on startup and refuses to start if something i
 ## What I would do with more time
 
 - **Refresh tokens** in an httpOnly cookie, so the access token can be short-lived (minutes) without logging users out every hour.
+- **httpOnly cookie for the token** instead of `localStorage`, with CSRF protection, so injected scripts can never read it.
 - **Per-device logout**: store a session id (`jti`) per login and revoke only that one, instead of all sessions of the user.
