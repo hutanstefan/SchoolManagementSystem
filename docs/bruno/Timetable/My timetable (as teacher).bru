@@ -1,0 +1,25 @@
+meta {
+  name: My timetable (as teacher)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/timetable/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Uses the teacher token saved by Auth > Login as teacher. Students get their class timetable here.
+}

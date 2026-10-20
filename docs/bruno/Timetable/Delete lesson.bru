@@ -1,0 +1,17 @@
+meta {
+  name: Delete lesson
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/timetable-entries/{{lessonId}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 204", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

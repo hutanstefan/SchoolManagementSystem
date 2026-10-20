@@ -1,0 +1,21 @@
+meta {
+  name: Class timetable
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/classes/{{classId}}/timetable
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Monday to Friday, lessons sorted by period.
+}

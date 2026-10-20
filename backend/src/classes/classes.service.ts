@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types';
 import { Paginated, pageArgs, paginated } from '../common/dto/pagination.dto';
+import { personSelect, toPerson } from '../common/mappers';
 import { Prisma, Role } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StudentDto } from '../students/dto/student.dto';
@@ -18,11 +19,6 @@ import {
   UpdateClassDto,
 } from './dto/class.dto';
 
-const personSelect = {
-  id: true,
-  user: { select: { firstName: true, lastName: true } },
-} as const;
-
 const classSelect = {
   id: true,
   name: true,
@@ -32,10 +28,6 @@ const classSelect = {
 } as const satisfies Prisma.ClassSelect;
 
 type ClassRow = Prisma.ClassGetPayload<{ select: typeof classSelect }>;
-type PersonRow = {
-  id: string;
-  user: { firstName: string; lastName: string };
-};
 
 @Injectable()
 export class ClassesService {
@@ -201,19 +193,28 @@ export class ClassesService {
     }
   }
 
-  /** Where-clause limiting classes to the ones a user may see. */
+  /**
+   * Where-clause limiting classes to the ones a user may see: admins see all,
+   * teachers the classes they teach or are homeroom teacher of, students their own class.
+   */
   private visibleTo(user: AuthUser): Prisma.ClassWhereInput {
-    if (user.role === Role.ADMIN) return {};
-    return {
-      OR: [
-        { homeroomTeacher: { userId: user.id } },
-        { subjects: { some: { teacher: { userId: user.id } } } },
-      ],
-    };
+    switch (user.role) {
+      case Role.ADMIN:
+        return {};
+      case Role.TEACHER:
+        return {
+          OR: [
+            { homeroomTeacher: { userId: user.id } },
+            { subjects: { some: { teacher: { userId: user.id } } } },
+          ],
+        };
+      case Role.STUDENT:
+        return { students: { some: { userId: user.id } } };
+    }
   }
 
-  /** 404 if the class doesn't exist, 403 if a teacher isn't assigned to it. */
-  private async assertCanView(user: AuthUser, id: string): Promise<void> {
+  /** 404 if the class doesn't exist, 403 if the user has no access to it. */
+  async assertCanView(user: AuthUser, id: string): Promise<void> {
     await this.assertExists(id);
     if (user.role === Role.ADMIN) return;
 
@@ -221,11 +222,15 @@ export class ClassesService {
       where: { id, ...this.visibleTo(user) },
     });
     if (visible === 0) {
-      throw new ForbiddenException('You are not assigned to this class');
+      throw new ForbiddenException(
+        user.role === Role.STUDENT
+          ? 'You are not enrolled in this class'
+          : 'You are not assigned to this class',
+      );
     }
   }
 
-  private async assertExists(id: string): Promise<void> {
+  async assertExists(id: string): Promise<void> {
     const exists = await this.prisma.class.findUnique({
       where: { id },
       select: { id: true },
@@ -263,16 +268,6 @@ export function compareClassNames(
 ): number {
   const result = a.localeCompare(b, 'en', { numeric: true });
   return order === 'asc' ? result : -result;
-}
-
-function toPerson(person: PersonRow | null) {
-  return person
-    ? {
-        id: person.id,
-        firstName: person.user.firstName,
-        lastName: person.user.lastName,
-      }
-    : null;
 }
 
 function toClassDto(schoolClass: ClassRow): ClassDto {

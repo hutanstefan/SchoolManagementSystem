@@ -1,0 +1,17 @@
+meta {
+  name: Teacher timetable
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/teachers/{{assignTeacherId}}/timetable
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

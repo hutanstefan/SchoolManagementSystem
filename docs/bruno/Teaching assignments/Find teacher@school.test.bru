@@ -1,0 +1,25 @@
+meta {
+  name: Find teacher@school.test
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/teachers?search=teacher@school.test
+  body: none
+  auth: inherit
+}
+
+params:query {
+  search: teacher@school.test
+}
+
+script:post-response {
+  if (res.getStatus() < 300) bru.setVar("assignTeacherId", res.getBody().data[0].id);
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

@@ -1,7 +1,7 @@
 meta {
   name: Login as teacher
   type: http
-  seq: 5
+  seq: 1
 }
 
 post {
@@ -19,6 +19,7 @@ body:json {
 
 script:post-response {
   if (res.getStatus() < 300) bru.setVar("token", res.getBody().accessToken);
+  if (res.getStatus() < 300) bru.setVar("teacherToken", res.getBody().accessToken);
 }
 
 tests {

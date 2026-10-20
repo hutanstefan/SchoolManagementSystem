@@ -173,35 +173,44 @@ erDiagram
 
 All endpoints are under `/api`. "Teacher (own)" means a teacher only sees the classes they teach or are homeroom teacher of; any other class returns `403`.
 
-| Method | Path                               | Access               | Description                                            |
-| ------ | ---------------------------------- | -------------------- | ------------------------------------------------------ |
-| GET    | `/health`                          | Public               | API and database status                                |
-| POST   | `/auth/login`                      | Public               | Log in, returns a JWT (max 5 attempts/min)             |
-| GET    | `/auth/me`                         | Any logged-in        | The current user with their role and profile           |
-| POST   | `/auth/logout`                     | Any logged-in        | Log out: revokes every token of the user (all devices) |
-| GET    | `/students`                        | Admin                | List students (paginated, search, class filter)        |
-| POST   | `/students`                        | Admin                | Create a student account, optionally in a class        |
-| GET    | `/students/:id`                    | Admin                | Student details                                        |
-| PATCH  | `/students/:id`                    | Admin                | Update a student, move or unassign, reset password     |
-| DELETE | `/students/:id`                    | Admin                | Delete a student and their grades                      |
-| GET    | `/teachers`                        | Admin                | List teachers (paginated, search)                      |
-| POST   | `/teachers`                        | Admin                | Create a teacher account                               |
-| GET    | `/teachers/:id`                    | Admin                | Teacher details, homeroom classes and subjects         |
-| PATCH  | `/teachers/:id`                    | Admin                | Update a teacher, reset password                       |
-| DELETE | `/teachers/:id`                    | Admin                | Delete a teacher (their grades are kept)               |
-| GET    | `/classes`                         | Admin, Teacher (own) | List classes (paginated, natural order 9A → 12A)       |
-| POST   | `/classes`                         | Admin                | Create a class                                         |
-| GET    | `/classes/:id`                     | Admin, Teacher (own) | Class details with subjects and teachers               |
-| PATCH  | `/classes/:id`                     | Admin                | Rename, change homeroom teacher                        |
-| DELETE | `/classes/:id`                     | Admin                | Delete a class (students become unassigned)            |
-| GET    | `/classes/:id/students`            | Admin, Teacher (own) | Students enrolled in the class                         |
-| POST   | `/classes/:id/students`            | Admin                | Assign several students to the class at once           |
-| DELETE | `/classes/:id/students/:studentId` | Admin                | Remove a student from the class                        |
-| GET    | `/subjects`                        | Any logged-in        | List subjects                                          |
-| GET    | `/subjects/:id`                    | Any logged-in        | Subject details                                        |
-| POST   | `/subjects`                        | Admin                | Create a subject                                       |
-| PATCH  | `/subjects/:id`                    | Admin                | Rename a subject                                       |
-| DELETE | `/subjects/:id`                    | Admin                | Delete a subject (blocked while in use: `409`)         |
+| Method | Path                               | Access                                    | Description                                                            |
+| ------ | ---------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------- |
+| GET    | `/health`                          | Public                                    | API and database status                                                |
+| POST   | `/auth/login`                      | Public                                    | Log in, returns a JWT (max 5 attempts/min)                             |
+| GET    | `/auth/me`                         | Any logged-in                             | The current user with their role and profile                           |
+| POST   | `/auth/logout`                     | Any logged-in                             | Log out: revokes every token of the user (all devices)                 |
+| GET    | `/students`                        | Admin                                     | List students (paginated, search, class filter)                        |
+| POST   | `/students`                        | Admin                                     | Create a student account, optionally in a class                        |
+| GET    | `/students/:id`                    | Admin                                     | Student details                                                        |
+| PATCH  | `/students/:id`                    | Admin                                     | Update a student, move or unassign, reset password                     |
+| DELETE | `/students/:id`                    | Admin                                     | Delete a student and their grades                                      |
+| GET    | `/teachers`                        | Admin                                     | List teachers (paginated, search)                                      |
+| POST   | `/teachers`                        | Admin                                     | Create a teacher account                                               |
+| GET    | `/teachers/:id`                    | Admin                                     | Teacher details, homeroom classes and subjects                         |
+| PATCH  | `/teachers/:id`                    | Admin                                     | Update a teacher, reset password                                       |
+| DELETE | `/teachers/:id`                    | Admin                                     | Delete a teacher (their grades are kept)                               |
+| GET    | `/classes`                         | Admin, Teacher (own)                      | List classes (paginated, natural order 9A → 12A)                       |
+| POST   | `/classes`                         | Admin                                     | Create a class                                                         |
+| GET    | `/classes/:id`                     | Admin, Teacher (own)                      | Class details with subjects and teachers                               |
+| PATCH  | `/classes/:id`                     | Admin                                     | Rename, change homeroom teacher                                        |
+| DELETE | `/classes/:id`                     | Admin                                     | Delete a class (students become unassigned)                            |
+| GET    | `/classes/:id/students`            | Admin, Teacher (own)                      | Students enrolled in the class                                         |
+| POST   | `/classes/:id/students`            | Admin                                     | Assign several students to the class at once                           |
+| DELETE | `/classes/:id/students/:studentId` | Admin                                     | Remove a student from the class                                        |
+| GET    | `/subjects`                        | Any logged-in                             | List subjects                                                          |
+| GET    | `/subjects/:id`                    | Any logged-in                             | Subject details                                                        |
+| POST   | `/subjects`                        | Admin                                     | Create a subject                                                       |
+| PATCH  | `/subjects/:id`                    | Admin                                     | Rename a subject                                                       |
+| DELETE | `/subjects/:id`                    | Admin                                     | Delete a subject (blocked while in use: `409`)                         |
+| POST   | `/classes/:id/subjects`            | Admin                                     | Add a subject to a class, with its teacher and weekly hours            |
+| PATCH  | `/class-subjects/:id`              | Admin                                     | Change the teacher or the weekly hours (checked against the timetable) |
+| DELETE | `/class-subjects/:id`              | Admin                                     | Remove a subject from a class with its lessons (grades are kept)       |
+| GET    | `/classes/:id/timetable`           | Admin, Teacher (own), Student (own class) | Weekly timetable of a class                                            |
+| GET    | `/teachers/:id/timetable`          | Admin                                     | Weekly timetable of a teacher                                          |
+| GET    | `/timetable/me`                    | Teacher, Student                          | My lessons (teacher) or my class timetable (student)                   |
+| POST   | `/classes/:id/timetable`           | Admin                                     | Add a lesson (409 on any conflict)                                     |
+| PATCH  | `/timetable-entries/:id`           | Admin                                     | Move a lesson to another slot or room                                  |
+| DELETE | `/timetable-entries/:id`           | Admin                                     | Remove a lesson                                                        |
 
 ### Conventions
 
@@ -219,6 +228,20 @@ All endpoints are under `/api`. "Teacher (own)" means a teacher only sees the cl
   ```
 
   `message` is a list for validation errors. Status codes: `400` invalid input (including malformed ids), `401` missing or invalid token, `403` not allowed, `404` not found, `409` conflict (duplicate email or name, resource still in use), `429` too many login attempts.
+
+## Timetable rules
+
+Every lesson added or moved is checked, and each rule has a clear `409` message:
+
+| Rule                                                                                | Example message                                                       |
+| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| A class has at most one lesson per slot                                             | `9A already has Physics on Monday, period 2`                          |
+| A teacher can't be in two classes at once                                           | `Mihai Ionescu already teaches 10A on Monday, period 2`               |
+| A subject can't exceed its weekly hours                                             | `Mathematics already has 4/4 hours scheduled in 9A`                   |
+| Weekly hours can't drop below what is scheduled                                     | `Mathematics has 5 lessons in the 9A timetable. Remove 1 of them ...` |
+| Changing a subject's teacher requires the new teacher to be free at all its lessons | (same as the teacher rule)                                            |
+
+The checks and the write run in one **serializable** transaction, so two admins editing the timetable at the same moment can't both pass the checks and create a conflict; one of them gets a `409` and can retry. The class rule is also guaranteed by a unique index in the database.
 
 ## Authentication and authorization
 

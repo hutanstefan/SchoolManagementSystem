@@ -1,0 +1,33 @@
+meta {
+  name: Add subject to class
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/classes/{{newClassId}}/subjects
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "subjectId": "{{mathSubjectId}}",
+    "teacherId": "{{assignTeacherId}}",
+    "hoursPerWeek": 2
+  }
+}
+
+script:post-response {
+  if (res.getStatus() < 300) bru.setVar("classSubjectId", res.getBody().classSubjectId);
+}
+
+tests {
+  test("Status is 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  Mathematics, 2 hours per week, taught by teacher@school.test, in the class created by Classes > Create class.
+}

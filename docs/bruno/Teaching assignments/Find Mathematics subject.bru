@@ -1,0 +1,21 @@
+meta {
+  name: Find Mathematics subject
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/subjects
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  if (res.getStatus() < 300) bru.setVar("mathSubjectId", ((body) => body.find((s) => s.name === 'Mathematics').id)(res.getBody()));
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
