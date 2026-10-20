@@ -1,0 +1,27 @@
+meta {
+  name: Create class
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/classes
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "DEMO-{{$randomInt}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() < 300) bru.setVar("newClassId", res.getBody().id);
+}
+
+tests {
+  test("Status is 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

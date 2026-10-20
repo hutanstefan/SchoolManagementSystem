@@ -1,0 +1,30 @@
+meta {
+  name: Create teacher
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/teachers
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "email": "demo.teacher.{{$timestamp}}@school.test",
+    "password": "Welcome123",
+    "firstName": "Demo",
+    "lastName": "Teacher"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() < 300) bru.setVar("newTeacherId", res.getBody().id);
+}
+
+tests {
+  test("Status is 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

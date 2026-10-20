@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -52,5 +53,19 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Missing, invalid or expired token' })
   me(@CurrentUser() user: AuthUser): Promise<AuthUserDto> {
     return this.authService.getProfile(user.id);
+  }
+
+  @ApiBearerAuth()
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Log out',
+    description:
+      'Invalidates every token of the current user (all devices). The client should also discard its token.',
+  })
+  @ApiNoContentResponse()
+  @ApiUnauthorizedResponse({ description: 'Missing, invalid or expired token' })
+  logout(@CurrentUser() user: AuthUser): Promise<void> {
+    return this.authService.logout(user.id);
   }
 }

@@ -1,0 +1,27 @@
+meta {
+  name: List teachers
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/teachers?page=1&pageSize=20&search=
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  pageSize: 20
+  search: 
+}
+
+script:post-response {
+  if (res.getStatus() < 300) bru.setVar("teacherId", res.getBody().data[0].id);
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

@@ -1,7 +1,7 @@
 meta {
   name: Login as admin
   type: http
-  seq: 1
+  seq: 7
 }
 
 post {
@@ -18,12 +18,15 @@ body:json {
 }
 
 script:post-response {
-  // Store the token so every other request can use it.
-  bru.setVar("token", res.getBody().accessToken);
+  if (res.getStatus() < 300) bru.setVar("token", res.getBody().accessToken);
 }
 
 tests {
   test("Status is 200", function () {
     expect(res.getStatus()).to.equal(200);
   });
+}
+
+docs {
+  Kept last in the folder, so running the whole collection continues as admin.
 }

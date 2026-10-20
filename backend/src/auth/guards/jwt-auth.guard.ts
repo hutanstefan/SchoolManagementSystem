@@ -14,8 +14,9 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
  * Global guard: every route needs a valid "Authorization: Bearer <token>" header,
  * unless it is marked with @Public().
  *
- * The user is re-loaded from the database on every request, so a deleted user
- * or a changed role takes effect immediately instead of when the token expires.
+ * The user is re-loaded from the database on every request, so a deleted user,
+ * a changed role, a logout or a password reset take effect immediately instead
+ * of when the token expires.
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -47,13 +48,17 @@ export class JwtAuthGuard implements CanActivate {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, role: true },
+      select: { id: true, role: true, tokenVersion: true },
     });
     if (!user) {
       throw new UnauthorizedException('User no longer exists');
     }
+    if (payload.ver !== user.tokenVersion) {
+      // The user logged out or their password was reset after this token was issued.
+      throw new UnauthorizedException('Session has ended, please log in again');
+    }
 
-    request.user = user;
+    request.user = { id: user.id, role: user.role };
     return true;
   }
 

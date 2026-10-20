@@ -1,0 +1,17 @@
+meta {
+  name: Get class
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/classes/{{classId}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

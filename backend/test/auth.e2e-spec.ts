@@ -1,34 +1,23 @@
-import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from '../src/app.module';
-import { configureApp } from '../src/app.setup';
+import {
+  cleanupTestData,
+  createTestApp,
+  loginAs,
+  PASSWORD,
+  TestApp,
+  uniqueName,
+} from './utils';
 
-/**
- * Runs against the seeded database (`npm run db:seed`).
- * Each test file gets a fresh app, so the login rate limit starts from zero.
- */
-const PASSWORD = 'Password123!';
-
-async function createApp(): Promise<INestApplication<App>> {
-  const moduleRef = await Test.createTestingModule({
-    imports: [AppModule],
-  }).compile();
-  const app = moduleRef.createNestApplication<INestApplication<App>>();
-  configureApp(app);
-  await app.init();
-  return app;
-}
-
+/** Each test gets a fresh app, so the login rate limit starts from zero. */
 describe('Auth (e2e)', () => {
-  let app: INestApplication<App>;
+  let app: TestApp;
 
   beforeEach(async () => {
-    app = await createApp();
+    app = await createTestApp();
   });
 
   afterEach(async () => {
+    await cleanupTestData(app);
     await app.close();
   });
 
@@ -119,5 +108,54 @@ describe('Auth (e2e)', () => {
       await login('admin@school.test', 'wrong').expect(401);
     }
     await login('admin@school.test', 'wrong').expect(429);
+  });
+
+  describe('logout', () => {
+    it('invalidates the token immediately', async () => {
+      // A throwaway account, so seeded users keep their sessions.
+      const adminToken = await loginAs(app, 'admin');
+      const email = `${uniqueName('logout')}@school.test`;
+      await request(app.getHttpServer())
+        .post('/api/students')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          email,
+          password: 'Welcome123',
+          firstName: 'Log',
+          lastName: 'Out',
+          dateOfBirth: '2011-01-01',
+        })
+        .expect(201);
+      const { body } = await login(email, 'Welcome123').expect(200);
+      const auth = `Bearer ${body.accessToken}`;
+
+      await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Authorization', auth)
+        .expect(200);
+      await request(app.getHttpServer())
+        .post('/api/auth/logout')
+        .set('Authorization', auth)
+        .expect(204);
+
+      const response = await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Authorization', auth)
+        .expect(401);
+      expect(response.body.message).toBe(
+        'Session has ended, please log in again',
+      );
+
+      // Logging in again gives a new, working token.
+      const { body: again } = await login(email, 'Welcome123').expect(200);
+      await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${again.accessToken}`)
+        .expect(200);
+    });
+
+    it('requires a token', async () => {
+      await request(app.getHttpServer()).post('/api/auth/logout').expect(401);
+    });
   });
 });

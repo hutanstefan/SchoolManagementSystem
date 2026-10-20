@@ -47,7 +47,7 @@ export class AuthService {
   async login({ email, password }: LoginDto): Promise<LoginResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { email },
-      select: { ...authUserSelect, passwordHash: true },
+      select: { ...authUserSelect, passwordHash: true, tokenVersion: true },
     });
 
     const passwordMatches = await bcrypt.compare(
@@ -59,8 +59,16 @@ export class AuthService {
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
 
-    const payload: JwtPayload = { sub: user.id, role: user.role };
-    const { passwordHash: _passwordHash, ...profile } = user;
+    const payload: JwtPayload = {
+      sub: user.id,
+      role: user.role,
+      ver: user.tokenVersion,
+    };
+    const {
+      passwordHash: _passwordHash,
+      tokenVersion: _tokenVersion,
+      ...profile
+    } = user;
 
     return {
       accessToken: await this.jwt.signAsync(payload),
@@ -68,6 +76,17 @@ export class AuthService {
       expiresIn: this.config.get('JWT_EXPIRES_IN_SECONDS', { infer: true }),
       user: this.toAuthUser(profile),
     };
+  }
+
+  /**
+   * Ends every session of the user: bumping tokenVersion makes all tokens
+   * issued so far invalid (see JwtAuthGuard).
+   */
+  async logout(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+    });
   }
 
   async getProfile(userId: string): Promise<AuthUserDto> {

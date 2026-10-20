@@ -1,11 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ClassSummaryDto } from '../../common/dto/summaries.dto';
 import { Role } from '../../generated/prisma/enums';
-
-export class ClassSummaryDto {
-  id!: string;
-  /** @example 9A */
-  name!: string;
-}
 
 export class StudentProfileDto {
   id!: string;

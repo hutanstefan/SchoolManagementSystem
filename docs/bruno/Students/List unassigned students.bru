@@ -1,0 +1,21 @@
+meta {
+  name: List unassigned students
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/students?unassigned=true
+  body: none
+  auth: inherit
+}
+
+params:query {
+  unassigned: true
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

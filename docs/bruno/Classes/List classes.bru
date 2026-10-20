@@ -1,0 +1,32 @@
+meta {
+  name: List classes
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/classes?page=1&pageSize=20&sort=name&order=asc
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  pageSize: 20
+  sort: name
+  order: asc
+}
+
+script:post-response {
+  if (res.getStatus() < 300) bru.setVar("classId", res.getBody().data[0].id);
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Admins see every class, teachers only their own. Saves the first class id as {{classId}}.
+}

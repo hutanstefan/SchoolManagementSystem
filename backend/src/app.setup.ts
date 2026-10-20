@@ -1,6 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { Env } from './config/env.validation';
 
 /**
@@ -23,5 +24,6 @@ export function configureApp(app: INestApplication): void {
       transform: true, // turn payloads into DTO class instances (runs @Transform)
     }),
   );
+  app.useGlobalFilters(new AllExceptionsFilter());
   app.enableShutdownHooks();
 }

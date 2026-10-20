@@ -1,0 +1,25 @@
+meta {
+  name: Assign student to class
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/classes/{{newClassId}}/students
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "studentIds": [
+      "{{studentId}}"
+    ]
+  }
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

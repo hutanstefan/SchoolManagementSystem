@@ -1,7 +1,7 @@
 meta {
   name: Login as teacher
   type: http
-  seq: 2
+  seq: 5
 }
 
 post {
@@ -18,8 +18,7 @@ body:json {
 }
 
 script:post-response {
-  // Store the token so every other request can use it.
-  bru.setVar("token", res.getBody().accessToken);
+  if (res.getStatus() < 300) bru.setVar("token", res.getBody().accessToken);
 }
 
 tests {

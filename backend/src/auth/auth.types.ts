@@ -6,6 +6,8 @@ export interface JwtPayload {
   /** User id (standard JWT "subject" claim). */
   sub: string;
   role: Role;
+  /** The user's tokenVersion when the token was issued (see JwtAuthGuard). */
+  ver: number;
 }
 
 /** The authenticated user, attached to the request by JwtAuthGuard. */

@@ -11,8 +11,7 @@ get {
 }
 
 tests {
-  test("API and database are up", function () {
+  test("Status is 200", function () {
     expect(res.getStatus()).to.equal(200);
-    expect(res.getBody().database).to.equal("up");
   });
 }

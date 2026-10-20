@@ -1,0 +1,17 @@
+meta {
+  name: Remove student from class
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{baseUrl}}/classes/{{newClassId}}/students/{{studentId}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 204", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

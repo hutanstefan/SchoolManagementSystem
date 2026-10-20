@@ -19,7 +19,7 @@ A full-stack web application for managing students, teachers, classes and grades
 .
 ├── backend/             NestJS REST API
 │   ├── prisma/          Schema, migrations and seed
-│   └── src/             Feature modules (auth, health, ...)
+│   └── src/             Feature modules (auth, students, teachers, classes, ...)
 ├── frontend/            React single-page app
 ├── docs/                Schema picture, Bruno and Postman collections
 ├── docker-compose.yml   PostgreSQL for local development
@@ -171,11 +171,54 @@ erDiagram
 
 ### Endpoints
 
-| Method | Path              | Access        | Description                                  |
-| ------ | ----------------- | ------------- | -------------------------------------------- |
-| GET    | `/api/health`     | Public        | API and database status                      |
-| POST   | `/api/auth/login` | Public        | Log in, returns a JWT (max 5 attempts/min)   |
-| GET    | `/api/auth/me`    | Any logged-in | The current user with their role and profile |
+All endpoints are under `/api`. "Teacher (own)" means a teacher only sees the classes they teach or are homeroom teacher of; any other class returns `403`.
+
+| Method | Path                               | Access               | Description                                            |
+| ------ | ---------------------------------- | -------------------- | ------------------------------------------------------ |
+| GET    | `/health`                          | Public               | API and database status                                |
+| POST   | `/auth/login`                      | Public               | Log in, returns a JWT (max 5 attempts/min)             |
+| GET    | `/auth/me`                         | Any logged-in        | The current user with their role and profile           |
+| POST   | `/auth/logout`                     | Any logged-in        | Log out: revokes every token of the user (all devices) |
+| GET    | `/students`                        | Admin                | List students (paginated, search, class filter)        |
+| POST   | `/students`                        | Admin                | Create a student account, optionally in a class        |
+| GET    | `/students/:id`                    | Admin                | Student details                                        |
+| PATCH  | `/students/:id`                    | Admin                | Update a student, move or unassign, reset password     |
+| DELETE | `/students/:id`                    | Admin                | Delete a student and their grades                      |
+| GET    | `/teachers`                        | Admin                | List teachers (paginated, search)                      |
+| POST   | `/teachers`                        | Admin                | Create a teacher account                               |
+| GET    | `/teachers/:id`                    | Admin                | Teacher details, homeroom classes and subjects         |
+| PATCH  | `/teachers/:id`                    | Admin                | Update a teacher, reset password                       |
+| DELETE | `/teachers/:id`                    | Admin                | Delete a teacher (their grades are kept)               |
+| GET    | `/classes`                         | Admin, Teacher (own) | List classes (paginated, natural order 9A → 12A)       |
+| POST   | `/classes`                         | Admin                | Create a class                                         |
+| GET    | `/classes/:id`                     | Admin, Teacher (own) | Class details with subjects and teachers               |
+| PATCH  | `/classes/:id`                     | Admin                | Rename, change homeroom teacher                        |
+| DELETE | `/classes/:id`                     | Admin                | Delete a class (students become unassigned)            |
+| GET    | `/classes/:id/students`            | Admin, Teacher (own) | Students enrolled in the class                         |
+| POST   | `/classes/:id/students`            | Admin                | Assign several students to the class at once           |
+| DELETE | `/classes/:id/students/:studentId` | Admin                | Remove a student from the class                        |
+| GET    | `/subjects`                        | Any logged-in        | List subjects                                          |
+| GET    | `/subjects/:id`                    | Any logged-in        | Subject details                                        |
+| POST   | `/subjects`                        | Admin                | Create a subject                                       |
+| PATCH  | `/subjects/:id`                    | Admin                | Rename a subject                                       |
+| DELETE | `/subjects/:id`                    | Admin                | Delete a subject (blocked while in use: `409`)         |
+
+### Conventions
+
+- **Pagination:** list endpoints accept `page`, `pageSize` (max 100), `sort`, `order` (`asc`/`desc`) and `search`, and return `{ data, meta: { page, pageSize, total, totalPages } }`.
+- **Errors** always have the same shape:
+
+  ```json
+  {
+    "statusCode": 404,
+    "error": "Not Found",
+    "message": "Student not found",
+    "path": "/api/students/0b39a733-7b2b-45e6-9d19-7938ad3af0b6",
+    "timestamp": "2026-10-20T10:00:00.000Z"
+  }
+  ```
+
+  `message` is a list for validation errors. Status codes: `400` invalid input (including malformed ids), `401` missing or invalid token, `403` not allowed, `404` not found, `409` conflict (duplicate email or name, resource still in use), `429` too many login attempts.
 
 ## Authentication and authorization
 
@@ -183,6 +226,7 @@ erDiagram
 - **Every route is protected by default.** A global guard requires a valid token everywhere; public routes are explicitly marked with `@Public()`. A new endpoint can't be left unprotected by accident.
 - **Roles** are checked by a second global guard, driven by the `@Roles(...)` decorator. Finer rules (for example "a teacher can only grade their own classes") are enforced in the services, because they depend on the data.
 - **The user is re-loaded on every request**, so deleting a user or changing their role takes effect immediately, not when the token expires.
+- **Logout really ends the session.** A JWT can't be "deleted" on the server, so every user has a `token_version` and every token carries the version it was issued with. `POST /auth/logout` increments it, and the guard rejects any token with an older version. A password reset by the admin does the same, so old sessions can't outlive a changed password. The trade-off: logout ends the sessions on all devices.
 - **Passwords** are hashed with bcrypt (unique salt per user). Login failures always return the same message (`Invalid email or password`), and an unknown email still runs a bcrypt comparison, so neither the message nor the response time reveals which emails exist.
 - **Brute-force protection:** login is limited to 5 attempts per minute per IP (all other routes: 120 per minute).
 - **Input validation:** every request body is validated with DTOs; unknown fields are rejected.
@@ -211,3 +255,4 @@ The API validates its environment on startup and refuses to start if something i
 ## What I would do with more time
 
 - **Refresh tokens** in an httpOnly cookie, so the access token can be short-lived (minutes) without logging users out every hour.
+- **Per-device logout**: store a session id (`jti`) per login and revoke only that one, instead of all sessions of the user.

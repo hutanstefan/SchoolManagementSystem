@@ -1,0 +1,36 @@
+meta {
+  name: Create student
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/students
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "email": "demo.{{$timestamp}}@school.test",
+    "password": "Welcome123",
+    "firstName": "Demo",
+    "lastName": "Student",
+    "dateOfBirth": "2011-03-14",
+    "classId": "{{classId}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() < 300) bru.setVar("studentId", res.getBody().id);
+}
+
+tests {
+  test("Status is 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  Enrolls the student in {{classId}} (set by Classes > List classes).
+}

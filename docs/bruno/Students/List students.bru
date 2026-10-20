@@ -1,0 +1,24 @@
+meta {
+  name: List students
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/students?page=1&pageSize=20&sort=lastName&order=asc
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  pageSize: 20
+  sort: lastName
+  order: asc
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
