@@ -51,7 +51,9 @@ Open **http://localhost:8080** and log in with one of the [test accounts](#test-
 
 The services start in order: the migrations wait for a healthy database, the API for the migrations to succeed and the web app for a healthy API. The defaults work out of the box; to change ports or the JWT secret, copy `.env.example` to `.env`. To start over with fresh demo data: `docker compose down -v`.
 
-## Local development
+## Local development (hot reload)
+
+Only needed if you want to **change the code**: the Docker setup above runs the built app, so every change would need a rebuild. Here only the database runs in Docker, while the API and the web app run with hot reload, so changes show up instantly.
 
 **1. Start the database**
 
