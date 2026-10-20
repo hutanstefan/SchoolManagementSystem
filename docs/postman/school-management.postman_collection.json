@@ -1343,7 +1343,10 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "if (pm.response.code < 300) pm.collectionVariables.set('studentToken', pm.response.json().accessToken);"
+                  "if (pm.response.code < 300) {",
+                  "  pm.collectionVariables.set('studentToken', pm.response.json().accessToken);",
+                  "  pm.collectionVariables.set('studentClassId', pm.response.json().user.student.class.id);",
+                  "}"
                 ]
               }
             }
@@ -1416,6 +1419,45 @@
                 }
               ]
             }
+          }
+        },
+        {
+          "name": "My class (as student)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Lists the subjects and their teachers', () => pm.expect(pm.response.json().subjects.length).to.be.above(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/classes/{{studentClassId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "classes",
+                "{{studentClassId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Uses the student token and class id saved by Login as student (for My grades). A student can open their own class (subjects, teachers, homeroom teacher); any other class returns 403."
           }
         }
       ]
@@ -1995,6 +2037,45 @@
                 "{{newClassId}}"
               ]
             }
+          }
+        },
+        {
+          "name": "My profile (as teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Is homeroom teacher of 9A', () => pm.expect(pm.response.json().homeroomClasses.map((c) => c.name)).to.include('9A'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/teachers/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "teachers",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "The logged-in teacher with their homeroom classes and teaching assignments. Uses the teacher token saved by Auth > Login as teacher. Admins and students get 403."
           }
         }
       ]

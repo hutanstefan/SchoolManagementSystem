@@ -18,7 +18,10 @@ body:json {
 }
 
 script:post-response {
-  if (res.getStatus() < 300) bru.setVar("studentToken", res.getBody().accessToken);
+  if (res.getStatus() < 300) {
+    bru.setVar("studentToken", res.getBody().accessToken);
+    bru.setVar("studentClassId", res.getBody().user.student.class.id);
+  }
 }
 
 tests {
@@ -28,5 +31,5 @@ tests {
 }
 
 docs {
-  Saves only studentToken, so the rest of the collection stays logged in as admin.
+  Saves only studentToken and the student's class id, so the rest of the collection stays logged in as admin.
 }

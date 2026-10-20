@@ -1,0 +1,28 @@
+meta {
+  name: My class (as student)
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/classes/{{studentClassId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{studentToken}}
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Lists the subjects and their teachers", function () {
+    expect(res.getBody().subjects.length).to.be.above(0);
+  });
+}
+
+docs {
+  Uses the student token and class id saved by Login as student (for My grades). A student can open their own class (subjects, teachers, homeroom teacher); any other class returns 403.
+}

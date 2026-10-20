@@ -1,0 +1,28 @@
+meta {
+  name: My profile (as teacher)
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/teachers/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Is homeroom teacher of 9A", function () {
+    expect(res.getBody().homeroomClasses.map((c) => c.name)).to.include("9A");
+  });
+}
+
+docs {
+  The logged-in teacher with their homeroom classes and teaching assignments. Uses the teacher token saved by Auth > Login as teacher. Admins and students get 403.
+}
