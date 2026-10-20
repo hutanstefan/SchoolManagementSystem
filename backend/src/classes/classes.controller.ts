@@ -68,9 +68,11 @@ export class ClassesController {
   }
 
   @Get(':id')
+  @Roles(Role.ADMIN, Role.TEACHER, Role.STUDENT)
   @ApiOperation({
     summary: 'Get a class with its subjects and teachers',
-    description: 'Teachers can only open classes they are assigned to.',
+    description:
+      'Teachers can only open classes they are assigned to, students only their own class.',
   })
   @ApiOkResponse({ type: ClassDetailDto })
   @ApiNotFoundResponse({ type: ErrorResponseDto })

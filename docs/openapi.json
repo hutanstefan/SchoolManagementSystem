@@ -1,0 +1,4579 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid email or password"
+          },
+          "429": {
+            "description": "More than 5 attempts per minute"
+          }
+        },
+        "summary": "Log in with email and password",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUserDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired token"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the currently logged-in user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "description": "Invalidates every token of the current user (all devices). The client should also discard its token.",
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": "Missing, invalid or expired token"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Log out",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Check that the API and the database are up",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/api/students": {
+      "get": {
+        "operationId": "StudentsController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "Items per page (max 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "description": "Sort direction.",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Field to sort by.",
+            "schema": {
+              "default": "lastName",
+              "type": "string",
+              "enum": [
+                "lastName",
+                "firstName",
+                "email",
+                "dateOfBirth",
+                "createdAt"
+              ]
+            }
+          },
+          {
+            "name": "classId",
+            "required": false,
+            "in": "query",
+            "description": "Only students of this class.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "unassigned",
+            "required": false,
+            "in": "query",
+            "description": "Only students without a class.",
+            "schema": {
+              "type": "boolean",
+              "enum": [
+                true,
+                false
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedStudentsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List students (paginated, searchable, filterable by class)",
+        "tags": [
+          "Students"
+        ]
+      },
+      "post": {
+        "operationId": "StudentsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStudentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Class not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email already in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a student account, optionally enrolled in a class",
+        "tags": [
+          "Students"
+        ]
+      }
+    },
+    "/api/students/{id}": {
+      "get": {
+        "operationId": "StudentsController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a student",
+        "tags": [
+          "Students"
+        ]
+      },
+      "patch": {
+        "operationId": "StudentsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStudentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Student or class not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email already in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a student (password resets it, classId moves or unassigns)",
+        "tags": [
+          "Students"
+        ]
+      },
+      "delete": {
+        "operationId": "StudentsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a student and their grades",
+        "tags": [
+          "Students"
+        ]
+      }
+    },
+    "/api/teachers": {
+      "get": {
+        "operationId": "TeachersController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "Items per page (max 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "description": "Sort direction.",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Field to sort by.",
+            "schema": {
+              "default": "lastName",
+              "type": "string",
+              "enum": [
+                "lastName",
+                "firstName",
+                "email",
+                "createdAt"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedTeachersDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only (except GET /teachers/me)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List teachers (paginated, searchable)",
+        "tags": [
+          "Teachers"
+        ]
+      },
+      "post": {
+        "operationId": "TeachersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTeacherDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeacherDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only (except GET /teachers/me)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email already in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a teacher account",
+        "tags": [
+          "Teachers"
+        ]
+      }
+    },
+    "/api/teachers/me": {
+      "get": {
+        "description": "The logged-in teacher with their homeroom classes and teaching assignments.",
+        "operationId": "TeachersController_findMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeacherDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only (except GET /teachers/me)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "My profile, classes and subjects (teacher)",
+        "tags": [
+          "Teachers"
+        ]
+      }
+    },
+    "/api/teachers/{id}": {
+      "get": {
+        "operationId": "TeachersController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeacherDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only (except GET /teachers/me)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a teacher with their classes and subjects",
+        "tags": [
+          "Teachers"
+        ]
+      },
+      "patch": {
+        "operationId": "TeachersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTeacherDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeacherDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only (except GET /teachers/me)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email already in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a teacher (send password to reset it)",
+        "tags": [
+          "Teachers"
+        ]
+      },
+      "delete": {
+        "operationId": "TeachersController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only (except GET /teachers/me)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a teacher (their grades are kept)",
+        "tags": [
+          "Teachers"
+        ]
+      }
+    },
+    "/api/classes": {
+      "get": {
+        "description": "Admins get every class. Teachers get only the classes they teach or are homeroom teacher of.",
+        "operationId": "ClassesController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "Items per page (max 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "description": "Sort direction.",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Field to sort by.",
+            "schema": {
+              "default": "name",
+              "type": "string",
+              "enum": [
+                "name",
+                "createdAt"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedClassesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List classes",
+        "tags": [
+          "Classes"
+        ]
+      },
+      "post": {
+        "operationId": "ClassesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateClassDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Teacher not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Name taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a class (admin)",
+        "tags": [
+          "Classes"
+        ]
+      }
+    },
+    "/api/classes/{id}": {
+      "get": {
+        "description": "Teachers can only open classes they are assigned to, students only their own class.",
+        "operationId": "ClassesController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a class with its subjects and teachers",
+        "tags": [
+          "Classes"
+        ]
+      },
+      "patch": {
+        "operationId": "ClassesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateClassDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Name taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rename a class or change its homeroom teacher (admin)",
+        "tags": [
+          "Classes"
+        ]
+      },
+      "delete": {
+        "description": "Its students become unassigned. Its teaching assignments and timetable are deleted.",
+        "operationId": "ClassesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a class (admin)",
+        "tags": [
+          "Classes"
+        ]
+      }
+    },
+    "/api/classes/{id}/students": {
+      "get": {
+        "description": "Teachers can only list classes they are assigned to.",
+        "operationId": "ClassesController_findStudents",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StudentDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the students enrolled in a class",
+        "tags": [
+          "Classes"
+        ]
+      },
+      "post": {
+        "description": "Moves the students into this class. Returns the updated class list.",
+        "operationId": "ClassesController_assignStudents",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignStudentsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StudentDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Class or student not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Assign students to a class (admin)",
+        "tags": [
+          "Classes"
+        ]
+      }
+    },
+    "/api/classes/{id}/students/{studentId}": {
+      "delete": {
+        "operationId": "ClassesController_unassignStudent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "studentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Student is not in this class",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a student from a class (admin)",
+        "tags": [
+          "Classes"
+        ]
+      }
+    },
+    "/api/subjects": {
+      "get": {
+        "operationId": "SubjectsController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SubjectDto"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all subjects (any logged-in user)",
+        "tags": [
+          "Subjects"
+        ]
+      },
+      "post": {
+        "operationId": "SubjectsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSubjectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Name taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a subject",
+        "tags": [
+          "Subjects"
+        ]
+      }
+    },
+    "/api/subjects/{id}": {
+      "get": {
+        "operationId": "SubjectsController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a subject (any logged-in user)",
+        "tags": [
+          "Subjects"
+        ]
+      },
+      "patch": {
+        "operationId": "SubjectsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSubjectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Name taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rename a subject",
+        "tags": [
+          "Subjects"
+        ]
+      },
+      "delete": {
+        "operationId": "SubjectsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Subject still in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a subject that is not taught or graded anywhere",
+        "tags": [
+          "Subjects"
+        ]
+      }
+    },
+    "/api/classes/{id}/subjects": {
+      "post": {
+        "description": "Sets who teaches it (optional) and how many hours per week.",
+        "operationId": "ClassSubjectsController_create",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateClassSubjectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassSubjectSummaryDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Class, subject or teacher not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Subject already taught in the class",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a subject to a class",
+        "tags": [
+          "Teaching assignments"
+        ]
+      }
+    },
+    "/api/class-subjects/{id}": {
+      "patch": {
+        "description": "The new teacher must be free at every time the subject is scheduled, and the hours can't go below the lessons already in the timetable.",
+        "operationId": "ClassSubjectsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateClassSubjectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassSubjectSummaryDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Timetable conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change the teacher or the weekly hours of a subject in a class",
+        "tags": [
+          "Teaching assignments"
+        ]
+      },
+      "delete": {
+        "description": "Its lessons are removed from the timetable. Grades are kept.",
+        "operationId": "ClassSubjectsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a subject from a class",
+        "tags": [
+          "Teaching assignments"
+        ]
+      }
+    },
+    "/api/timetable/me": {
+      "get": {
+        "description": "Teachers get the lessons they teach. Students get their class's timetable (empty if they have no class).",
+        "operationId": "TimetableController_forCurrentUser",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimetableDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "My timetable",
+        "tags": [
+          "Timetable"
+        ]
+      }
+    },
+    "/api/classes/{id}/timetable": {
+      "get": {
+        "description": "Admins see every class, teachers the classes they are assigned to, students their own class.",
+        "operationId": "TimetableController_forClass",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimetableDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Weekly timetable of a class",
+        "tags": [
+          "Timetable"
+        ]
+      },
+      "post": {
+        "description": "Rejected with 409 if the class or the teacher is busy in that slot, or the subject already has all its weekly hours.",
+        "operationId": "TimetableController_create",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTimetableEntryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimetableLessonDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Timetable conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a lesson to a class timetable (admin)",
+        "tags": [
+          "Timetable"
+        ]
+      }
+    },
+    "/api/teachers/{id}/timetable": {
+      "get": {
+        "operationId": "TimetableController_forTeacher",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimetableDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Weekly timetable of a teacher (admin)",
+        "tags": [
+          "Timetable"
+        ]
+      }
+    },
+    "/api/timetable-entries/{id}": {
+      "patch": {
+        "operationId": "TimetableController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTimetableEntryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimetableLessonDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Timetable conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Move a lesson to another slot or room (admin)",
+        "tags": [
+          "Timetable"
+        ]
+      },
+      "delete": {
+        "operationId": "TimetableController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a lesson (admin)",
+        "tags": [
+          "Timetable"
+        ]
+      }
+    },
+    "/api/grades/me": {
+      "get": {
+        "description": "Grades per subject with the subject average (two decimals and rounded to a whole grade, as in Romanian schools) and the overall average.",
+        "operationId": "GradesController_myReport",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentGradesReportDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "My grades (student)",
+        "tags": [
+          "Grades"
+        ]
+      }
+    },
+    "/api/grades": {
+      "get": {
+        "description": "Admins see every grade. Teachers see the subjects they teach in each class, everything in their homeroom classes and every grade they gave.",
+        "operationId": "GradesController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "Items per page (max 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "description": "Sort direction (newest first by default).",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Field to sort by (newest first by default).",
+            "schema": {
+              "default": "date",
+              "type": "string",
+              "enum": [
+                "date",
+                "value",
+                "createdAt"
+              ]
+            }
+          },
+          {
+            "name": "classId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "studentId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedGradesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List grades (paginated, newest first)",
+        "tags": [
+          "Grades"
+        ]
+      },
+      "post": {
+        "description": "Teachers can only grade a subject they teach, in that student's class. The change is written to the grade history.",
+        "operationId": "GradesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGradeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GradeDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Give a grade",
+        "tags": [
+          "Grades"
+        ]
+      }
+    },
+    "/api/grades/{id}": {
+      "patch": {
+        "description": "Teachers can only change grades they gave.",
+        "operationId": "GradesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGradeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GradeDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change the value or date of a grade",
+        "tags": [
+          "Grades"
+        ]
+      },
+      "delete": {
+        "description": "Teachers can only delete grades they gave. The grade history keeps a record.",
+        "operationId": "GradesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a grade",
+        "tags": [
+          "Grades"
+        ]
+      }
+    },
+    "/api/grades/{id}/history": {
+      "get": {
+        "description": "Who created, changed or deleted it, and when. Still available after deletion.",
+        "operationId": "GradesController_history",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GradeHistoryEntryDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "History of a grade (admin)",
+        "tags": [
+          "Grades"
+        ]
+      }
+    },
+    "/api/students/{id}/grades": {
+      "get": {
+        "description": "Admins, and teachers of the student's class.",
+        "operationId": "GradesController_studentReport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentGradesReportDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A student's grades and averages",
+        "tags": [
+          "Grades"
+        ]
+      }
+    },
+    "/api/classes/{id}/gradebook": {
+      "get": {
+        "description": "Every student of the class with their grades and average in that subject. Open to admins, the subject teacher and the homeroom teacher.",
+        "operationId": "GradesController_gradebook",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GradebookDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Gradebook of a subject in a class",
+        "tags": [
+          "Grades"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "School Management System API",
+    "description": "REST API for managing students, teachers, classes, timetables and grades.\n\nLog in with `POST /api/auth/login` (test accounts are listed in the README), then click **Authorize** and paste the `accessToken`.",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Case-insensitive: it is trimmed and lower-cased before lookup.",
+            "example": "admin@school.test",
+            "maxLength": 254,
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "example": "Password123!",
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "Role": {
+        "type": "string",
+        "enum": [
+          "ADMIN",
+          "TEACHER",
+          "STUDENT"
+        ]
+      },
+      "ClassSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "9A"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "StudentProfileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "example": "2011-05-14"
+          },
+          "class": {
+            "nullable": true,
+            "description": "Null when the student is not assigned to a class yet.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClassSummaryDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "dateOfBirth",
+          "class"
+        ]
+      },
+      "TeacherProfileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "AuthUserDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "example": "STUDENT",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "example": "student@school.test"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Andrei"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Georgescu"
+          },
+          "student": {
+            "nullable": true,
+            "description": "Present only for students.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StudentProfileDto"
+              }
+            ]
+          },
+          "teacher": {
+            "nullable": true,
+            "description": "Present only for teachers.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeacherProfileDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "role",
+          "id",
+          "email",
+          "firstName",
+          "lastName",
+          "student",
+          "teacher"
+        ]
+      },
+      "LoginResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT to send as `Authorization: Bearer <token>`."
+          },
+          "tokenType": {
+            "type": "string",
+            "example": "Bearer"
+          },
+          "expiresIn": {
+            "type": "number",
+            "description": "Token lifetime in seconds.",
+            "example": 3600
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUserDto"
+          }
+        },
+        "required": [
+          "accessToken",
+          "tokenType",
+          "expiresIn",
+          "user"
+        ]
+      },
+      "ErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "example": 404
+          },
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "object",
+            "description": "A message, or a list of validation messages.",
+            "example": "Student not found"
+          },
+          "path": {
+            "type": "string",
+            "example": "/api/students/0b39a733-7b2b-45e6-9d19-7938ad3af0b6"
+          },
+          "timestamp": {
+            "type": "string",
+            "example": "2026-10-20T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "statusCode",
+          "error",
+          "message",
+          "path",
+          "timestamp"
+        ]
+      },
+      "StudentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "example": "student@school.test"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Andrei"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Georgescu"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "example": "2011-07-25"
+          },
+          "class": {
+            "nullable": true,
+            "description": "Null when the student is not assigned to a class.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClassSummaryDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "email",
+          "firstName",
+          "lastName",
+          "dateOfBirth",
+          "class",
+          "createdAt"
+        ]
+      },
+      "PaginationMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "number",
+            "example": 20
+          },
+          "total": {
+            "type": "number",
+            "example": 62
+          },
+          "totalPages": {
+            "type": "number",
+            "example": 4
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "totalPages"
+        ]
+      },
+      "PaginatedStudentsDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudentDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateStudentDto": {
+        "type": "object",
+        "properties": {
+          "dateOfBirth": {
+            "type": "string",
+            "description": "Format YYYY-MM-DD.",
+            "example": "2011-03-14"
+          },
+          "classId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Class to enroll the student in. Omit or send null to leave unassigned.",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "example": "elena.marin@school.test",
+            "maxLength": 254,
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "description": "Initial password: at least 8 characters, with a letter and a digit.",
+            "example": "Welcome123"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Elena",
+            "maxLength": 50
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Marin",
+            "maxLength": 50
+          }
+        },
+        "required": [
+          "dateOfBirth",
+          "email",
+          "password",
+          "firstName",
+          "lastName"
+        ]
+      },
+      "UpdateStudentDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "elena.marin@school.test",
+            "maxLength": 254,
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "description": "Initial password: at least 8 characters, with a letter and a digit.",
+            "example": "Welcome123"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Elena",
+            "maxLength": 50
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Marin",
+            "maxLength": 50
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "description": "Format YYYY-MM-DD.",
+            "example": "2011-03-14"
+          },
+          "classId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Class to enroll the student in. Omit or send null to leave unassigned.",
+            "format": "uuid"
+          }
+        }
+      },
+      "TeacherDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "example": "teacher@school.test"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Mihai"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Ionescu"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "email",
+          "firstName",
+          "lastName",
+          "createdAt"
+        ]
+      },
+      "PaginatedTeachersDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeacherDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "SubjectSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "Mathematics"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "TeachingAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "classSubjectId": {
+            "type": "string"
+          },
+          "class": {
+            "$ref": "#/components/schemas/ClassSummaryDto"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "hoursPerWeek": {
+            "type": "number",
+            "example": 4
+          }
+        },
+        "required": [
+          "classSubjectId",
+          "class",
+          "subject",
+          "hoursPerWeek"
+        ]
+      },
+      "TeacherDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "example": "teacher@school.test"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Mihai"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Ionescu"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "homeroomClasses": {
+            "description": "Classes where this teacher is the homeroom teacher (diriginte).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassSummaryDto"
+            }
+          },
+          "teaching": {
+            "description": "Subjects taught, per class.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeachingAssignmentDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "email",
+          "firstName",
+          "lastName",
+          "createdAt",
+          "homeroomClasses",
+          "teaching"
+        ]
+      },
+      "CreateTeacherDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "elena.marin@school.test",
+            "maxLength": 254,
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "description": "Initial password: at least 8 characters, with a letter and a digit.",
+            "example": "Welcome123"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Elena",
+            "maxLength": 50
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Marin",
+            "maxLength": 50
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "firstName",
+          "lastName"
+        ]
+      },
+      "UpdateTeacherDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "elena.marin@school.test",
+            "maxLength": 254,
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "description": "Initial password: at least 8 characters, with a letter and a digit.",
+            "example": "Welcome123"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Elena",
+            "maxLength": 50
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Marin",
+            "maxLength": 50
+          }
+        }
+      },
+      "PersonSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Teacher or student id (not the user id)."
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Mihai"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Ionescu"
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName"
+        ]
+      },
+      "ClassDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "9A"
+          },
+          "homeroomTeacher": {
+            "nullable": true,
+            "description": "Homeroom teacher (diriginte), or null.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonSummaryDto"
+              }
+            ]
+          },
+          "studentCount": {
+            "type": "number",
+            "example": 10
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "homeroomTeacher",
+          "studentCount",
+          "createdAt"
+        ]
+      },
+      "PaginatedClassesDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "ClassSubjectSummaryDto": {
+        "type": "object",
+        "properties": {
+          "classSubjectId": {
+            "type": "string"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "teacher": {
+            "nullable": true,
+            "description": "Null while nobody is assigned to teach it.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonSummaryDto"
+              }
+            ]
+          },
+          "hoursPerWeek": {
+            "type": "number",
+            "example": 4
+          }
+        },
+        "required": [
+          "classSubjectId",
+          "subject",
+          "teacher",
+          "hoursPerWeek"
+        ]
+      },
+      "ClassDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "9A"
+          },
+          "homeroomTeacher": {
+            "nullable": true,
+            "description": "Homeroom teacher (diriginte), or null.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonSummaryDto"
+              }
+            ]
+          },
+          "studentCount": {
+            "type": "number",
+            "example": 10
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "subjects": {
+            "description": "Subjects studied by the class and who teaches each one.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassSubjectSummaryDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "homeroomTeacher",
+          "studentCount",
+          "createdAt",
+          "subjects"
+        ]
+      },
+      "CreateClassDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Trimmed and upper-cased, so \"9a\" becomes \"9A\".",
+            "example": "9C",
+            "maxLength": 20,
+            "pattern": "^[0-9A-Z][0-9A-Z -]*$"
+          },
+          "homeroomTeacherId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Homeroom teacher (diriginte). Omit or send null for none.",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateClassDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Trimmed and upper-cased, so \"9a\" becomes \"9A\".",
+            "example": "9C",
+            "maxLength": 20,
+            "pattern": "^[0-9A-Z][0-9A-Z -]*$"
+          },
+          "homeroomTeacherId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Homeroom teacher (diriginte). Omit or send null for none.",
+            "format": "uuid"
+          }
+        }
+      },
+      "AssignStudentsDto": {
+        "type": "object",
+        "properties": {
+          "studentIds": {
+            "description": "Students to move into the class (they leave their current class, if any).",
+            "minItems": 1,
+            "uniqueItems": true,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "studentIds"
+        ]
+      },
+      "SubjectDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "Mathematics"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "CreateSubjectDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 50
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateSubjectDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 50
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "CreateClassSubjectDto": {
+        "type": "object",
+        "properties": {
+          "subjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teacherId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Teacher of this subject in this class. Omit or send null to leave it vacant.",
+            "format": "uuid"
+          },
+          "hoursPerWeek": {
+            "type": "number",
+            "description": "Lessons per week (1-10).",
+            "example": 4,
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "subjectId",
+          "hoursPerWeek"
+        ]
+      },
+      "UpdateClassSubjectDto": {
+        "type": "object",
+        "properties": {
+          "teacherId": {
+            "type": "string",
+            "nullable": true,
+            "description": "New teacher, or null to make the subject vacant.",
+            "format": "uuid"
+          },
+          "hoursPerWeek": {
+            "type": "number",
+            "description": "Lessons per week (1-10). Can't go below the lessons already in the timetable.",
+            "example": 3,
+            "minimum": 1,
+            "maximum": 10
+          }
+        }
+      },
+      "Weekday": {
+        "type": "string",
+        "enum": [
+          "MONDAY",
+          "TUESDAY",
+          "WEDNESDAY",
+          "THURSDAY",
+          "FRIDAY"
+        ]
+      },
+      "TimetableLessonDto": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Weekday"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "period": {
+            "type": "number",
+            "example": 2
+          },
+          "room": {
+            "type": "string",
+            "nullable": true,
+            "example": "Room 101"
+          },
+          "classSubjectId": {
+            "type": "string"
+          },
+          "class": {
+            "$ref": "#/components/schemas/ClassSummaryDto"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "teacher": {
+            "nullable": true,
+            "description": "Null while the subject has no teacher.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonSummaryDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "day",
+          "id",
+          "period",
+          "room",
+          "classSubjectId",
+          "class",
+          "subject",
+          "teacher"
+        ]
+      },
+      "TimetableDayDto": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Weekday"
+              }
+            ]
+          },
+          "lessons": {
+            "description": "Sorted by period.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimetableLessonDto"
+            }
+          }
+        },
+        "required": [
+          "day",
+          "lessons"
+        ]
+      },
+      "TimetableDto": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimetableDayDto"
+            }
+          }
+        },
+        "required": [
+          "days"
+        ]
+      },
+      "CreateTimetableEntryDto": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "example": "MONDAY",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Weekday"
+              }
+            ]
+          },
+          "classSubjectId": {
+            "type": "string",
+            "description": "The subject of the class to schedule (see the class details).",
+            "format": "uuid"
+          },
+          "period": {
+            "type": "number",
+            "description": "Lesson number in the day (1-8).",
+            "example": 5,
+            "minimum": 1,
+            "maximum": 8
+          },
+          "room": {
+            "type": "string",
+            "nullable": true,
+            "example": "Room 101",
+            "maxLength": 30
+          }
+        },
+        "required": [
+          "day",
+          "classSubjectId",
+          "period"
+        ]
+      },
+      "UpdateTimetableEntryDto": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Weekday"
+              }
+            ]
+          },
+          "period": {
+            "type": "number",
+            "example": 6,
+            "minimum": 1,
+            "maximum": 8
+          },
+          "room": {
+            "type": "string",
+            "nullable": true,
+            "example": "Physics lab",
+            "maxLength": 30
+          }
+        }
+      },
+      "GradeEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number",
+            "example": 9
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-10-20"
+          },
+          "teacher": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonSummaryDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "value",
+          "date",
+          "teacher"
+        ]
+      },
+      "SubjectGradesDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "teacher": {
+            "nullable": true,
+            "description": "Current teacher of the subject in the student's class.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonSummaryDto"
+              }
+            ]
+          },
+          "grades": {
+            "description": "Sorted by date.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GradeEntryDto"
+            }
+          },
+          "average": {
+            "type": "number",
+            "nullable": true,
+            "description": "Mean with two decimals, truncated.",
+            "example": 9.5
+          },
+          "roundedAverage": {
+            "type": "number",
+            "nullable": true,
+            "description": "Average rounded to a whole grade (.50 rounds up).",
+            "example": 10
+          },
+          "minimumGrades": {
+            "type": "number",
+            "nullable": true,
+            "description": "Weekly hours + 1. Null if the subject isn't taught in the student's current class.",
+            "example": 5
+          },
+          "hasMinimumGrades": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Whether the student has at least the minimum number of grades."
+          }
+        },
+        "required": [
+          "subject",
+          "teacher",
+          "grades",
+          "average",
+          "roundedAverage",
+          "minimumGrades",
+          "hasMinimumGrades"
+        ]
+      },
+      "StudentGradesReportDto": {
+        "type": "object",
+        "properties": {
+          "student": {
+            "$ref": "#/components/schemas/PersonSummaryDto"
+          },
+          "class": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClassSummaryDto"
+              }
+            ]
+          },
+          "subjects": {
+            "description": "Every subject of the class (and any other subject the student has grades in).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectGradesDto"
+            }
+          },
+          "overallAverage": {
+            "type": "number",
+            "nullable": true,
+            "description": "Mean of the rounded subject averages, two decimals, truncated.\nNull until every subject has at least one grade.",
+            "example": 9.12
+          }
+        },
+        "required": [
+          "student",
+          "class",
+          "subjects",
+          "overallAverage"
+        ]
+      },
+      "GradeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number",
+            "example": 9
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-10-20"
+          },
+          "student": {
+            "$ref": "#/components/schemas/PersonSummaryDto"
+          },
+          "class": {
+            "nullable": true,
+            "description": "The student's current class.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClassSummaryDto"
+              }
+            ]
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "teacher": {
+            "nullable": true,
+            "description": "Who gave the grade. Null if that teacher was deleted.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonSummaryDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "value",
+          "date",
+          "student",
+          "class",
+          "subject",
+          "teacher",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PaginatedGradesDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GradeDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateGradeDto": {
+        "type": "object",
+        "properties": {
+          "studentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "value": {
+            "type": "number",
+            "description": "Grade from 1 to 10.",
+            "example": 9,
+            "minimum": 1,
+            "maximum": 10
+          },
+          "date": {
+            "type": "string",
+            "description": "YYYY-MM-DD, today or earlier. Defaults to today.",
+            "example": "2026-10-20"
+          }
+        },
+        "required": [
+          "studentId",
+          "subjectId",
+          "value"
+        ]
+      },
+      "UpdateGradeDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "example": 10,
+            "minimum": 1,
+            "maximum": 10
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-10-19"
+          }
+        }
+      },
+      "GradeAction": {
+        "type": "string",
+        "enum": [
+          "CREATED",
+          "UPDATED",
+          "DELETED"
+        ]
+      },
+      "GradeChangedByDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              }
+            ]
+          },
+          "id": {
+            "type": "string",
+            "description": "User id."
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Mihai"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Ionescu"
+          }
+        },
+        "required": [
+          "role",
+          "id",
+          "firstName",
+          "lastName"
+        ]
+      },
+      "GradeHistoryEntryDto": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GradeAction"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "gradeId": {
+            "type": "string"
+          },
+          "oldValue": {
+            "type": "number",
+            "nullable": true
+          },
+          "newValue": {
+            "type": "number",
+            "nullable": true
+          },
+          "oldDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "newDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "changedBy": {
+            "nullable": true,
+            "description": "Null if that account was deleted.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GradeChangedByDto"
+              }
+            ]
+          },
+          "changedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "id",
+          "gradeId",
+          "oldValue",
+          "newValue",
+          "oldDate",
+          "newDate",
+          "changedBy",
+          "changedAt"
+        ]
+      },
+      "GradebookRowDto": {
+        "type": "object",
+        "properties": {
+          "student": {
+            "$ref": "#/components/schemas/PersonSummaryDto"
+          },
+          "grades": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GradeEntryDto"
+            }
+          },
+          "average": {
+            "type": "number",
+            "nullable": true,
+            "example": 8.66
+          },
+          "roundedAverage": {
+            "type": "number",
+            "nullable": true,
+            "example": 9
+          },
+          "hasMinimumGrades": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "student",
+          "grades",
+          "average",
+          "roundedAverage",
+          "hasMinimumGrades"
+        ]
+      },
+      "GradebookDto": {
+        "type": "object",
+        "properties": {
+          "class": {
+            "$ref": "#/components/schemas/ClassSummaryDto"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "teacher": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonSummaryDto"
+              }
+            ]
+          },
+          "hoursPerWeek": {
+            "type": "number",
+            "example": 4
+          },
+          "minimumGrades": {
+            "type": "number",
+            "example": 5
+          },
+          "students": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GradebookRowDto"
+            }
+          }
+        },
+        "required": [
+          "class",
+          "subject",
+          "teacher",
+          "hoursPerWeek",
+          "minimumGrades",
+          "students"
+        ]
+      }
+    }
+  }
+}

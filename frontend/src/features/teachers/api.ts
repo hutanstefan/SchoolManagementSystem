@@ -9,6 +9,7 @@ import { queryKeys } from '@/api/query-keys'
 import type { operations } from '@/api/schema'
 
 export type Teacher = Schemas['TeacherDto']
+export type TeacherDetail = Schemas['TeacherDetailDto']
 export type TeacherQuery = NonNullable<
   operations['TeachersController_findAll']['parameters']['query']
 >
@@ -31,6 +32,15 @@ export function useTeacher(id: string) {
     queryKey: queryKeys.teachers.detail(id),
     queryFn: () =>
       unwrap(api.GET('/api/teachers/{id}', { params: { path: { id } } })),
+  })
+}
+
+/** The logged-in teacher with their classes and subjects (teacher only). */
+export function useMyTeacherProfile() {
+  return useQuery({
+    queryKey: queryKeys.teachers.me,
+    queryFn: () => unwrap(api.GET('/api/teachers/me')),
+    staleTime: 5 * 60 * 1000,
   })
 }
 

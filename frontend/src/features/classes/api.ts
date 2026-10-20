@@ -28,11 +28,12 @@ export function useAllClasses() {
   return useClasses({ pageSize: 100 })
 }
 
-export function useClass(id: string) {
+export function useClass(id: string, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.classes.detail(id),
     queryFn: () =>
       unwrap(api.GET('/api/classes/{id}', { params: { path: { id } } })),
+    enabled: options.enabled ?? true,
   })
 }
 

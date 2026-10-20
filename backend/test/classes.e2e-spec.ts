@@ -157,8 +157,27 @@ describe('Classes (e2e)', () => {
   });
 
   describe('student', () => {
-    it('has no access to the classes endpoints', async () => {
+    it('cannot list classes or their students', async () => {
       await as(studentToken)(api().get('/api/classes')).expect(403);
+      await as(studentToken)(
+        api().get(`/api/classes/${classIds['9A']}/students`),
+      ).expect(403);
+    });
+
+    it('can open their own class with its subjects and teachers', async () => {
+      const { body } = await as(studentToken)(
+        api().get(`/api/classes/${classIds['9A']}`),
+      ).expect(200);
+      expect(body.name).toBe('9A');
+      expect(body.homeroomTeacher).not.toBeNull();
+      expect(body.subjects.length).toBeGreaterThan(0);
+    });
+
+    it("gets 403 for another class's details", async () => {
+      const response = await as(studentToken)(
+        api().get(`/api/classes/${classIds['10A']}`),
+      ).expect(403);
+      expect(response.body.message).toBe('You are not enrolled in this class');
     });
   });
 });

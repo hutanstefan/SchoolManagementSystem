@@ -23,6 +23,8 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import type { AuthUser } from '../auth/auth.types';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ErrorResponseDto } from '../common/dto/error-response.dto';
 import { Paginated } from '../common/dto/pagination.dto';
@@ -40,7 +42,10 @@ import { TeachersService } from './teachers.service';
 @ApiTags('Teachers')
 @ApiBearerAuth()
 @Roles(Role.ADMIN)
-@ApiForbiddenResponse({ type: ErrorResponseDto, description: 'Admin only' })
+@ApiForbiddenResponse({
+  type: ErrorResponseDto,
+  description: 'Admin only (except GET /teachers/me)',
+})
 @ApiBadRequestResponse({
   type: ErrorResponseDto,
   description: 'Validation failed',
@@ -54,6 +59,19 @@ export class TeachersController {
   @ApiOkResponse({ type: PaginatedTeachersDto })
   findAll(@Query() query: TeacherQueryDto): Promise<Paginated<TeacherDto>> {
     return this.teachersService.findAll(query);
+  }
+
+  // Declared before ':id' so "me" is not parsed as an id.
+  @Get('me')
+  @Roles(Role.TEACHER)
+  @ApiOperation({
+    summary: 'My profile, classes and subjects (teacher)',
+    description:
+      'The logged-in teacher with their homeroom classes and teaching assignments.',
+  })
+  @ApiOkResponse({ type: TeacherDetailDto })
+  findMe(@CurrentUser() user: AuthUser): Promise<TeacherDetailDto> {
+    return this.teachersService.findMe(user.id);
   }
 
   @Get(':id')

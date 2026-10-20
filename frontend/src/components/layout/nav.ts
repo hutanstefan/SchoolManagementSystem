@@ -35,6 +35,7 @@ export const NAV_ITEMS: Record<Role, NavItem[]> = {
   STUDENT: [
     { label: 'Dashboard', to: '/student', icon: LayoutDashboard, end: true },
     { label: 'My grades', to: '/student/grades', icon: ClipboardList },
+    { label: 'My class', to: '/student/class', icon: School },
     { label: 'My timetable', to: '/student/timetable', icon: CalendarDays },
   ],
 }

@@ -52,6 +52,41 @@ export function todayIso(now: Date = new Date()): string {
 
 export const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8] as const
 
+/** Start of a period in minutes after midnight (period 1 starts at 08:00). */
+function periodStart(period: number): number {
+  return (7 + period) * 60
+}
+
+/** The period being taught at `now` (breaks don't count), or null. */
+export function currentPeriod(now: Date = new Date()): number | null {
+  const minutes = now.getHours() * 60 + now.getMinutes()
+  return (
+    PERIODS.find(
+      (period) =>
+        minutes >= periodStart(period) && minutes < periodStart(period) + 50,
+    ) ?? null
+  )
+}
+
+/** True once a period is over on the current day. */
+export function isPeriodOver(period: number, now: Date = new Date()): boolean {
+  return now.getHours() * 60 + now.getMinutes() >= periodStart(period) + 50
+}
+
+/** "Tuesday 20 October" */
+export function formatLongDate(now: Date = new Date()): string {
+  return now.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+}
+
+/** Natural order for class names: "9A" before "10A". */
+export function compareClassNames(a: string, b: string): number {
+  return a.localeCompare(b, 'en', { numeric: true })
+}
+
 /**
  * Display times for a period: lessons start at 08:00 and last 50 minutes,
  * followed by a 10 minute break (the usual Romanian school day).

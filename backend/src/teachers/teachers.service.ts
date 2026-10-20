@@ -61,6 +61,16 @@ export class TeachersService {
     return paginated(rows.map(toTeacherDto), total, query);
   }
 
+  /** The profile of the logged-in teacher, with their classes and subjects. */
+  async findMe(userId: string): Promise<TeacherDetailDto> {
+    const teacher = await this.prisma.teacher.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!teacher) throw new NotFoundException('Teacher profile not found');
+    return this.findOne(teacher.id);
+  }
+
   async findOne(id: string): Promise<TeacherDetailDto> {
     const teacher = await this.prisma.teacher.findUnique({
       where: { id },

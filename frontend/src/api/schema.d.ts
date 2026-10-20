@@ -130,6 +130,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/teachers/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My profile, classes and subjects (teacher)
+         * @description The logged-in teacher with their homeroom classes and teaching assignments.
+         */
+        get: operations["TeachersController_findMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/teachers/{id}": {
         parameters: {
             query?: never;
@@ -179,7 +199,7 @@ export interface paths {
         };
         /**
          * Get a class with its subjects and teachers
-         * @description Teachers can only open classes they are assigned to.
+         * @description Teachers can only open classes they are assigned to, students only their own class.
          */
         get: operations["ClassesController_findOne"];
         put?: never;
@@ -1455,7 +1475,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description Admin only */
+            /** @description Admin only (except GET /teachers/me) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1496,7 +1516,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description Admin only */
+            /** @description Admin only (except GET /teachers/me) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1507,6 +1527,43 @@ export interface operations {
             };
             /** @description Email already in use */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    TeachersController_findMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeacherDetailDto"];
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Admin only (except GET /teachers/me) */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1544,7 +1601,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description Admin only */
+            /** @description Admin only (except GET /teachers/me) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1589,7 +1646,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description Admin only */
+            /** @description Admin only (except GET /teachers/me) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1640,7 +1697,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description Admin only */
+            /** @description Admin only (except GET /teachers/me) */
             403: {
                 headers: {
                     [name: string]: unknown;

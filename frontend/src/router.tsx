@@ -2,10 +2,8 @@ import { createBrowserRouter, type RouteObject } from 'react-router'
 import { RequireAuth } from '@/auth/require-auth'
 import { FullPageSpinner } from '@/components/full-page-spinner'
 import { AppLayout } from '@/components/layout/app-layout'
-import { DashboardPage } from '@/pages/dashboard-page'
 import { HomeRedirect } from '@/pages/home-redirect'
 import { NotFoundPage } from '@/pages/not-found-page'
-import { PlaceholderPage } from '@/pages/placeholder-page'
 
 /**
  * Feature pages are loaded on demand, so a student never downloads the admin
@@ -50,6 +48,46 @@ const admin = {
     })),
 }
 
+const teacher = {
+  dashboard: () =>
+    import('@/features/teacher-portal/teacher-dashboard-page').then((m) => ({
+      Component: m.TeacherDashboardPage,
+    })),
+  classes: () =>
+    import('@/features/teacher-portal/my-classes-page').then((m) => ({
+      Component: m.MyClassesPage,
+    })),
+  class: () =>
+    import('@/features/teacher-portal/my-class-page').then((m) => ({
+      Component: m.MyClassPage,
+    })),
+  student: () =>
+    import('@/features/teacher-portal/student-report-page').then((m) => ({
+      Component: m.StudentReportPage,
+    })),
+}
+
+const student = {
+  dashboard: () =>
+    import('@/features/student-portal/student-dashboard-page').then((m) => ({
+      Component: m.StudentDashboardPage,
+    })),
+  grades: () =>
+    import('@/features/student-portal/my-grades-page').then((m) => ({
+      Component: m.MyGradesPage,
+    })),
+  class: () =>
+    import('@/features/student-portal/my-class-page').then((m) => ({
+      Component: m.StudentClassPage,
+    })),
+}
+
+/** Shared by teachers and students. */
+const myTimetable = () =>
+  import('@/features/timetable/my-timetable-page').then((m) => ({
+    Component: m.MyTimetablePage,
+  }))
+
 export const routes: RouteObject[] = [
   {
     // Shown while the first lazy page of a fresh page load is downloading.
@@ -90,12 +128,11 @@ export const routes: RouteObject[] = [
           </RequireAuth>
         ),
         children: [
-          { index: true, element: <DashboardPage /> },
-          { path: 'classes', element: <PlaceholderPage title="My classes" /> },
-          {
-            path: 'timetable',
-            element: <PlaceholderPage title="My timetable" />,
-          },
+          { index: true, lazy: teacher.dashboard },
+          { path: 'classes', lazy: teacher.classes },
+          { path: 'classes/:id', lazy: teacher.class },
+          { path: 'students/:id', lazy: teacher.student },
+          { path: 'timetable', lazy: myTimetable },
         ],
       },
       {
@@ -106,12 +143,10 @@ export const routes: RouteObject[] = [
           </RequireAuth>
         ),
         children: [
-          { index: true, element: <DashboardPage /> },
-          { path: 'grades', element: <PlaceholderPage title="My grades" /> },
-          {
-            path: 'timetable',
-            element: <PlaceholderPage title="My timetable" />,
-          },
+          { index: true, lazy: student.dashboard },
+          { path: 'grades', lazy: student.grades },
+          { path: 'class', lazy: student.class },
+          { path: 'timetable', lazy: myTimetable },
         ],
       },
       { path: '*', element: <NotFoundPage /> },

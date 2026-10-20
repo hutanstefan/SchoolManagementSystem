@@ -1,8 +1,8 @@
 import { INestApplication } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 
-/** Interactive API documentation at /api/docs (raw OpenAPI JSON at /api/docs-json). */
-export function setupSwagger(app: INestApplication): void {
+/** The OpenAPI document of the API (also exported to docs/openapi.json). */
+export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
   const config = new DocumentBuilder()
     .setTitle('School Management System API')
     .setDescription(
@@ -14,8 +14,12 @@ export function setupSwagger(app: INestApplication): void {
     .addBearerAuth()
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document, {
+  return SwaggerModule.createDocument(app, config);
+}
+
+/** Interactive API documentation at /api/docs (raw OpenAPI JSON at /api/docs-json). */
+export function setupSwagger(app: INestApplication): void {
+  SwaggerModule.setup('api/docs', app, createOpenApiDocument(app), {
     swaggerOptions: { persistAuthorization: true },
   });
 }

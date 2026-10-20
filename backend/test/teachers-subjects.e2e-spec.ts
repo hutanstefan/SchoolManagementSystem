@@ -57,6 +57,29 @@ describe('Teachers and subjects (e2e)', () => {
       );
     });
 
+    it('lets a teacher read their own profile at /teachers/me', async () => {
+      const { body } = await as(teacherToken)(
+        api().get('/api/teachers/me'),
+      ).expect(200);
+
+      expect(body.email).toBe('teacher@school.test');
+      expect(body.homeroomClasses.map((c: { name: string }) => c.name)).toEqual(
+        ['9A'],
+      );
+      expect(
+        body.teaching.map((t: { class: { name: string } }) => t.class.name),
+      ).toEqual(['9A', '9B', '10A']);
+    });
+
+    it('keeps /teachers/me for teachers only', async () => {
+      await as(adminToken)(api().get('/api/teachers/me')).expect(403);
+      await as(studentToken)(api().get('/api/teachers/me')).expect(403);
+    });
+
+    it('keeps the other teacher endpoints admin-only', async () => {
+      await as(teacherToken)(api().get('/api/teachers')).expect(403);
+    });
+
     it('creates, updates (with password reset) and deletes a teacher', async () => {
       const email = `${uniqueName('teacher')}@school.test`;
       const { body: created } = await as(adminToken)(

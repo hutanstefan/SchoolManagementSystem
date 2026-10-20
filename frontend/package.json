@@ -13,7 +13,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "api:types": "npx -y openapi-typescript@7 http://localhost:3000/api/docs-json -o src/api/schema.d.ts"
+    "api:types": "npx -y openapi-typescript@7 ../docs/openapi.json -o src/api/schema.d.ts"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
