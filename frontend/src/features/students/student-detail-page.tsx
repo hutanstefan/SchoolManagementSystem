@@ -43,7 +43,7 @@ export function StudentDetailPage() {
       <BackLink to="/admin/students" label="All students" />
       <PageHeader
         title={fullName(s)}
-        description={s.email}
+        description={`${s.email} · Reg. no. ${s.registrationNumber}`}
         actions={
           <>
             <Button variant="outline" onClick={() => setEditOpen(true)}>

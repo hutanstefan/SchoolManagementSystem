@@ -13,6 +13,8 @@ import { ErrorResponseDto } from '../dto/error-response.dto';
 interface ResolvedError {
   status: number;
   message: string | string[];
+  /** Machine-readable details some errors carry (e.g. timetable conflicts). */
+  conflict?: unknown;
 }
 
 /** Friendly messages for unique constraints, by database index name. */
@@ -43,7 +45,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = http.getRequest<Request>();
     const response = http.getResponse<Response>();
 
-    const { status, message } = this.resolve(exception);
+    const { status, message, conflict } = this.resolve(exception);
 
     if (status >= 500) {
       this.logger.error(
@@ -52,12 +54,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
 
-    const body: ErrorResponseDto = {
+    const body: ErrorResponseDto & { conflict?: unknown } = {
       statusCode: status,
       error: this.statusText(status),
       message,
       path: request.url,
       timestamp: new Date().toISOString(),
+      ...(conflict === undefined ? {} : { conflict }),
     };
     response.status(status).json(body);
   }
@@ -69,7 +72,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
         typeof res === 'object' && res !== null && 'message' in res
           ? (res as { message: string | string[] }).message
           : exception.message;
-      return { status: exception.getStatus(), message };
+      const conflict =
+        typeof res === 'object' && res !== null && 'conflict' in res
+          ? res.conflict
+          : undefined;
+      return { status: exception.getStatus(), message, conflict };
     }
 
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {

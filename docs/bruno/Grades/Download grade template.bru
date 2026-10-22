@@ -1,0 +1,32 @@
+meta {
+  name: Download grade template
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{baseUrl}}/grade-imports/template?subjectId={{mathSubjectId}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  subjectId: {{mathSubjectId}}
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Is an Excel file", function () {
+    expect(res.getHeader("content-type")).to.contain("spreadsheetml");
+  });
+}
+
+docs {
+  An .xlsx for every class where the teacher teaches Mathematics (add classId for one class): Class, Reg. no., Last name, First name, a Grade column that only accepts 1-10 and an optional Date column. No ids in the file.
+}

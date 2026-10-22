@@ -62,10 +62,28 @@ export class BatchGradeDto {
   @Min(1)
   @Max(10)
   value!: number;
+
+  /**
+   * Date of this grade (YYYY-MM-DD, today or earlier), e.g. from a
+   * spreadsheet. Defaults to the date of the batch.
+   */
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @IsNotFutureDate()
+  date?: string;
+
+  /**
+   * Replace this existing grade of the student in the subject (value and
+   * date change, the history keeps the old ones) instead of adding a new one.
+   * Teachers can only replace grades they gave.
+   */
+  @IsOptional()
+  @IsUUID()
+  replaceGradeId?: string;
 }
 
 /** Up to this many grades are saved in one batch. */
-export const MAX_BATCH_GRADES = 100;
+export const MAX_BATCH_GRADES = 500;
 
 export class CreateGradesBatchDto {
   /** The subject every grade in the batch is for. */
@@ -91,9 +109,11 @@ export class CreateGradesBatchDto {
 }
 
 export class GradesBatchResultDto {
-  /** Number of grades created. @example 24 */
+  /** Number of grades saved (created or replaced). @example 24 */
   count!: number;
-  /** Ids of the created grades, in the order they were sent. */
+  /** How many of them replaced an existing grade. @example 1 */
+  replaced!: number;
+  /** Ids of the saved grades, in the order they were sent. */
   gradeIds!: string[];
 }
 
@@ -199,6 +219,8 @@ export class SubjectGradesDto {
 
 export class StudentGradesReportDto {
   student!: PersonSummaryDto;
+  /** Number in the school register (nr. matricol). @example 2026-0042 */
+  registrationNumber!: string;
   class!: ClassSummaryDto | null;
   /** Every subject of the class (and any other subject the student has grades in). */
   subjects!: SubjectGradesDto[];
@@ -212,6 +234,8 @@ export class StudentGradesReportDto {
 
 export class GradebookRowDto {
   student!: PersonSummaryDto;
+  /** The student's number in the school register (nr. matricol). @example 2026-0042 */
+  registrationNumber!: string;
   grades!: GradeEntryDto[];
   /** @example 8.66 */
   average!: number | null;

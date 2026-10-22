@@ -37,12 +37,20 @@ export class ApiError extends Error {
   readonly status: number
   /** Individual validation messages, when the API returned a list. */
   readonly details: string[]
+  /** What a change clashed with, when the API describes it (timetable 409s). */
+  readonly conflict: unknown
 
-  constructor(status: number, message: string, details: string[] = []) {
+  constructor(
+    status: number,
+    message: string,
+    details: string[] = [],
+    conflict?: unknown,
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.details = details
+    this.conflict = conflict
   }
 }
 
@@ -51,12 +59,18 @@ function toApiError(status: number, body: unknown): ApiError {
     typeof body === 'object' && body !== null && 'message' in body
       ? (body as { message: unknown }).message
       : undefined
+  const conflict =
+    typeof body === 'object' && body !== null && 'conflict' in body
+      ? (body as { conflict: unknown }).conflict
+      : undefined
 
   if (Array.isArray(message)) {
     const details = message.map(String)
     return new ApiError(status, details.join('. '), details)
   }
-  if (typeof message === 'string') return new ApiError(status, message)
+  if (typeof message === 'string') {
+    return new ApiError(status, message, [], conflict)
+  }
   return new ApiError(status, 'Something went wrong, please try again')
 }
 

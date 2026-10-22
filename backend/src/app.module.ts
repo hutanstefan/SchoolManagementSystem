@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { ClassSubjectsModule } from './class-subjects/class-subjects.module';
 import { ClassesModule } from './classes/classes.module';
+import { GradeImportsModule } from './grade-imports/grade-imports.module';
 import { GradeScansModule } from './grade-scans/grade-scans.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
@@ -37,6 +38,7 @@ import { TimetableModule } from './timetable/timetable.module';
     TimetableModule,
     GradesModule,
     GradeScansModule,
+    GradeImportsModule,
   ],
   providers: [
     // Global guards run in this order for every request:

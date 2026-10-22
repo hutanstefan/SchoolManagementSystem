@@ -27,6 +27,7 @@ export const STUDENT_USER: AuthUser = {
   role: 'STUDENT',
   student: {
     id: 's-1',
+    registrationNumber: '2026-0001',
     dateOfBirth: '2011-07-25',
     class: { id: 'c-9a', name: '9A' },
   },

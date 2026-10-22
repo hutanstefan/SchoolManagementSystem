@@ -136,20 +136,20 @@ export class GradesService {
   }
 
   /**
-   * Grades for many students of one class in one subject, e.g. read from
-   * photos of tests or from a spreadsheet. Saved together or not at all: one
+   * Grades for many students in one subject, e.g. read from photos of tests
+   * or from a spreadsheet. With a class, every student must be in it; without
+   * one (an import for several classes), the user must be allowed to grade
+   * the subject in each student's class. Saved together or not at all: one
    * invalid entry rejects the whole batch.
    */
   async createMany(
     user: AuthUser,
-    classId: string,
+    classId: string | null,
     dto: CreateGradesBatchDto,
   ): Promise<GradesBatchResultDto> {
-    const { className, teacherId } = await this.assertCanGrade(
-      user,
-      classId,
-      dto.subjectId,
-    );
+    const classCheck = classId
+      ? await this.assertCanGrade(user, classId, dto.subjectId)
+      : null;
 
     const studentIds = dto.grades.map((g) => g.studentId);
     if (new Set(studentIds).size !== studentIds.length) {
@@ -157,42 +157,157 @@ export class GradesService {
         'Each student can appear only once in a batch',
       );
     }
-    const enrolled = await this.prisma.student.count({
-      where: { id: { in: studentIds }, classId },
+    const students = await this.prisma.student.findMany({
+      where: { id: { in: studentIds } },
+      select: { id: true, classId: true },
     });
-    if (enrolled !== studentIds.length) {
-      throw new BadRequestException(
-        `${studentIds.length - enrolled} of the students are not in ${className}`,
-      );
-    }
+    const classOf = new Map(students.map((s) => [s.id, s.classId]));
 
-    const date = new Date(dto.date ?? todayInSchool());
-    const created = await this.prisma.$transaction(async (tx) => {
-      const grades = await tx.grade.createManyAndReturn({
-        data: dto.grades.map((g) => ({
+    // The teacher each grade is attributed to: the subject's teacher in the
+    // student's class.
+    const teacherByClass = new Map<string, string | null>();
+    if (classId && classCheck) {
+      const outside = studentIds.filter((id) => classOf.get(id) !== classId);
+      if (outside.length > 0) {
+        throw new BadRequestException(
+          `${outside.length} of the students are not in ${classCheck.className}`,
+        );
+      }
+      teacherByClass.set(classId, classCheck.teacherId);
+    } else {
+      if (students.length !== studentIds.length) {
+        throw new BadRequestException(
+          `${studentIds.length - students.length} of the students don't exist`,
+        );
+      }
+      if (students.some((s) => s.classId === null)) {
+        throw new BadRequestException(
+          'Every student must be enrolled in a class',
+        );
+      }
+      for (const id of new Set(students.map((s) => s.classId!))) {
+        const { teacherId } = await this.assertCanGrade(
+          user,
+          id,
+          dto.subjectId,
+        );
+        teacherByClass.set(id, teacherId);
+      }
+    }
+    const teacherOf = (studentId: string) =>
+      teacherByClass.get(classOf.get(studentId)!) ?? null;
+
+    const replacements = await this.findReplacements(user, dto);
+    const batchDate = dto.date ?? todayInSchool();
+
+    const saved = await this.prisma.$transaction(async (tx) => {
+      const ids = new Map<number, string>();
+
+      // New grades, in one statement.
+      const toCreate = dto.grades
+        .map((g, index) => ({ g, index }))
+        .filter(({ g }) => !g.replaceGradeId);
+      const created = await tx.grade.createManyAndReturn({
+        data: toCreate.map(({ g }) => ({
           studentId: g.studentId,
           subjectId: dto.subjectId,
-          teacherId,
+          teacherId: teacherOf(g.studentId),
           value: g.value,
-          date,
+          date: new Date(g.date ?? batchDate),
         })),
-        select: { id: true, studentId: true, value: true },
+        select: { id: true, studentId: true, value: true, date: true },
       });
+      // createManyAndReturn keeps the input order on PostgreSQL.
+      created.forEach((grade, i) => ids.set(toCreate[i].index, grade.id));
       await tx.gradeHistory.createMany({
-        data: grades.map((grade) => ({
+        data: created.map((grade) => ({
           gradeId: grade.id,
           studentId: grade.studentId,
           subjectId: dto.subjectId,
           action: GradeAction.CREATED,
           newValue: grade.value,
-          newDate: date,
+          newDate: grade.date,
           changedById: user.id,
         })),
       });
-      return grades;
+
+      // Replaced grades: new value and date, the old ones go to the history.
+      for (const [index, g] of dto.grades.entries()) {
+        if (!g.replaceGradeId) continue;
+        const old = replacements.get(g.replaceGradeId)!;
+        const date = new Date(g.date ?? batchDate);
+        await tx.grade.update({
+          where: { id: g.replaceGradeId },
+          data: { value: g.value, date },
+        });
+        await tx.gradeHistory.create({
+          data: {
+            gradeId: g.replaceGradeId,
+            studentId: g.studentId,
+            subjectId: dto.subjectId,
+            action: GradeAction.UPDATED,
+            oldValue: old.value,
+            newValue: g.value,
+            oldDate: old.date,
+            newDate: date,
+            changedById: user.id,
+          },
+        });
+        ids.set(index, g.replaceGradeId);
+      }
+      return dto.grades.map((_, index) => ids.get(index)!);
     });
-    // createManyAndReturn keeps the input order on PostgreSQL.
-    return { count: created.length, gradeIds: created.map((g) => g.id) };
+
+    return {
+      count: saved.length,
+      replaced: replacements.size,
+      gradeIds: saved,
+    };
+  }
+
+  /**
+   * The grades a batch wants to replace: each must exist, belong to that
+   * student and subject, and (for a teacher) have been given by them.
+   */
+  private async findReplacements(
+    user: AuthUser,
+    dto: CreateGradesBatchDto,
+  ): Promise<Map<string, { value: number; date: Date }>> {
+    const wanted = dto.grades.filter((g) => g.replaceGradeId);
+    const ids = wanted.map((g) => g.replaceGradeId!);
+    if (new Set(ids).size !== ids.length) {
+      throw new BadRequestException('A grade can be replaced only once');
+    }
+    if (ids.length === 0) return new Map();
+
+    const grades = await this.prisma.grade.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        value: true,
+        date: true,
+        studentId: true,
+        subjectId: true,
+        teacher: { select: { userId: true } },
+      },
+    });
+    const byId = new Map(grades.map((g) => [g.id, g]));
+    for (const entry of wanted) {
+      const grade = byId.get(entry.replaceGradeId!);
+      if (
+        !grade ||
+        grade.studentId !== entry.studentId ||
+        grade.subjectId !== dto.subjectId
+      ) {
+        throw new BadRequestException(
+          "A grade to replace doesn't exist or belongs to another student or subject",
+        );
+      }
+      if (user.role === Role.TEACHER && grade.teacher?.userId !== user.id) {
+        throw new ForbiddenException('You can only change grades you gave');
+      }
+    }
+    return new Map(grades.map((g) => [g.id, { value: g.value, date: g.date }]));
   }
 
   /**
@@ -430,7 +545,7 @@ export class GradesService {
 
     const students = await this.prisma.student.findMany({
       where: { classId },
-      select: personSelect,
+      select: { ...personSelect, registrationNumber: true },
       orderBy: [{ user: { lastName: 'asc' } }, { user: { firstName: 'asc' } }],
     });
     const grades = await this.prisma.grade.findMany({
@@ -450,6 +565,7 @@ export class GradesService {
         const own = grades.filter((g) => g.studentId === student.id);
         return {
           student: toPerson(student),
+          registrationNumber: student.registrationNumber,
           grades: own.map(toGradeEntry),
           ...subjectAverage(own.map((g) => g.value)),
           hasMinimumGrades: own.length >= minimum,
@@ -538,6 +654,7 @@ export class GradesService {
       where: { id: studentId },
       select: {
         ...personSelect,
+        registrationNumber: true,
         class: {
           select: {
             id: true,
@@ -608,6 +725,7 @@ export class GradesService {
 
     return {
       student: toPerson(student),
+      registrationNumber: student.registrationNumber,
       class: student.class
         ? { id: student.class.id, name: student.class.name }
         : null,

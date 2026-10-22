@@ -24,14 +24,11 @@ import {
 } from './api'
 import { PhotoPicker, type Photo } from './photo-picker'
 import { prepareImage } from './prepare-image'
-import {
-  batches,
-  failedTest,
-  gradesToSave,
-  toReviewRow,
-  type ReviewRow,
-} from './review'
-import { ReviewTable } from './review-table'
+import { batches, gradesToSave } from '@/features/grades/review/review'
+import { ReviewTable } from '@/features/grades/review/review-table'
+import { useReviewContext } from '@/features/grades/review/use-review-context'
+import { PhotoThumb, ScanReading } from './scan-row'
+import { failedTest, toScanRow, type ScanRow } from './scan-rows'
 
 /** Photos per page visit. */
 const MAX_PHOTOS = 20
@@ -60,8 +57,9 @@ export function ScanTestsPage() {
 
   const [photos, setPhotos] = useState<Photo[]>([])
   const [result, setResult] = useState<GradeScanResult | null>(null)
-  const [rows, setRows] = useState<ReviewRow[]>([])
+  const [rows, setRows] = useState<ScanRow[]>([])
   const [date, setDate] = useState(todayIso())
+  const { context, canReplace } = useReviewContext([classId], subjectId, date)
   /** Photos read so far while a scan runs, or null when idle. */
   const [progress, setProgress] = useState<{
     done: number
@@ -173,20 +171,20 @@ export function ScanTestsPage() {
       },
       tests,
     })
-    setRows(tests.map(toReviewRow))
+    setRows(tests.map(toScanRow))
   }
 
   /** Reads again only the photos that failed, keeping the teacher's other edits. */
   const retryFailed = async () => {
     const failedIndexes = rows
-      .filter((row) => row.test.status === 'failed')
-      .map((row) => row.test.index)
+      .filter((row) => row.failed)
+      .map((row) => row.source.index)
     const { tests } = await scanPhotos(failedIndexes)
     const byIndex = new Map(tests.map((test) => [test.index, test]))
     setRows((current) =>
       current.map((row) => {
-        const test = byIndex.get(row.test.index)
-        return test ? toReviewRow(test) : row
+        const test = byIndex.get(row.source.index)
+        return test ? toScanRow(test) : row
       }),
     )
   }
@@ -198,8 +196,8 @@ export function ScanTestsPage() {
     setRows([])
   }
 
-  const grades = gradesToSave(rows)
-  const failedCount = rows.filter((r) => r.test.status === 'failed').length
+  const grades = gradesToSave(rows, context)
+  const failedCount = rows.filter((r) => r.failed).length
   const submit = () => {
     if (!grades) return
     save.mutate(
@@ -326,9 +324,20 @@ export function ScanTestsPage() {
           )}
           <ReviewTable
             rows={rows}
-            photoUrls={photos.map((p) => p.url)}
             students={students.data ?? []}
-            mainModel={result.model}
+            subjectName={result.subject.name}
+            context={context}
+            canReplace={canReplace}
+            sourceHeader="Photo"
+            renderSource={(row) => (
+              <PhotoThumb
+                url={photos[row.source.index]?.url ?? null}
+                test={row.source}
+              />
+            )}
+            renderRead={(row) => (
+              <ScanReading test={row.source} mainModel={result.model} />
+            )}
             onChange={(index, change) =>
               setRows((current) =>
                 current.map((row, i) =>

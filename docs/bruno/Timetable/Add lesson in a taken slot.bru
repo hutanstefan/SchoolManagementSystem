@@ -22,8 +22,13 @@ tests {
   test("Status is 409", function () {
     expect(res.getStatus()).to.equal(409);
   });
+  test("Says what is in the way", function () {
+    const conflict = res.getBody().conflict;
+    expect(conflict.type).to.equal("CLASS_SLOT_TAKEN");
+    expect(conflict.lessons.length).to.equal(1);
+  });
 }
 
 docs {
-  Rejected: the class already has a lesson on Monday, period 6.
+  Rejected: the class already has a lesson on Monday, period 6. The `conflict` object in the body says which lesson is in the way, so the client can offer to swap or replace it (`swap: true` or `replaceLessonId`) or to pick a free slot.
 }

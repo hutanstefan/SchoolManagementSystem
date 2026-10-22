@@ -14,6 +14,7 @@ const data: GradebookData = {
   students: [
     {
       student: { id: 'st-1', firstName: 'Ana', lastName: 'Matei' },
+      registrationNumber: '2026-0001',
       grades: [
         {
           id: 'g-own',

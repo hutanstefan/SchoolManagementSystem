@@ -1,0 +1,25 @@
+meta {
+  name: Free slots of a subject
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/class-subjects/{{classSubjectId}}/free-slots
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Monday, period 6 is not free", function () {
+    const taken = res.getBody().some((s) => s.day === "MONDAY" && s.period === 6);
+    expect(taken).to.equal(false);
+  });
+}
+
+docs {
+  Slots where both the class and the subject's teacher are free. The timetable editor offers them when a slot is taken or the teacher is busy elsewhere.
+}

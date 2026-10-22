@@ -197,6 +197,7 @@ describe('Grades (e2e)', () => {
       expect(body.minimumGrades).toBe(5); // 4 hours per week + 1
       expect(body.students).toHaveLength(10);
       for (const row of body.students) {
+        expect(row.registrationNumber).toMatch(/^\d{4}-\d{4}$/);
         if (row.grades.length > 0) {
           expect(row.roundedAverage).toBe(Math.floor(row.average + 0.5));
         }

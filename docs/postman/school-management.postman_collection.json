@@ -827,7 +827,12 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status is 409', () => pm.response.to.have.status(409));"
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Says what is in the way', () => {",
+                  "  const conflict = pm.response.json().conflict;",
+                  "  pm.expect(conflict.type).to.equal('CLASS_SLOT_TAKEN');",
+                  "  pm.expect(conflict.lessons.length).to.equal(1);",
+                  "});"
                 ]
               }
             }
@@ -860,7 +865,40 @@
                 }
               }
             },
-            "description": "Rejected: the class already has a lesson on Monday, period 6."
+            "description": "Rejected: the class already has a lesson on Monday, period 6. The `conflict` object in the body says which lesson is in the way, so the client can offer to swap or replace it (`swap: true` or `replaceLessonId`) or to pick a free slot."
+          }
+        },
+        {
+          "name": "Free slots of a subject",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Monday, period 6 is not free', () => {",
+                  "  const taken = pm.response.json().some((s) => s.day === 'MONDAY' && s.period === 6);",
+                  "  pm.expect(taken).to.equal(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/class-subjects/{{classSubjectId}}/free-slots",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "class-subjects",
+                "{{classSubjectId}}",
+                "free-slots"
+              ]
+            },
+            "description": "Slots where both the class and the subject's teacher are free. The timetable editor offers them when a slot is taken or the teacher is busy elsewhere."
           }
         },
         {
@@ -1617,7 +1655,153 @@
                 }
               ]
             },
-            "description": "Sends two sample photos from docs/sample-tests (paths relative to docs/postman; in the Postman app, set docs/postman as the working directory or pick the files again). Claude reads the student and the grade on each one, or simulated results in demo mode without ANTHROPIC_API_KEY. Nothing is saved: the reviewed results are saved with \"Give grades in bulk\"."
+            "description": "Sends two sample photos from docs/sample-tests (paths relative to docs/postman; in the Postman app, set docs/postman as the working directory or pick the files again). The AI (Gemini or Claude) reads the student and the grade on each one, or simulated results in demo mode without an AI key. Nothing is saved: the reviewed results are saved with \"Give grades in bulk\"."
+          }
+        },
+        {
+          "name": "Import options",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test(\"Mathematics in the teacher's classes\", () => {",
+                  "  const maths = pm.response.json().find((o) => o.subject.name === 'Mathematics');",
+                  "  pm.expect(maths.classes.length).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/grade-imports/options",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grade-imports",
+                "options"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "The subjects the user can import grades for, each with its classes: everything for an admin, their own teaching assignments for a teacher."
+          }
+        },
+        {
+          "name": "Download grade template",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Is an Excel file', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('spreadsheetml'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/grade-imports/template?subjectId={{mathSubjectId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grade-imports",
+                "template"
+              ],
+              "query": [
+                {
+                  "key": "subjectId",
+                  "value": "{{mathSubjectId}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "An .xlsx for every class where the teacher teaches Mathematics (add classId for one class): Class, Reg. no., Last name, First name, a Grade column that only accepts 1-10 and an optional Date column. No ids in the file."
+          }
+        },
+        {
+          "name": "Import grades from CSV",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Every row matched, 8,5 rounded to 9', () => {",
+                  "  const rows = pm.response.json().rows;",
+                  "  pm.expect(rows.length).to.equal(3);",
+                  "  pm.expect(rows.every((r) => r.student !== null && r.student.class.name === '9A')).to.equal(true);",
+                  "  pm.expect(rows[1].grade).to.equal(9);",
+                  "  pm.expect(rows[0].date).to.equal('2026-10-15');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/grade-imports",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grade-imports"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "subjectId",
+                  "value": "{{mathSubjectId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "../sample-grades/grades-9A.csv"
+                }
+              ]
+            },
+            "description": "Reads docs/sample-grades/grades-9A.csv (Romanian headers, ; separator, dates as DD.MM.YYYY; path relative to docs/postman) for all the teacher's classes: rows are matched by reg. no., else by class and name. Nothing is saved: the reviewed rows are saved with POST /grades/batch, which also accepts a date per grade and replaceGradeId."
           }
         }
       ]

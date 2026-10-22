@@ -1,14 +1,42 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
+import { TimetableConflictException } from './timetable-conflict.exception';
 import { ClassesService } from '../classes/classes.service';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { serializableTransaction } from '../prisma/serializable-transaction';
 import { toWeek, TimetableService } from './timetable.service';
 
+const lessonRow = (
+  id: string,
+  subject: string,
+  className = '9A',
+  slot: { day?: 'MONDAY' | 'TUESDAY'; period?: number } = {},
+) => ({
+  id,
+  day: slot.day ?? 'MONDAY',
+  period: slot.period ?? 5,
+  room: null,
+  classSubject: {
+    id: `cs-${subject}`,
+    class: { id: `class-${className}`, name: className },
+    subject: { id: `s-${subject}`, name: subject },
+    teacher: {
+      id: 'teacher-mihai',
+      user: { firstName: 'Mihai', lastName: 'Ionescu' },
+    },
+  },
+});
+
 describe('TimetableService.create', () => {
   const tx = {
-    classSubject: { findUnique: jest.fn() },
-    timetableEntry: { findFirst: jest.fn(), create: jest.fn() },
+    classSubject: { findUnique: jest.fn(), update: jest.fn() },
+    timetableEntry: {
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      delete: jest.fn(),
+    },
   };
   const prisma = {
     // Run the transaction callback directly against the mocked client.
@@ -27,26 +55,37 @@ describe('TimetableService.create', () => {
     hoursPerWeek: 4,
     class: { name: '9A' },
     subject: { name: 'Mathematics' },
-    _count: { timetableEntries: 3 },
   };
+  /** findMany is called for the teacher's clashes, then the subject's lessons. */
+  const mockFindMany = (teacherClashes: unknown[], scheduled: unknown[]) =>
+    tx.timetableEntry.findMany
+      .mockResolvedValueOnce(teacherClashes)
+      .mockResolvedValueOnce(scheduled);
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
+    prisma.$transaction.mockImplementation(
+      (fn: (client: typeof tx) => unknown) => fn(tx),
+    );
     tx.classSubject.findUnique.mockResolvedValue(mathIn9A);
     tx.timetableEntry.findFirst.mockResolvedValue(null);
-    tx.timetableEntry.create.mockResolvedValue({
-      id: 'lesson-1',
-      day: 'MONDAY',
-      period: 5,
-      room: null,
-      classSubject: {
-        id: 'cs-math',
-        class: { id: 'class-9a', name: '9A' },
-        subject: { id: 's-math', name: 'Mathematics' },
-        teacher: null,
-      },
-    });
+    mockFindMany(
+      [],
+      [lessonRow('l-a', 'Mathematics'), lessonRow('l-b', 'Mathematics')],
+    );
+    tx.timetableEntry.create.mockResolvedValue(
+      lessonRow('lesson-1', 'Mathematics'),
+    );
   });
+
+  const conflictOf = async (promise: Promise<unknown>) => {
+    const error = await promise.then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(TimetableConflictException);
+    return error as TimetableConflictException;
+  };
 
   it('creates the lesson when the slot is free and hours are left', async () => {
     const lesson = await service.create('class-9a', dto);
@@ -65,45 +104,91 @@ describe('TimetableService.create', () => {
     );
   });
 
-  it('rejects a slot where the class already has a lesson', async () => {
-    tx.timetableEntry.findFirst.mockResolvedValueOnce({
-      classSubject: { class: { name: '9A' }, subject: { name: 'Physics' } },
-    });
-
-    await expect(service.create('class-9a', dto)).rejects.toThrow(
-      new ConflictException('9A already has Physics on Monday, period 5'),
+  it('describes the lesson in the way when the class slot is taken', async () => {
+    tx.timetableEntry.findFirst.mockResolvedValueOnce(
+      lessonRow('l-physics', 'Physics'),
     );
+
+    const error = await conflictOf(service.create('class-9a', dto));
+
+    expect(error.message).toBe('9A already has Physics on Monday, period 5');
+    expect(error.conflict).toMatchObject({
+      type: 'CLASS_SLOT_TAKEN',
+      day: 'MONDAY',
+      period: 5,
+      lessons: [{ id: 'l-physics', subject: { name: 'Physics' } }],
+    });
   });
 
-  it('rejects a slot where the teacher teaches another class', async () => {
-    tx.timetableEntry.findFirst
-      .mockResolvedValueOnce(null) // class is free
-      .mockResolvedValueOnce({
-        classSubject: {
-          class: { name: '10A' },
-          teacher: { user: { firstName: 'Mihai', lastName: 'Ionescu' } },
-        },
-      });
+  it("describes the teacher's other lesson when the teacher is busy", async () => {
+    tx.timetableEntry.findMany.mockReset();
+    mockFindMany([lessonRow('l-10a', 'Mathematics', '10A')], []);
 
-    await expect(service.create('class-9a', dto)).rejects.toThrow(
-      new ConflictException(
-        'Mihai Ionescu already teaches 10A on Monday, period 5',
-      ),
+    const error = await conflictOf(service.create('class-9a', dto));
+
+    expect(error.message).toBe(
+      'Mihai Ionescu already teaches 10A on Monday, period 5',
     );
+    expect(error.conflict.type).toBe('TEACHER_BUSY');
+    expect(error.conflict.lessons[0]).toMatchObject({ class: { name: '10A' } });
   });
 
-  it('rejects a lesson when the weekly hours are already scheduled', async () => {
-    tx.classSubject.findUnique.mockResolvedValue({
-      ...mathIn9A,
-      _count: { timetableEntries: 4 },
-    });
-
-    await expect(service.create('class-9a', dto)).rejects.toThrow(
-      new ConflictException(
-        'Mathematics already has 4/4 hours scheduled in 9A',
-      ),
+  it('lists the scheduled lessons when the weekly hours are full', async () => {
+    tx.timetableEntry.findMany.mockReset();
+    const four = ['l1', 'l2', 'l3', 'l4'].map((id) =>
+      lessonRow(id, 'Mathematics'),
     );
+    mockFindMany([], four);
+
+    const error = await conflictOf(service.create('class-9a', dto));
+
+    expect(error.message).toBe(
+      'Mathematics already has 4/4 hours scheduled in 9A',
+    );
+    expect(error.conflict).toMatchObject({
+      type: 'WEEKLY_HOURS_FULL',
+      classSubjectId: 'cs-math',
+      hoursPerWeek: 4,
+    });
+    expect(error.conflict.lessons).toHaveLength(4);
     expect(tx.timetableEntry.create).not.toHaveBeenCalled();
+  });
+
+  it('adds an hour when asked to, in the same transaction', async () => {
+    tx.timetableEntry.findMany.mockReset();
+    const four = ['l1', 'l2', 'l3', 'l4'].map((id) =>
+      lessonRow(id, 'Mathematics'),
+    );
+    mockFindMany([], four);
+
+    await service.create('class-9a', { ...dto, increaseHours: true });
+
+    expect(tx.classSubject.update).toHaveBeenCalledWith({
+      where: { id: 'cs-math' },
+      data: { hoursPerWeek: 5 },
+    });
+    expect(tx.timetableEntry.create).toHaveBeenCalled();
+  });
+
+  it('replaces the lesson in the slot only if it really is there', async () => {
+    tx.timetableEntry.findUnique.mockResolvedValueOnce({
+      classId: 'class-9a',
+      day: 'MONDAY',
+      period: 5,
+    });
+    await service.create('class-9a', { ...dto, replaceLessonId: 'l-physics' });
+    expect(tx.timetableEntry.delete).toHaveBeenCalledWith({
+      where: { id: 'l-physics' },
+    });
+
+    tx.timetableEntry.findUnique.mockResolvedValueOnce({
+      classId: 'class-9a',
+      day: 'TUESDAY',
+      period: 1,
+    });
+    await expect(
+      service.create('class-9a', { ...dto, replaceLessonId: 'l-moved' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
 

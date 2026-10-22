@@ -98,6 +98,22 @@ export class GradesController {
     return this.gradesService.create(user, dto);
   }
 
+  @Post('grades/batch')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiOperation({
+    summary: 'Give grades to many students, in one or more classes, at once',
+    description:
+      "Like POST /classes/:id/grades, for students of several classes (an Excel import for all classes). Teachers must teach the subject in every student's class. Saved in one transaction: all grades or none.",
+  })
+  @ApiCreatedResponse({ type: GradesBatchResultDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto })
+  createManyAcrossClasses(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateGradesBatchDto,
+  ): Promise<GradesBatchResultDto> {
+    return this.gradesService.createMany(user, null, dto);
+  }
+
   @Post('classes/:id/grades')
   @Roles(Role.ADMIN, Role.TEACHER)
   @ApiOperation({

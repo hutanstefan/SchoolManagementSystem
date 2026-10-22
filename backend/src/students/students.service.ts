@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Paginated, pageArgs, paginated } from '../common/dto/pagination.dto';
+import { todayInSchool } from '../common/dates';
 import { hashPassword } from '../common/password';
 import { Prisma, Role } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -10,6 +11,11 @@ import {
   StudentQueryDto,
   UpdateStudentDto,
 } from './dto/student.dto';
+import {
+  formatRegistrationNumber,
+  nextNumberInYear,
+  parseRegistrationNumber,
+} from './registration-number';
 import { studentSelect, toStudentDto } from './student.mapper';
 
 @Injectable()
@@ -25,19 +31,30 @@ export class StudentsService {
       ...(query.unassigned === true && { classId: null }),
       ...(query.unassigned === false && { classId: { not: null } }),
       ...(query.search && {
-        user: {
-          OR: [
-            { firstName: { contains: query.search, mode: 'insensitive' } },
-            { lastName: { contains: query.search, mode: 'insensitive' } },
-            { email: { contains: query.search, mode: 'insensitive' } },
-          ],
-        },
+        OR: [
+          // "2026-0042", "2026-42" or part of one, like "0042".
+          {
+            registrationNumber: {
+              contains:
+                parseRegistrationNumber(query.search) ?? query.search.trim(),
+            },
+          },
+          {
+            user: {
+              OR: [
+                { firstName: { contains: query.search, mode: 'insensitive' } },
+                { lastName: { contains: query.search, mode: 'insensitive' } },
+                { email: { contains: query.search, mode: 'insensitive' } },
+              ],
+            },
+          },
+        ],
       }),
     };
 
     const orderBy: Prisma.StudentOrderByWithRelationInput =
-      query.sort === 'dateOfBirth'
-        ? { dateOfBirth: query.order }
+      query.sort === 'dateOfBirth' || query.sort === 'registrationNumber'
+        ? { [query.sort]: query.order }
         : { user: { [query.sort]: query.order } };
 
     const [rows, total] = await this.prisma.$transaction([
@@ -65,16 +82,49 @@ export class StudentsService {
   async create(dto: CreateStudentDto): Promise<StudentDto> {
     await this.users.assertEmailAvailable(dto.email);
     if (dto.classId) await this.assertClassExists(dto.classId);
+    const passwordHash = await hashPassword(dto.password);
+    const year = Number(todayInSchool().slice(0, 4));
 
+    // The next number of the year is the highest one + 1. Two students created
+    // at the same moment could pick the same one: the unique index rejects the
+    // second insert, which then tries the next number.
+    for (let attempt = 1; ; attempt++) {
+      const highest = await this.prisma.student.findFirst({
+        where: { registrationNumber: { startsWith: `${year}-` } },
+        orderBy: { registrationNumber: 'desc' },
+        select: { registrationNumber: true },
+      });
+      const registrationNumber = formatRegistrationNumber(
+        year,
+        nextNumberInYear(highest?.registrationNumber ?? null),
+      );
+      try {
+        return await this.insert(dto, passwordHash, registrationNumber);
+      } catch (error) {
+        // The email was checked above, so a duplicate is the number.
+        const clash =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002';
+        if (!clash || attempt === 5) throw error;
+      }
+    }
+  }
+
+  private async insert(
+    dto: CreateStudentDto,
+    passwordHash: string,
+    registrationNumber: string,
+  ): Promise<StudentDto> {
     // Nested create: the user and the student profile are inserted in one transaction.
     const student = await this.prisma.student.create({
       data: {
+        registrationNumber,
         dateOfBirth: new Date(dto.dateOfBirth),
         class: dto.classId ? { connect: { id: dto.classId } } : undefined,
         user: {
           create: {
             email: dto.email,
-            passwordHash: await hashPassword(dto.password),
+            passwordHash,
             role: Role.STUDENT,
             firstName: dto.firstName,
             lastName: dto.lastName,

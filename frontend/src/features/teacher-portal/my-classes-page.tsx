@@ -1,4 +1,4 @@
-import { ClipboardList, School, Users } from 'lucide-react'
+import { ClipboardList, FileSpreadsheet, School, Users } from 'lucide-react'
 import { Link } from 'react-router'
 import { PageHeader } from '@/components/page-header'
 import { EmptyState, ErrorState } from '@/components/states'
@@ -25,6 +25,13 @@ export function MyClassesPage() {
       <PageHeader
         title="My classes"
         description="Classes you teach or are the homeroom teacher of."
+        actions={
+          <Button asChild variant="outline">
+            <Link to="/teacher/grades/import">
+              <FileSpreadsheet aria-hidden /> Import grades from Excel
+            </Link>
+          </Button>
+        }
       />
       {profile.isPending ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -19,6 +19,8 @@ export const queryKeys = {
     list: (params: object) => ['classes', 'list', params] as const,
     detail: (id: string) => ['classes', 'detail', id] as const,
     students: (id: string) => ['classes', 'students', id] as const,
+    /** Subjects and classes the user can import grades for. */
+    gradeImportOptions: ['classes', 'grade-import-options'] as const,
   },
   subjects: {
     all: ['subjects'] as const,

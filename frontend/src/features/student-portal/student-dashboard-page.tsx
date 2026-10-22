@@ -170,8 +170,12 @@ export function StudentDashboardPage() {
               )
             }
           />
-          <dl className="grid gap-4 p-4 text-sm sm:grid-cols-2 lg:grid-cols-5">
+          <dl className="grid gap-4 p-4 text-sm sm:grid-cols-3 lg:grid-cols-6">
             <ProfileField label="Name" value={fullName(user)} />
+            <ProfileField
+              label="Reg. no. (nr. matricol)"
+              value={user?.student?.registrationNumber}
+            />
             <ProfileField label="Email" value={user?.email} />
             <ProfileField
               label="Date of birth"

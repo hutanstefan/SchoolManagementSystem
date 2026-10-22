@@ -49,6 +49,12 @@ const admin = {
 }
 
 /** Shared by admins and teachers. */
+const importGrades = () =>
+  import('@/features/grade-imports/import-grades-page').then((m) => ({
+    Component: m.ImportGradesPage,
+  }))
+
+/** Shared by admins and teachers. */
 const scanTests = () =>
   import('@/features/grade-scans/scan-tests-page').then((m) => ({
     Component: m.ScanTestsPage,
@@ -123,6 +129,7 @@ export const routes: RouteObject[] = [
           { path: 'classes', lazy: admin.classes },
           { path: 'classes/:id', lazy: admin.class },
           { path: 'classes/:id/scan', lazy: scanTests },
+          { path: 'grades/import', lazy: importGrades },
           { path: 'subjects', lazy: admin.subjects },
           { path: 'grades', lazy: admin.grades },
         ],
@@ -139,6 +146,7 @@ export const routes: RouteObject[] = [
           { path: 'classes', lazy: teacher.classes },
           { path: 'classes/:id', lazy: teacher.class },
           { path: 'classes/:id/scan', lazy: scanTests },
+          { path: 'grades/import', lazy: importGrades },
           { path: 'students/:id', lazy: teacher.student },
           { path: 'timetable', lazy: myTimetable },
         ],

@@ -1,5 +1,13 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class CreateClassSubjectDto {
   @IsUUID()
@@ -37,4 +45,14 @@ export class UpdateClassSubjectDto {
   @Min(1)
   @Max(10)
   hoursPerWeek?: number;
+
+  /**
+   * Lessons of this subject to take out of the timetable first, in the same
+   * transaction (resolves an HOURS_BELOW_SCHEDULED conflict).
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsUUID('all', { each: true })
+  removeLessonIds?: string[];
 }

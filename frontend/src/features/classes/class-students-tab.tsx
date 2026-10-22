@@ -35,6 +35,15 @@ export function ClassStudentsTab({ classId }: { classId: string }) {
 
   const columns: Column<Student>[] = [
     {
+      header: 'Reg. no.',
+      cell: (s) => (
+        <span className="text-muted-foreground whitespace-nowrap tabular-nums">
+          {s.registrationNumber}
+        </span>
+      ),
+      className: 'w-24',
+    },
+    {
       header: 'Name',
       cell: (s) => (
         <Link

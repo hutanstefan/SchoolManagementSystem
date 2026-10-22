@@ -66,6 +66,15 @@ export function StudentsPage() {
 
   const columns: Column<Student>[] = [
     {
+      header: 'Reg. no.',
+      cell: (s) => (
+        <span className="text-muted-foreground whitespace-nowrap tabular-nums">
+          {s.registrationNumber}
+        </span>
+      ),
+      className: 'w-24',
+    },
+    {
       header: 'Name',
       cell: (s) => <span className="font-medium">{fullName(s)}</span>,
     },
@@ -137,7 +146,7 @@ export function StudentsPage() {
               setSearch(value)
               setPage(1)
             }}
-            placeholder="Search by name or email"
+            placeholder="Search by name, email or reg. no."
           />
           <Select
             value={classFilter}

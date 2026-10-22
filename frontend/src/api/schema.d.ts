@@ -398,6 +398,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/class-subjects/{id}/free-slots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Free slots for a subject of a class (admin)
+         * @description Slots where the class has no lesson and the subject's teacher teaches no other class. Used to suggest another slot after a conflict.
+         */
+        get: operations["TimetableController_freeSlots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/timetable-entries/{id}": {
         parameters: {
             query?: never;
@@ -454,6 +474,26 @@ export interface paths {
          * @description Teachers can only grade a subject they teach, in that student's class. The change is written to the grade history.
          */
         post: operations["GradesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/grades/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give grades to many students, in one or more classes, at once
+         * @description Like POST /classes/:id/grades, for students of several classes (an Excel import for all classes). Teachers must teach the subject in every student's class. Saved in one transaction: all grades or none.
+         */
+        post: operations["GradesController_createManyAcrossClasses"];
         delete?: never;
         options?: never;
         head?: never;
@@ -584,6 +624,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/grade-imports/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Subjects and classes the user can import grades for
+         * @description Admins: every subject taught in a class. Teachers: the subjects they teach, in the classes they teach them.
+         */
+        get: operations["GradeImportsController_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/grade-imports/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download an Excel template to fill in grades
+         * @description An .xlsx file with the class, registration number and name of every student, for one class or (without classId) every class where the user can grade the subject. The teacher types the grades and uploads it to POST /grade-imports.
+         */
+        get: operations["GradeImportsController_template"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/grade-imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read grades from an Excel file
+         * @description Matches every row to a student by registration number, else by class and name, and checks the grades and dates. Nothing is saved: review the rows, then save them with POST /grades/batch.
+         */
+        post: operations["GradeImportsController_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -607,6 +707,11 @@ export interface components {
         };
         StudentProfileDto: {
             id: string;
+            /**
+             * @description Number in the school register (nr. matricol).
+             * @example 2026-0042
+             */
+            registrationNumber: string;
             /** @example 2011-05-14 */
             dateOfBirth: string;
             /** @description Null when the student is not assigned to a class yet. */
@@ -659,6 +764,12 @@ export interface components {
         StudentDto: {
             id: string;
             userId: string;
+            /**
+             * @description Number in the school register (număr matricol): year of enrollment and
+             *     number in that year, given automatically.
+             * @example 2026-0042
+             */
+            registrationNumber: string;
             /** @example student@school.test */
             email: string;
             /** @example Andrei */
@@ -922,6 +1033,11 @@ export interface components {
              * @example 3
              */
             hoursPerWeek?: number;
+            /**
+             * @description Lessons of this subject to take out of the timetable first, in the same
+             *     transaction (resolves an HOURS_BELOW_SCHEDULED conflict).
+             */
+            removeLessonIds?: string[];
         };
         /** @enum {string} */
         Weekday: "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY";
@@ -946,6 +1062,11 @@ export interface components {
         TimetableDto: {
             days: components["schemas"]["TimetableDayDto"][];
         };
+        FreeSlotDto: {
+            day: components["schemas"]["Weekday"];
+            /** @example 3 */
+            period: number;
+        };
         CreateTimetableEntryDto: {
             /** @example MONDAY */
             day: components["schemas"]["Weekday"];
@@ -961,6 +1082,58 @@ export interface components {
             period: number;
             /** @example Room 101 */
             room?: string | null;
+            /**
+             * Format: uuid
+             * @description Resolves a CLASS_SLOT_TAKEN conflict: removes this lesson of the class
+             *     (it must be in the same slot) and adds the new one, in one transaction.
+             */
+            replaceLessonId?: string;
+            /**
+             * @description Resolves a WEEKLY_HOURS_FULL conflict: when every weekly hour of the
+             *     subject is already scheduled, adds one more hour (up to 10).
+             */
+            increaseHours?: boolean;
+        };
+        /**
+         * @description - CLASS_SLOT_TAKEN: the class already has a lesson in the slot (`lessons[0]`).
+         *     - TEACHER_BUSY: the teacher teaches another class then (`lessons`).
+         *     - WEEKLY_HOURS_FULL: all weekly hours of the subject are scheduled (`lessons`).
+         *     - HOURS_BELOW_SCHEDULED: fewer weekly hours than lessons in the timetable (`lessons`).
+         * @enum {string}
+         */
+        TimetableConflictType: "CLASS_SLOT_TAKEN" | "TEACHER_BUSY" | "WEEKLY_HOURS_FULL" | "HOURS_BELOW_SCHEDULED";
+        TimetableConflictDto: {
+            /**
+             * @description - CLASS_SLOT_TAKEN: the class already has a lesson in the slot (`lessons[0]`).
+             *     - TEACHER_BUSY: the teacher teaches another class then (`lessons`).
+             *     - WEEKLY_HOURS_FULL: all weekly hours of the subject are scheduled (`lessons`).
+             *     - HOURS_BELOW_SCHEDULED: fewer weekly hours than lessons in the timetable (`lessons`).
+             */
+            type: components["schemas"]["TimetableConflictType"];
+            /** @description The slot that was asked for (slot conflicts). */
+            day?: components["schemas"]["Weekday"];
+            /** @description The lessons involved in the conflict. */
+            lessons: components["schemas"]["TimetableLessonDto"][];
+            period?: number;
+            /** @description The subject of the class (hours conflicts). */
+            classSubjectId?: string;
+            /** @description The subject's weekly hours (hours conflicts). */
+            hoursPerWeek?: number;
+        };
+        TimetableConflictErrorDto: {
+            /** @example 404 */
+            statusCode: number;
+            error: string;
+            /**
+             * @description A message, or a list of validation messages.
+             * @example Student not found
+             */
+            message: Record<string, never>;
+            /** @example /api/students/0b39a733-7b2b-45e6-9d19-7938ad3af0b6 */
+            path: string;
+            /** @example 2026-10-20T10:00:00.000Z */
+            timestamp: string;
+            conflict: components["schemas"]["TimetableConflictDto"];
         };
         UpdateTimetableEntryDto: {
             day?: components["schemas"]["Weekday"];
@@ -968,6 +1141,17 @@ export interface components {
             period?: number;
             /** @example Physics lab */
             room?: string | null;
+            /**
+             * @description Resolves a CLASS_SLOT_TAKEN conflict: the lesson already in the new slot
+             *     takes this lesson's old slot (both teachers are checked).
+             */
+            swap?: boolean;
+            /**
+             * Format: uuid
+             * @description Resolves a CLASS_SLOT_TAKEN conflict the other way: removes the lesson
+             *     that is in the new slot (it must be the one in that slot).
+             */
+            replaceLessonId?: string;
         };
         GradeEntryDto: {
             id: string;
@@ -1003,6 +1187,11 @@ export interface components {
         };
         StudentGradesReportDto: {
             student: components["schemas"]["PersonSummaryDto"];
+            /**
+             * @description Number in the school register (nr. matricol).
+             * @example 2026-0042
+             */
+            registrationNumber: string;
             class: components["schemas"]["ClassSummaryDto"] | null;
             /** @description Every subject of the class (and any other subject the student has grades in). */
             subjects: components["schemas"]["SubjectGradesDto"][];
@@ -1055,6 +1244,18 @@ export interface components {
             studentId: string;
             /** @example 9 */
             value: number;
+            /**
+             * @description Date of this grade (YYYY-MM-DD, today or earlier), e.g. from a
+             *     spreadsheet. Defaults to the date of the batch.
+             */
+            date?: string;
+            /**
+             * Format: uuid
+             * @description Replace this existing grade of the student in the subject (value and
+             *     date change, the history keeps the old ones) instead of adding a new one.
+             *     Teachers can only replace grades they gave.
+             */
+            replaceGradeId?: string;
         };
         CreateGradesBatchDto: {
             /**
@@ -1072,11 +1273,16 @@ export interface components {
         };
         GradesBatchResultDto: {
             /**
-             * @description Number of grades created.
+             * @description Number of grades saved (created or replaced).
              * @example 24
              */
             count: number;
-            /** @description Ids of the created grades, in the order they were sent. */
+            /**
+             * @description How many of them replaced an existing grade.
+             * @example 1
+             */
+            replaced: number;
+            /** @description Ids of the saved grades, in the order they were sent. */
             gradeIds: string[];
         };
         UpdateGradeDto: {
@@ -1111,6 +1317,11 @@ export interface components {
         };
         GradebookRowDto: {
             student: components["schemas"]["PersonSummaryDto"];
+            /**
+             * @description The student's number in the school register (nr. matricol).
+             * @example 2026-0042
+             */
+            registrationNumber: string;
             grades: components["schemas"]["GradeEntryDto"][];
             /** @example 8.66 */
             average: number | null;
@@ -1179,6 +1390,75 @@ export interface components {
             subject: components["schemas"]["SubjectSummaryDto"];
             /** @description One entry per photo, in upload order. Nothing is saved yet. */
             tests: components["schemas"]["ScannedTestDto"][];
+        };
+        GradeImportOptionDto: {
+            subject: components["schemas"]["SubjectSummaryDto"];
+            /** @description In natural order (9A before 10A). */
+            classes: components["schemas"]["ClassSummaryDto"][];
+        };
+        ImportStudentDto: {
+            id: string;
+            /**
+             * @description Number in the school register (nr. matricol).
+             * @example 2026-0042
+             */
+            registrationNumber: string;
+            /** @example Ioana */
+            firstName: string;
+            /** @example Popescu */
+            lastName: string;
+            class: components["schemas"]["ClassSummaryDto"];
+        };
+        ImportedGradeRowDto: {
+            /**
+             * @description Row number in the spreadsheet, as Excel shows it.
+             * @example 5
+             */
+            rowNumber: number;
+            /**
+             * @description The class as written in the file.
+             * @example 9A
+             */
+            classRead: string | null;
+            /**
+             * @description The registration number as written in the file.
+             * @example 2026-42
+             */
+            registrationNumberRead: string | null;
+            /**
+             * @description The student as written in the file.
+             * @example Popescu Ioana
+             */
+            studentNameRead: string | null;
+            /**
+             * @description The grade as written in the file.
+             * @example 7,50
+             */
+            gradeRead: string | null;
+            /**
+             * @description The grade to give: a whole number from 1 to 10.
+             * @example 8
+             */
+            grade: number | null;
+            /** @description The date from the file (YYYY-MM-DD), or null to use the date chosen on the page. */
+            date: string | null;
+            /** @description The student the row belongs to, if found. */
+            student: components["schemas"]["ImportStudentDto"] | null;
+            /** @description Anything the teacher should check. */
+            note: string | null;
+        };
+        GradeImportResultDto: {
+            subject: components["schemas"]["SubjectSummaryDto"];
+            /** @description The classes of the import: the one asked for, or every class where the user can grade the subject. */
+            classes: components["schemas"]["ClassSummaryDto"][];
+            /** @description Every student of those classes, to fix a row matched to the wrong student. */
+            students: components["schemas"]["ImportStudentDto"][];
+            /** @example grades-9A-Mathematics.xlsx */
+            fileName: string;
+            /** @description Rows with a grade, in file order. Nothing is saved yet. */
+            rows: components["schemas"]["ImportedGradeRowDto"][];
+            /** @description Rows without a grade (students who weren't graded), left out. */
+            skippedRows: number;
         };
     };
     responses: never;
@@ -1305,7 +1585,7 @@ export interface operations {
                 /** @description Sort direction. */
                 order?: "asc" | "desc";
                 /** @description Field to sort by. */
-                sort?: "lastName" | "firstName" | "email" | "dateOfBirth" | "createdAt";
+                sort?: "lastName" | "firstName" | "email" | "dateOfBirth" | "registrationNumber" | "createdAt";
                 /** @description Only students of this class. */
                 classId?: string;
                 /** @description Only students without a class. */
@@ -2742,13 +3022,13 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description Timetable conflict */
+            /** @description Timetable conflict (CLASS_SLOT_TAKEN, TEACHER_BUSY or WEEKLY_HOURS_FULL) */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponseDto"];
+                    "application/json": components["schemas"]["TimetableConflictErrorDto"];
                 };
             };
         };
@@ -2770,6 +3050,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TimetableDto"];
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    TimetableController_freeSlots: {
+        parameters: {
+            query?: {
+                /** @description A lesson to ignore, e.g. the one being moved. */
+                excludeLessonId?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreeSlotDto"][];
                 };
             };
             /** @description Validation failed */
@@ -2891,13 +3220,13 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description Timetable conflict */
+            /** @description Timetable conflict (CLASS_SLOT_TAKEN or TEACHER_BUSY) */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponseDto"];
+                    "application/json": components["schemas"]["TimetableConflictErrorDto"];
                 };
             };
         };
@@ -3007,6 +3336,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GradeDto"];
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    GradesController_createManyAcrossClasses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGradesBatchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradesBatchResultDto"];
                 };
             };
             /** @description Validation failed */
@@ -3382,6 +3759,158 @@ export interface operations {
                 };
             };
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    GradeImportsController_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradeImportOptionDto"][];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    GradeImportsController_template: {
+        parameters: {
+            query: {
+                /** @description The subject the grades are for. */
+                subjectId: string;
+                /** @description One class; leave it out for every class where the user can grade the subject. */
+                classId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The .xlsx file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    GradeImportsController_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: uuid */
+                    subjectId: string;
+                    /**
+                     * Format: uuid
+                     * @description One class; leave it out for every class where the user can grade the subject.
+                     */
+                    classId?: string;
+                    /**
+                     * Format: binary
+                     * @description The filled-in template (.xlsx) or a .csv file with a Grade column and the registration numbers or names of the students (at most 2 MB).
+                     */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradeImportResultDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

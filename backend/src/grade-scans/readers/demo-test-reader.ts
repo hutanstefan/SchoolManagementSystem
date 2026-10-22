@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { nameTokens } from '../matching';
+import { nameTokens } from '../../grades/matching';
 import type {
   Confidence,
   ReadContext,

@@ -358,6 +358,16 @@ async function main(): Promise<void> {
     ...Array.from({ length: UNASSIGNED_STUDENTS }, () => null),
   ];
 
+  // Registration numbers: the year a student started high school (grade 9),
+  // and their number among that year's enrollments.
+  const enrolledInYear = new Map<number, number>();
+  const nextRegistrationNumber = (gradeLevel: number): string => {
+    const year = yearStart.getUTCFullYear() - (gradeLevel - 9);
+    const number = (enrolledInYear.get(year) ?? 0) + 1;
+    enrolledInYear.set(year, number);
+    return `${year}-${String(number).padStart(4, '0')}`;
+  };
+
   for (const [index, classId] of studentSlots.entries()) {
     const isMainStudent = index === 0;
     const firstName = isMainStudent ? 'Andrei' : faker.person.firstName();
@@ -366,14 +376,13 @@ async function main(): Promise<void> {
       ? `student@${EMAIL_DOMAIN}`
       : makeEmail(firstName, lastName, usedEmails);
 
+    const gradeLevel = classId
+      ? gradeLevelByClassId.get(classId)!
+      : faker.number.int({ min: 9, max: 12 });
     const student = await prisma.student.create({
       data: {
-        dateOfBirth: birthDateForGrade(
-          classId
-            ? gradeLevelByClassId.get(classId)!
-            : faker.number.int({ min: 9, max: 12 }),
-          yearStart,
-        ),
+        registrationNumber: nextRegistrationNumber(gradeLevel),
+        dateOfBirth: birthDateForGrade(gradeLevel, yearStart),
         class: classId ? { connect: { id: classId } } : undefined,
         user: {
           create: {

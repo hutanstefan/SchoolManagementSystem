@@ -1,4 +1,4 @@
-import { Pencil, ScanLine, Trash2 } from 'lucide-react'
+import { Pencil, FileSpreadsheet, ScanLine, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { BackLink } from '@/components/back-link'
@@ -96,11 +96,20 @@ export function ClassDetailPage() {
             studentLink={(studentId) => `/admin/students/${studentId}`}
             initialSubjectId={searchParams.get('subject')}
             actions={(subjectId) => (
-              <Button asChild variant="outline">
-                <Link to={`/admin/classes/${c.id}/scan?subject=${subjectId}`}>
-                  <ScanLine aria-hidden /> Scan tests
-                </Link>
-              </Button>
+              <>
+                <Button asChild variant="outline">
+                  <Link
+                    to={`/admin/grades/import?subject=${subjectId}&class=${c.id}`}
+                  >
+                    <FileSpreadsheet aria-hidden /> Import from Excel
+                  </Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link to={`/admin/classes/${c.id}/scan?subject=${subjectId}`}>
+                    <ScanLine aria-hidden /> Scan tests
+                  </Link>
+                </Button>
+              </>
             )}
           />
         </TabsContent>

@@ -1,4 +1,4 @@
-import { History, Pencil } from 'lucide-react'
+import { FileSpreadsheet, History, Pencil } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { DataTable, type Column } from '@/components/data-table'
@@ -128,7 +128,14 @@ export function GradesPage() {
     <>
       <PageHeader
         title="Grades"
-        description="All grades in the school. Add new grades from a class gradebook."
+        description="All grades in the school. Add new grades from a class gradebook, or import them from Excel."
+        actions={
+          <Button asChild variant="outline">
+            <Link to="/admin/grades/import">
+              <FileSpreadsheet aria-hidden /> Import from Excel
+            </Link>
+          </Button>
+        }
       />
       <Card className="gap-0 py-0">
         <div className="flex flex-col gap-3 border-b p-4 sm:flex-row">

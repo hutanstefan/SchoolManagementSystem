@@ -4,6 +4,7 @@ import { StudentDto } from './dto/student.dto';
 /** Fields needed to build a StudentDto. Shared with the classes module. */
 export const studentSelect = {
   id: true,
+  registrationNumber: true,
   dateOfBirth: true,
   class: { select: { id: true, name: true } },
   user: {
@@ -25,6 +26,7 @@ export function toStudentDto(student: StudentRow): StudentDto {
   return {
     id: student.id,
     userId: student.user.id,
+    registrationNumber: student.registrationNumber,
     email: student.user.email,
     firstName: student.user.firstName,
     lastName: student.user.lastName,

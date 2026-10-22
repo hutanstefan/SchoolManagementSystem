@@ -1,0 +1,29 @@
+meta {
+  name: Import options
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{baseUrl}}/grade-imports/options
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Mathematics in the teacher's classes", function () {
+    const maths = res.getBody().find((o) => o.subject.name === "Mathematics");
+    expect(maths.classes.length).to.be.greaterThan(0);
+  });
+}
+
+docs {
+  The subjects the user can import grades for, each with its classes: everything for an admin, their own teaching assignments for a teacher.
+}

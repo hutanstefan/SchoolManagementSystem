@@ -1,0 +1,37 @@
+meta {
+  name: Import grades from CSV
+  type: http
+  seq: 18
+}
+
+post {
+  url: {{baseUrl}}/grade-imports
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+body:multipart-form {
+  subjectId: {{mathSubjectId}}
+  file: @file(../sample-grades/grades-9A.csv)
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Every row matched, 8,5 rounded to 9", function () {
+    const rows = res.getBody().rows;
+    expect(rows.length).to.equal(3);
+    expect(rows.every((r) => r.student !== null && r.student.class.name === "9A")).to.equal(true);
+    expect(rows[1].grade).to.equal(9);
+    expect(rows[0].date).to.equal("2026-10-15");
+  });
+}
+
+docs {
+  Reads docs/sample-grades/grades-9A.csv (Romanian headers, ; separator, dates as DD.MM.YYYY) for all the teacher's classes: rows are matched by reg. no., else by class and name. Nothing is saved: the reviewed rows are saved with POST /grades/batch, which also accepts a date per grade and replaceGradeId.
+}

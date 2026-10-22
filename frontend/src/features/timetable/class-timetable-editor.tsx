@@ -18,12 +18,14 @@ import {
   type Weekday,
 } from '@/lib/format'
 import {
+  timetableConflictOf,
   useAddLesson,
   useClassTimetable,
   useDeleteLesson,
   useUpdateLesson,
   type Lesson,
 } from './api'
+import { ConflictDialog, type ConflictState } from './conflict-dialog'
 import { TimetableGrid } from './timetable-grid'
 
 type DialogState =
@@ -38,6 +40,10 @@ export function ClassTimetableEditor({
 }) {
   const timetable = useClassTimetable(schoolClass.id)
   const [dialog, setDialog] = useState<DialogState | null>(null)
+  // A new key per conflict, so the conflict dialog starts fresh each time.
+  const [conflict, setConflict] = useState<
+    (ConflictState & { key: number }) | null
+  >(null)
 
   if (timetable.isPending) return <LoadingBlock />
   if (timetable.error) {
@@ -80,7 +86,17 @@ export function ClassTimetableEditor({
         scheduled={scheduled}
         state={dialog}
         onClose={() => setDialog(null)}
+        onConflict={(state) =>
+          setConflict({ ...state, key: (conflict?.key ?? 0) + 1 })
+        }
       />
+      {conflict && (
+        <ConflictDialog
+          key={conflict.key}
+          initial={conflict}
+          onClose={() => setConflict(null)}
+        />
+      )}
     </Card>
   )
 }
@@ -99,11 +115,14 @@ function LessonDialog({
   scheduled,
   state,
   onClose,
+  onConflict,
 }: {
   schoolClass: ClassDetail
   scheduled: Map<string, number>
   state: DialogState | null
   onClose: () => void
+  /** A 409 the admin can resolve: this dialog closes and hands it over. */
+  onConflict: (state: ConflictState) => void
 }) {
   const add = useAddLesson()
   const update = useUpdateLesson()
@@ -133,18 +152,49 @@ function LessonDialog({
   }, [state, form])
 
   const submit = async ({ classSubjectId, day, period, room }: Output) => {
-    if (state?.mode === 'edit') {
-      await update.mutateAsync({
-        id: state.lesson.id,
-        body: { day, period, room: room || null },
+    const roomOrNull = room || null
+    try {
+      if (state?.mode === 'edit') {
+        await update.mutateAsync({
+          id: state.lesson.id,
+          body: { day, period, room: roomOrNull },
+        })
+      } else {
+        await add.mutateAsync({
+          classId: schoolClass.id,
+          body: { classSubjectId, day, period, room: roomOrNull },
+        })
+      }
+      onClose()
+    } catch (error) {
+      const conflict = timetableConflictOf(error)
+      if (!conflict || !state) throw error
+      onConflict({
+        conflict,
+        attempt:
+          state.mode === 'edit'
+            ? {
+                kind: 'move',
+                lesson: state.lesson,
+                day,
+                period,
+                room: roomOrNull,
+              }
+            : {
+                kind: 'add',
+                classId: schoolClass.id,
+                classSubjectId,
+                subjectName:
+                  schoolClass.subjects.find(
+                    (s) => s.classSubjectId === classSubjectId,
+                  )?.subject.name ?? 'The subject',
+                day,
+                period,
+                room: roomOrNull,
+              },
       })
-    } else {
-      await add.mutateAsync({
-        classId: schoolClass.id,
-        body: { classSubjectId, day, period, room: room || null },
-      })
+      onClose()
     }
-    onClose()
   }
 
   const subjectOptions = schoolClass.subjects.map((a) => ({

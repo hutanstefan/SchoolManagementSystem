@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -8,7 +9,9 @@ import { ClassSubjectSummaryDto } from '../classes/dto/class.dto';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { serializableTransaction } from '../prisma/serializable-transaction';
-import { assertTeacherIsFree } from '../timetable/timetable-conflicts';
+import { lessonSelect, toLesson } from '../timetable/lessons';
+import { TimetableConflictException } from '../timetable/timetable-conflict.exception';
+import { assertTeacherIsFreeAt } from '../timetable/timetable-conflicts';
 import {
   CreateClassSubjectDto,
   UpdateClassSubjectDto,
@@ -74,7 +77,8 @@ export class ClassSubjectsService {
 
   /**
    * Changes the teacher or the weekly hours. Both changes are checked against
-   * the timetable, inside one serializable transaction.
+   * the timetable, inside one serializable transaction. `removeLessonIds`
+   * takes lessons out of the timetable first, e.g. to lower the hours.
    */
   async update(
     id: string,
@@ -87,30 +91,53 @@ export class ClassSubjectsService {
         where: { id },
         select: {
           teacherId: true,
+          hoursPerWeek: true,
           class: { select: { name: true } },
           subject: { select: { name: true } },
-          timetableEntries: { select: { id: true, day: true, period: true } },
         },
       });
       if (!current) throw new NotFoundException('Class subject not found');
 
-      const scheduled = current.timetableEntries.length;
-      if (dto.hoursPerWeek !== undefined && dto.hoursPerWeek < scheduled) {
-        throw new ConflictException(
-          `${current.subject.name} has ${scheduled} lessons in the ${current.class.name} timetable. ` +
-            `Remove ${scheduled - dto.hoursPerWeek} of them before lowering the hours to ${dto.hoursPerWeek}.`,
+      if (dto.removeLessonIds?.length) {
+        const removed = await tx.timetableEntry.deleteMany({
+          where: { id: { in: dto.removeLessonIds }, classSubjectId: id },
+        });
+        if (removed.count !== dto.removeLessonIds.length) {
+          throw new BadRequestException(
+            `Some of the lessons to remove are not ${current.subject.name} lessons of ${current.class.name}`,
+          );
+        }
+      }
+
+      const lessons = await tx.timetableEntry.findMany({
+        where: { classSubjectId: id },
+        select: lessonSelect,
+        orderBy: [{ day: 'asc' }, { period: 'asc' }],
+      });
+      if (dto.hoursPerWeek !== undefined && dto.hoursPerWeek < lessons.length) {
+        throw new TimetableConflictException(
+          `${current.subject.name} has ${lessons.length} lessons in the ${current.class.name} timetable. ` +
+            `Remove ${lessons.length - dto.hoursPerWeek} of them before lowering the hours to ${dto.hoursPerWeek}.`,
+          {
+            type: 'HOURS_BELOW_SCHEDULED',
+            classSubjectId: id,
+            hoursPerWeek: dto.hoursPerWeek,
+            lessons: lessons.map(toLesson),
+          },
         );
       }
 
       // The new teacher must be free at every time this subject is scheduled.
       if (dto.teacherId && dto.teacherId !== current.teacherId) {
-        for (const entry of current.timetableEntries) {
-          await assertTeacherIsFree(tx, dto.teacherId, {
-            day: entry.day,
-            period: entry.period,
-            excludeEntryId: entry.id,
-          });
-        }
+        await assertTeacherIsFreeAt(
+          tx,
+          dto.teacherId,
+          lessons.map((lesson) => ({
+            day: lesson.day,
+            period: lesson.period,
+            exclude: [lesson.id],
+          })),
+        );
       }
 
       const updated = await tx.classSubject.update({

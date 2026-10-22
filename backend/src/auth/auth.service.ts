@@ -22,6 +22,7 @@ const authUserSelect = {
   student: {
     select: {
       id: true,
+      registrationNumber: true,
       dateOfBirth: true,
       class: { select: { id: true, name: true } },
     },
@@ -108,6 +109,7 @@ export class AuthService {
     role: AuthUserDto['role'];
     student: {
       id: string;
+      registrationNumber: string;
       dateOfBirth: Date;
       class: { id: string; name: string } | null;
     } | null;
@@ -122,6 +124,7 @@ export class AuthService {
       student: user.student
         ? {
             id: user.student.id,
+            registrationNumber: user.student.registrationNumber,
             dateOfBirth: user.student.dateOfBirth.toISOString().slice(0, 10),
             class: user.student.class,
           }

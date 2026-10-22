@@ -7,6 +7,11 @@ declare module '@tanstack/react-query' {
     mutationMeta: {
       /** Message shown in a toast when the mutation succeeds. */
       successMessage?: string
+      /**
+       * The page shows conflicts (409 with details) itself, e.g. in a dialog
+       * offering to resolve them, so no error toast for those.
+       */
+      handlesConflicts?: boolean
     }
   }
 }
@@ -29,7 +34,14 @@ export function createQueryClient(): QueryClient {
     },
     // Every failed or successful change shows a toast, so pages don't repeat this logic.
     mutationCache: new MutationCache({
-      onError: (error) => toast.error(errorMessage(error)),
+      onError: (error, _variables, _context, mutation) => {
+        const handled =
+          mutation.meta?.handlesConflicts &&
+          error instanceof ApiError &&
+          error.status === 409 &&
+          error.conflict !== undefined
+        if (!handled) toast.error(errorMessage(error))
+      },
       onSuccess: (_data, _variables, _context, mutation) => {
         if (mutation.meta?.successMessage) {
           toast.success(mutation.meta.successMessage)

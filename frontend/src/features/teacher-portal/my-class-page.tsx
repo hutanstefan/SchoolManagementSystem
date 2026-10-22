@@ -1,4 +1,4 @@
-import { ScanLine } from 'lucide-react'
+import { FileSpreadsheet, ScanLine } from 'lucide-react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { BackLink } from '@/components/back-link'
 import { DataTable, type Column } from '@/components/data-table'
@@ -93,11 +93,22 @@ export function MyClassPage() {
             studentLink={(studentId) => `/teacher/students/${studentId}`}
             initialSubjectId={searchParams.get('subject')}
             actions={(subjectId) => (
-              <Button asChild variant="outline">
-                <Link to={`/teacher/classes/${c.id}/scan?subject=${subjectId}`}>
-                  <ScanLine aria-hidden /> Scan tests
-                </Link>
-              </Button>
+              <>
+                <Button asChild variant="outline">
+                  <Link
+                    to={`/teacher/grades/import?subject=${subjectId}&class=${c.id}`}
+                  >
+                    <FileSpreadsheet aria-hidden /> Import from Excel
+                  </Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link
+                    to={`/teacher/classes/${c.id}/scan?subject=${subjectId}`}
+                  >
+                    <ScanLine aria-hidden /> Scan tests
+                  </Link>
+                </Button>
+              </>
             )}
           />
         </TabsContent>
@@ -113,6 +124,15 @@ export function MyClassPage() {
 }
 
 const studentColumns: Column<Student>[] = [
+  {
+    header: 'Reg. no.',
+    cell: (s) => (
+      <span className="text-muted-foreground whitespace-nowrap tabular-nums">
+        {s.registrationNumber}
+      </span>
+    ),
+    className: 'w-24',
+  },
   {
     header: 'Name',
     cell: (s) => (

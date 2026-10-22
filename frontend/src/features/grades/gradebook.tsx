@@ -86,6 +86,15 @@ export function Gradebook({
 
   const columns: Column<Row>[] = [
     {
+      header: 'Reg. no.',
+      className: 'w-24',
+      cell: (row) => (
+        <span className="text-muted-foreground whitespace-nowrap tabular-nums">
+          {row.registrationNumber}
+        </span>
+      ),
+    },
+    {
       header: 'Student',
       cell: (row) =>
         studentLink ? (

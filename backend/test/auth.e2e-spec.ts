@@ -80,7 +80,10 @@ describe('Auth (e2e)', () => {
     expect(response.body).toMatchObject({
       email: 'student@school.test',
       role: 'STUDENT',
-      student: { class: { name: '9A' } },
+      student: {
+        class: { name: '9A' },
+        registrationNumber: expect.stringMatching(/^\d{4}-\d{4}$/),
+      },
       teacher: null,
     });
   });

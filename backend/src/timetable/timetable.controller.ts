@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -28,7 +29,12 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { ErrorResponseDto } from '../common/dto/error-response.dto';
 import { Role } from '../generated/prisma/enums';
 import {
+  FreeSlotDto,
+  TimetableConflictErrorDto,
+} from './dto/timetable-conflict.dto';
+import {
   CreateTimetableEntryDto,
+  FreeSlotsQueryDto,
   TimetableDto,
   TimetableLessonDto,
   UpdateTimetableEntryDto,
@@ -84,6 +90,25 @@ export class TimetableController {
     return this.timetableService.forTeacher(teacherId);
   }
 
+  @Get('class-subjects/:id/free-slots')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Free slots for a subject of a class (admin)',
+    description:
+      "Slots where the class has no lesson and the subject's teacher teaches no other class. Used to suggest another slot after a conflict.",
+  })
+  @ApiOkResponse({ type: [FreeSlotDto] })
+  @ApiNotFoundResponse({ type: ErrorResponseDto })
+  freeSlots(
+    @Param('id', ParseUUIDPipe) classSubjectId: string,
+    @Query() query: FreeSlotsQueryDto,
+  ): Promise<FreeSlotDto[]> {
+    return this.timetableService.freeSlots(
+      classSubjectId,
+      query.excludeLessonId,
+    );
+  }
+
   @Post('classes/:id/timetable')
   @Roles(Role.ADMIN)
   @ApiOperation({
@@ -94,8 +119,9 @@ export class TimetableController {
   @ApiCreatedResponse({ type: TimetableLessonDto })
   @ApiNotFoundResponse({ type: ErrorResponseDto })
   @ApiConflictResponse({
-    type: ErrorResponseDto,
-    description: 'Timetable conflict',
+    type: TimetableConflictErrorDto,
+    description:
+      'Timetable conflict (CLASS_SLOT_TAKEN, TEACHER_BUSY or WEEKLY_HOURS_FULL)',
   })
   create(
     @Param('id', ParseUUIDPipe) classId: string,
@@ -110,8 +136,8 @@ export class TimetableController {
   @ApiOkResponse({ type: TimetableLessonDto })
   @ApiNotFoundResponse({ type: ErrorResponseDto })
   @ApiConflictResponse({
-    type: ErrorResponseDto,
-    description: 'Timetable conflict',
+    type: TimetableConflictErrorDto,
+    description: 'Timetable conflict (CLASS_SLOT_TAKEN or TEACHER_BUSY)',
   })
   update(
     @Param('id', ParseUUIDPipe) id: string,

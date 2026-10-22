@@ -32,6 +32,7 @@ export const STUDENT_SORT_FIELDS = [
   'firstName',
   'email',
   'dateOfBirth',
+  'registrationNumber',
   'createdAt',
 ] as const;
 
@@ -57,6 +58,11 @@ export class StudentQueryDto extends PaginationQueryDto {
 export class StudentDto {
   id!: string;
   userId!: string;
+  /**
+   * Number in the school register (număr matricol): year of enrollment and
+   * number in that year, given automatically. @example 2026-0042
+   */
+  registrationNumber!: string;
   /** @example student@school.test */
   email!: string;
   /** @example Andrei */

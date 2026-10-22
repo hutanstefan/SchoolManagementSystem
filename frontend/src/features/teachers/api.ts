@@ -36,11 +36,12 @@ export function useTeacher(id: string) {
 }
 
 /** The logged-in teacher with their classes and subjects (teacher only). */
-export function useMyTeacherProfile() {
+export function useMyTeacherProfile(options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.teachers.me,
     queryFn: () => unwrap(api.GET('/api/teachers/me')),
     staleTime: 5 * 60 * 1000,
+    enabled: options.enabled ?? true,
   })
 }
 

@@ -153,7 +153,9 @@ export function useAddClassSubject() {
   })
 }
 
-export function useUpdateClassSubject() {
+export function useUpdateClassSubject(
+  options: { handlesConflicts?: boolean } = {},
+) {
   const invalidate = useInvalidateSchool()
   return useMutation({
     mutationFn: ({
@@ -170,7 +172,10 @@ export function useUpdateClassSubject() {
         }),
       ),
     onSuccess: invalidate,
-    meta: { successMessage: 'Teaching assignment updated' },
+    meta: {
+      successMessage: 'Teaching assignment updated',
+      handlesConflicts: options.handlesConflicts,
+    },
   })
 }
 

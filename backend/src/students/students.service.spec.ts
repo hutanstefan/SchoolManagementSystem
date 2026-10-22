@@ -1,5 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { StudentsService } from './students.service';
@@ -8,7 +9,7 @@ describe('StudentsService', () => {
   const prisma = {
     user: { findUnique: jest.fn() },
     class: { findUnique: jest.fn() },
-    student: { create: jest.fn() },
+    student: { create: jest.fn(), findFirst: jest.fn() },
   };
   const service = new StudentsService(
     prisma as unknown as PrismaService,
@@ -25,6 +26,7 @@ describe('StudentsService', () => {
 
   const createdRow = {
     id: 'student-1',
+    registrationNumber: '2026-0042',
     dateOfBirth: new Date('2011-02-03T00:00:00.000Z'),
     class: null,
     user: {
@@ -40,11 +42,16 @@ describe('StudentsService', () => {
 
   it('creates the user account and the student profile together', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
+    prisma.student.findFirst.mockResolvedValue({
+      registrationNumber: '2026-0041',
+    });
     prisma.student.create.mockResolvedValue(createdRow);
 
     const result = await service.create(dto);
 
     const { data } = prisma.student.create.mock.calls[0][0];
+    // The next number of this year, after the highest one.
+    expect(data.registrationNumber).toMatch(/^\d{4}-\d{4}$/);
     expect(data.user.create).toMatchObject({
       email: dto.email,
       role: 'STUDENT',
@@ -57,8 +64,30 @@ describe('StudentsService', () => {
     ).toBe(true);
     expect(result).toMatchObject({
       id: 'student-1',
+      registrationNumber: '2026-0042',
       dateOfBirth: '2011-02-03',
     });
+  });
+
+  it('takes the next number when another student got that one first', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.student.findFirst
+      .mockResolvedValueOnce({ registrationNumber: '2026-0041' })
+      .mockResolvedValueOnce({ registrationNumber: '2026-0042' });
+    prisma.student.create
+      .mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      )
+      .mockResolvedValueOnce(createdRow);
+
+    await service.create(dto);
+
+    expect(prisma.student.create).toHaveBeenCalledTimes(2);
+    const second = prisma.student.create.mock.calls[1][0].data;
+    expect(second.registrationNumber.slice(5)).toBe('0043');
   });
 
   it('rejects an email that is already used', async () => {

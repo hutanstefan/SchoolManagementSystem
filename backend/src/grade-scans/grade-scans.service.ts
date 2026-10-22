@@ -17,7 +17,7 @@ import {
   lowerConfidence,
   nameMatches,
   toWholeGrade,
-} from './matching';
+} from '../grades/matching';
 import {
   TEST_READER,
   type ReadContext,

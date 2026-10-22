@@ -36,6 +36,7 @@ describe('AuthService', () => {
     tokenVersion: 3,
     student: {
       id: 'student-1',
+      registrationNumber: '2026-0001',
       dateOfBirth: new Date('2011-07-25T00:00:00.000Z'),
       class: { id: 'class-1', name: '9A' },
     },
@@ -81,6 +82,7 @@ describe('AuthService', () => {
         role: 'STUDENT',
         student: {
           id: 'student-1',
+          registrationNumber: '2026-0001',
           dateOfBirth: '2011-07-25',
           class: { id: 'class-1', name: '9A' },
         },

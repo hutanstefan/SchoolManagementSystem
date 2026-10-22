@@ -57,10 +57,13 @@ model User {
 }
 
 model Student {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @unique @map("user_id") @db.Uuid
-  dateOfBirth DateTime @map("date_of_birth") @db.Date
-  classId     String?  @map("class_id") @db.Uuid
+  id                 String   @id @default(uuid()) @db.Uuid
+  userId             String   @unique @map("user_id") @db.Uuid
+  /// Number in the school register (număr matricol): year of enrollment and
+  /// number among that year's enrollments, e.g. "2026-0042". Never changes.
+  registrationNumber String   @unique @map("registration_number")
+  dateOfBirth        DateTime @map("date_of_birth") @db.Date
+  classId            String?  @map("class_id") @db.Uuid
 
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// Deleting a class keeps its students, they just become unassigned.

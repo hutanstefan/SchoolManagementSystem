@@ -14,6 +14,7 @@ import { useSubjects } from '@/features/subjects/api'
 import { useAllTeachers } from '@/features/teachers/api'
 import { useClassTimetable } from '@/features/timetable/api'
 import { fullName } from '@/lib/format'
+import { timetableConflictOf } from '@/features/timetable/api'
 import {
   useAddClassSubject,
   useRemoveClassSubject,
@@ -21,6 +22,10 @@ import {
   type ClassDetail,
   type ClassSubject,
 } from './api'
+import {
+  AssignmentConflictDialog,
+  type AssignmentConflictState,
+} from './assignment-conflict-dialog'
 
 /** Subjects taught in the class, who teaches them and how many hours. */
 export function ClassSubjectsTab({
@@ -33,6 +38,9 @@ export function ClassSubjectsTab({
   const [editing, setEditing] = useState<ClassSubject | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [removing, setRemoving] = useState<ClassSubject | null>(null)
+  const [conflict, setConflict] = useState<
+    (AssignmentConflictState & { key: number }) | null
+  >(null)
 
   // Lessons already in the timetable for each subject.
   const scheduled = new Map<string, number>()
@@ -130,7 +138,17 @@ export function ClassSubjectsTab({
         assignment={editing}
         open={formOpen}
         onOpenChange={setFormOpen}
+        onConflict={(state) =>
+          setConflict({ ...state, key: (conflict?.key ?? 0) + 1 })
+        }
       />
+      {conflict && (
+        <AssignmentConflictDialog
+          key={conflict.key}
+          initial={conflict}
+          onClose={() => setConflict(null)}
+        />
+      )}
       <ConfirmDialog
         open={removing !== null}
         onOpenChange={(open) => !open && setRemoving(null)}
@@ -166,16 +184,18 @@ function ClassSubjectDialog({
   assignment,
   open,
   onOpenChange,
+  onConflict,
 }: {
   schoolClass: ClassDetail
   assignment: ClassSubject | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onConflict: (state: AssignmentConflictState) => void
 }) {
   const subjects = useSubjects()
   const teachers = useAllTeachers()
   const add = useAddClassSubject()
-  const update = useUpdateClassSubject()
+  const update = useUpdateClassSubject({ handlesConflicts: true })
   const form = useForm<Values, unknown, Output>({
     resolver: zodResolver(schema),
     defaultValues: { subjectId: '', teacherId: null, hoursPerWeek: '1' },
@@ -199,13 +219,24 @@ function ClassSubjectDialog({
 
   const submit = async (values: Output) => {
     if (assignment) {
-      await update.mutateAsync({
-        id: assignment.classSubjectId,
-        body: {
-          teacherId: values.teacherId,
-          hoursPerWeek: values.hoursPerWeek,
-        },
-      })
+      const body = {
+        teacherId: values.teacherId,
+        hoursPerWeek: values.hoursPerWeek,
+      }
+      try {
+        await update.mutateAsync({ id: assignment.classSubjectId, body })
+      } catch (error) {
+        const conflict = timetableConflictOf(error)
+        if (!conflict) throw error
+        onConflict({
+          classSubjectId: assignment.classSubjectId,
+          subjectName: assignment.subject.name,
+          body,
+          conflict,
+        })
+        onOpenChange(false)
+        return
+      }
     } else {
       await add.mutateAsync({ classId: schoolClass.id, body: values })
     }

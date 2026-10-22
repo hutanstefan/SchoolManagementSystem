@@ -40,7 +40,7 @@ export function StudentReportPage() {
       />
       <PageHeader
         title={fullName(r.student)}
-        description={r.class ? `Class ${r.class.name}` : 'Not in a class'}
+        description={`${r.class ? `Class ${r.class.name}` : 'Not in a class'} · Reg. no. ${r.registrationNumber}`}
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

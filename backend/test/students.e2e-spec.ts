@@ -95,6 +95,20 @@ describe('Students (e2e)', () => {
       expect(body.data[0].email).toBe('student@school.test');
     });
 
+    it('finds a student by registration number (nr. matricol)', async () => {
+      const { body: first } = await asAdmin(
+        api().get('/api/students?search=student@school.test'),
+      ).expect(200);
+      const { registrationNumber } = first.data[0];
+      expect(registrationNumber).toMatch(/^\d{4}-\d{4}$/);
+
+      const { body } = await asAdmin(
+        api().get(`/api/students?search=${registrationNumber}`),
+      ).expect(200);
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].email).toBe('student@school.test');
+    });
+
     it('filters unassigned students', async () => {
       const { body } = await asAdmin(
         api().get('/api/students?unassigned=true'),
@@ -124,6 +138,7 @@ describe('Students (e2e)', () => {
         email: data.email,
         dateOfBirth: '2011-05-14',
         class: null,
+        registrationNumber: expect.stringMatching(/^\d{4}-\d{4}$/),
       });
       expect(created).not.toHaveProperty('passwordHash');
 
@@ -144,6 +159,25 @@ describe('Students (e2e)', () => {
       // Delete
       await asAdmin(api().delete(`/api/students/${created.id}`)).expect(204);
       await asAdmin(api().get(`/api/students/${created.id}`)).expect(404);
+    });
+
+    it('numbers new students by year of enrollment, even when created together', async () => {
+      const year = new Date()
+        .toLocaleDateString('sv-SE', {
+          timeZone: 'Europe/Bucharest',
+        })
+        .slice(0, 4);
+      const created = await Promise.all(
+        [1, 2, 3].map(() =>
+          asAdmin(api().post('/api/students').send(newStudent())).expect(201),
+        ),
+      );
+      const numbers = created.map((r) => r.body.registrationNumber as string);
+
+      expect(new Set(numbers).size).toBe(3);
+      for (const number of numbers) {
+        expect(number.startsWith(`${year}-`)).toBe(true);
+      }
     });
 
     it('rejects a duplicate email with 409', async () => {

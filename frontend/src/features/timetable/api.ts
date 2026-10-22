@@ -1,9 +1,47 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, unwrap, type Schemas } from '@/api/client'
+import { ApiError, api, unwrap, type Schemas } from '@/api/client'
 import { queryKeys } from '@/api/query-keys'
 
 export type Timetable = Schemas['TimetableDto']
 export type Lesson = Schemas['TimetableLessonDto']
+export type TimetableConflict = Schemas['TimetableConflictDto']
+export type FreeSlot = Schemas['FreeSlotDto']
+
+/** The conflict described by a 409 from the timetable endpoints, if any. */
+export function timetableConflictOf(error: unknown): TimetableConflict | null {
+  return error instanceof ApiError &&
+    error.status === 409 &&
+    typeof error.conflict === 'object' &&
+    error.conflict !== null &&
+    'type' in error.conflict
+    ? (error.conflict as TimetableConflict)
+    : null
+}
+
+/** Slots where a subject could go: the class and its teacher are both free. */
+export function useFreeSlots(
+  classSubjectId: string | null,
+  excludeLessonId?: string,
+) {
+  return useQuery({
+    queryKey: [
+      ...queryKeys.timetable.all,
+      'free-slots',
+      classSubjectId,
+      excludeLessonId ?? null,
+    ],
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/class-subjects/{id}/free-slots', {
+          params: {
+            path: { id: classSubjectId! },
+            query: { excludeLessonId },
+          },
+        }),
+      ),
+    enabled: classSubjectId !== null,
+  })
+}
 
 export function useClassTimetable(classId: string) {
   return useQuery({
@@ -36,10 +74,14 @@ export function useMyTimetable() {
   })
 }
 
+/** Lessons can also change a subject's weekly hours, shown with the class. */
 function useInvalidateTimetables() {
   const queryClient = useQueryClient()
   return () =>
-    queryClient.invalidateQueries({ queryKey: queryKeys.timetable.all })
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.timetable.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.classes.all }),
+    ])
 }
 
 export function useAddLesson() {
@@ -59,7 +101,7 @@ export function useAddLesson() {
         }),
       ),
     onSuccess: invalidate,
-    meta: { successMessage: 'Lesson added' },
+    meta: { successMessage: 'Lesson added', handlesConflicts: true },
   })
 }
 
@@ -80,7 +122,7 @@ export function useUpdateLesson() {
         }),
       ),
     onSuccess: invalidate,
-    meta: { successMessage: 'Lesson updated' },
+    meta: { successMessage: 'Lesson updated', handlesConflicts: true },
   })
 }
 

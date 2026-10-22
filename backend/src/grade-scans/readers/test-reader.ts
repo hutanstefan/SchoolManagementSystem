@@ -1,3 +1,7 @@
+import type { Confidence } from '../../grades/matching';
+
+export type { Confidence };
+
 /** Image formats every AI provider accepts. */
 export type ImageMediaType =
   'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
@@ -21,8 +25,6 @@ export interface ReadContext {
   subjectName: string;
   roster: RosterEntry[];
 }
-
-export type Confidence = 'high' | 'medium' | 'low';
 
 /** What a reader found on one photo, before the service checks it. */
 export interface TestReading {

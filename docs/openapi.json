@@ -171,6 +171,7 @@
                 "firstName",
                 "email",
                 "dateOfBirth",
+                "registrationNumber",
                 "createdAt"
               ]
             }
@@ -2271,11 +2272,11 @@
             }
           },
           "409": {
-            "description": "Timetable conflict",
+            "description": "Timetable conflict (CLASS_SLOT_TAKEN, TEACHER_BUSY or WEEKLY_HOURS_FULL)",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/TimetableConflictErrorDto"
                 }
               }
             }
@@ -2358,6 +2359,86 @@
         ]
       }
     },
+    "/api/class-subjects/{id}/free-slots": {
+      "get": {
+        "description": "Slots where the class has no lesson and the subject's teacher teaches no other class. Used to suggest another slot after a conflict.",
+        "operationId": "TimetableController_freeSlots",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "excludeLessonId",
+            "required": false,
+            "in": "query",
+            "description": "A lesson to ignore, e.g. the one being moved.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FreeSlotDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Free slots for a subject of a class (admin)",
+        "tags": [
+          "Timetable"
+        ]
+      }
+    },
     "/api/timetable-entries/{id}": {
       "patch": {
         "operationId": "TimetableController_update",
@@ -2423,11 +2504,11 @@
             }
           },
           "409": {
-            "description": "Timetable conflict",
+            "description": "Timetable conflict (CLASS_SLOT_TAKEN or TEACHER_BUSY)",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/TimetableConflictErrorDto"
                 }
               }
             }
@@ -2750,6 +2831,74 @@
           }
         ],
         "summary": "Give a grade",
+        "tags": [
+          "Grades"
+        ]
+      }
+    },
+    "/api/grades/batch": {
+      "post": {
+        "description": "Like POST /classes/:id/grades, for students of several classes (an Excel import for all classes). Teachers must teach the subject in every student's class. Saved in one transaction: all grades or none.",
+        "operationId": "GradesController_createManyAcrossClasses",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGradesBatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GradesBatchResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Give grades to many students, in one or more classes, at once",
         "tags": [
           "Grades"
         ]
@@ -3293,6 +3442,235 @@
           "Grade scans (AI)"
         ]
       }
+    },
+    "/api/grade-imports/options": {
+      "get": {
+        "description": "Admins: every subject taught in a class. Teachers: the subjects they teach, in the classes they teach them.",
+        "operationId": "GradeImportsController_options",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GradeImportOptionDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Subjects and classes the user can import grades for",
+        "tags": [
+          "Grade imports (Excel)"
+        ]
+      }
+    },
+    "/api/grade-imports/template": {
+      "get": {
+        "description": "An .xlsx file with the class, registration number and name of every student, for one class or (without classId) every class where the user can grade the subject. The teacher types the grades and uploads it to POST /grade-imports.",
+        "operationId": "GradeImportsController_template",
+        "parameters": [
+          {
+            "name": "subjectId",
+            "required": true,
+            "in": "query",
+            "description": "The subject the grades are for.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "classId",
+            "required": false,
+            "in": "query",
+            "description": "One class; leave it out for every class where the user can grade the subject.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The .xlsx file",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Download an Excel template to fill in grades",
+        "tags": [
+          "Grade imports (Excel)"
+        ]
+      }
+    },
+    "/api/grade-imports": {
+      "post": {
+        "description": "Matches every row to a student by registration number, else by class and name, and checks the grades and dates. Nothing is saved: review the rows, then save them with POST /grades/batch.",
+        "operationId": "GradeImportsController_preview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "subjectId",
+                  "file"
+                ],
+                "properties": {
+                  "subjectId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "classId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "One class; leave it out for every class where the user can grade the subject."
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The filled-in template (.xlsx) or a .csv file with a Grade column and the registration numbers or names of the students (at most 2 MB)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GradeImportResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read grades from an Excel file",
+        "tags": [
+          "Grade imports (Excel)"
+        ]
+      }
     }
   },
   "info": {
@@ -3363,6 +3741,11 @@
           "id": {
             "type": "string"
           },
+          "registrationNumber": {
+            "type": "string",
+            "description": "Number in the school register (nr. matricol).",
+            "example": "2026-0042"
+          },
           "dateOfBirth": {
             "type": "string",
             "example": "2011-05-14"
@@ -3380,6 +3763,7 @@
         },
         "required": [
           "id",
+          "registrationNumber",
           "dateOfBirth",
           "class"
         ]
@@ -3520,6 +3904,11 @@
           "userId": {
             "type": "string"
           },
+          "registrationNumber": {
+            "type": "string",
+            "description": "Number in the school register (număr matricol): year of enrollment and\nnumber in that year, given automatically.",
+            "example": "2026-0042"
+          },
           "email": {
             "type": "string",
             "example": "student@school.test"
@@ -3554,6 +3943,7 @@
         "required": [
           "id",
           "userId",
+          "registrationNumber",
           "email",
           "firstName",
           "lastName",
@@ -4182,6 +4572,15 @@
             "example": 3,
             "minimum": 1,
             "maximum": 10
+          },
+          "removeLessonIds": {
+            "description": "Lessons of this subject to take out of the timetable first, in the same\ntransaction (resolves an HOURS_BELOW_SCHEDULED conflict).",
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },
@@ -4285,6 +4684,26 @@
           "days"
         ]
       },
+      "FreeSlotDto": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Weekday"
+              }
+            ]
+          },
+          "period": {
+            "type": "number",
+            "example": 3
+          }
+        },
+        "required": [
+          "day",
+          "period"
+        ]
+      },
       "CreateTimetableEntryDto": {
         "type": "object",
         "properties": {
@@ -4313,12 +4732,110 @@
             "nullable": true,
             "example": "Room 101",
             "maxLength": 30
+          },
+          "replaceLessonId": {
+            "type": "string",
+            "description": "Resolves a CLASS_SLOT_TAKEN conflict: removes this lesson of the class\n(it must be in the same slot) and adds the new one, in one transaction.",
+            "format": "uuid"
+          },
+          "increaseHours": {
+            "type": "boolean",
+            "description": "Resolves a WEEKLY_HOURS_FULL conflict: when every weekly hour of the\nsubject is already scheduled, adds one more hour (up to 10)."
           }
         },
         "required": [
           "day",
           "classSubjectId",
           "period"
+        ]
+      },
+      "TimetableConflictType": {
+        "type": "string",
+        "enum": [
+          "CLASS_SLOT_TAKEN",
+          "TEACHER_BUSY",
+          "WEEKLY_HOURS_FULL",
+          "HOURS_BELOW_SCHEDULED"
+        ],
+        "description": "- CLASS_SLOT_TAKEN: the class already has a lesson in the slot (`lessons[0]`).\n- TEACHER_BUSY: the teacher teaches another class then (`lessons`).\n- WEEKLY_HOURS_FULL: all weekly hours of the subject are scheduled (`lessons`).\n- HOURS_BELOW_SCHEDULED: fewer weekly hours than lessons in the timetable (`lessons`)."
+      },
+      "TimetableConflictDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "description": "- CLASS_SLOT_TAKEN: the class already has a lesson in the slot (`lessons[0]`).\n- TEACHER_BUSY: the teacher teaches another class then (`lessons`).\n- WEEKLY_HOURS_FULL: all weekly hours of the subject are scheduled (`lessons`).\n- HOURS_BELOW_SCHEDULED: fewer weekly hours than lessons in the timetable (`lessons`).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TimetableConflictType"
+              }
+            ]
+          },
+          "day": {
+            "description": "The slot that was asked for (slot conflicts).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Weekday"
+              }
+            ]
+          },
+          "lessons": {
+            "description": "The lessons involved in the conflict.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimetableLessonDto"
+            }
+          },
+          "period": {
+            "type": "number"
+          },
+          "classSubjectId": {
+            "type": "string",
+            "description": "The subject of the class (hours conflicts)."
+          },
+          "hoursPerWeek": {
+            "type": "number",
+            "description": "The subject's weekly hours (hours conflicts)."
+          }
+        },
+        "required": [
+          "type",
+          "lessons"
+        ]
+      },
+      "TimetableConflictErrorDto": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "example": 404
+          },
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "object",
+            "description": "A message, or a list of validation messages.",
+            "example": "Student not found"
+          },
+          "path": {
+            "type": "string",
+            "example": "/api/students/0b39a733-7b2b-45e6-9d19-7938ad3af0b6"
+          },
+          "timestamp": {
+            "type": "string",
+            "example": "2026-10-20T10:00:00.000Z"
+          },
+          "conflict": {
+            "$ref": "#/components/schemas/TimetableConflictDto"
+          }
+        },
+        "required": [
+          "statusCode",
+          "error",
+          "message",
+          "path",
+          "timestamp",
+          "conflict"
         ]
       },
       "UpdateTimetableEntryDto": {
@@ -4342,6 +4859,15 @@
             "nullable": true,
             "example": "Physics lab",
             "maxLength": 30
+          },
+          "swap": {
+            "type": "boolean",
+            "description": "Resolves a CLASS_SLOT_TAKEN conflict: the lesson already in the new slot\ntakes this lesson's old slot (both teachers are checked)."
+          },
+          "replaceLessonId": {
+            "type": "string",
+            "description": "Resolves a CLASS_SLOT_TAKEN conflict the other way: removes the lesson\nthat is in the new slot (it must be the one in that slot).",
+            "format": "uuid"
           }
         }
       },
@@ -4439,6 +4965,11 @@
           "student": {
             "$ref": "#/components/schemas/PersonSummaryDto"
           },
+          "registrationNumber": {
+            "type": "string",
+            "description": "Number in the school register (nr. matricol).",
+            "example": "2026-0042"
+          },
           "class": {
             "nullable": true,
             "type": "object",
@@ -4464,6 +4995,7 @@
         },
         "required": [
           "student",
+          "registrationNumber",
           "class",
           "subjects",
           "overallAverage"
@@ -4590,6 +5122,15 @@
             "example": 9,
             "minimum": 1,
             "maximum": 10
+          },
+          "date": {
+            "type": "string",
+            "description": "Date of this grade (YYYY-MM-DD, today or earlier), e.g. from a\nspreadsheet. Defaults to the date of the batch."
+          },
+          "replaceGradeId": {
+            "type": "string",
+            "description": "Replace this existing grade of the student in the subject (value and\ndate change, the history keeps the old ones) instead of adding a new one.\nTeachers can only replace grades they gave.",
+            "format": "uuid"
           }
         },
         "required": [
@@ -4629,11 +5170,16 @@
         "properties": {
           "count": {
             "type": "number",
-            "description": "Number of grades created.",
+            "description": "Number of grades saved (created or replaced).",
             "example": 24
           },
+          "replaced": {
+            "type": "number",
+            "description": "How many of them replaced an existing grade.",
+            "example": 1
+          },
           "gradeIds": {
-            "description": "Ids of the created grades, in the order they were sent.",
+            "description": "Ids of the saved grades, in the order they were sent.",
             "type": "array",
             "items": {
               "type": "string"
@@ -4642,6 +5188,7 @@
         },
         "required": [
           "count",
+          "replaced",
           "gradeIds"
         ]
       },
@@ -4763,6 +5310,11 @@
           "student": {
             "$ref": "#/components/schemas/PersonSummaryDto"
           },
+          "registrationNumber": {
+            "type": "string",
+            "description": "The student's number in the school register (nr. matricol).",
+            "example": "2026-0042"
+          },
           "grades": {
             "type": "array",
             "items": {
@@ -4785,6 +5337,7 @@
         },
         "required": [
           "student",
+          "registrationNumber",
           "grades",
           "average",
           "roundedAverage",
@@ -4955,6 +5508,172 @@
           "class",
           "subject",
           "tests"
+        ]
+      },
+      "GradeImportOptionDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "classes": {
+            "description": "In natural order (9A before 10A).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassSummaryDto"
+            }
+          }
+        },
+        "required": [
+          "subject",
+          "classes"
+        ]
+      },
+      "ImportStudentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "registrationNumber": {
+            "type": "string",
+            "description": "Number in the school register (nr. matricol).",
+            "example": "2026-0042"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Ioana"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Popescu"
+          },
+          "class": {
+            "$ref": "#/components/schemas/ClassSummaryDto"
+          }
+        },
+        "required": [
+          "id",
+          "registrationNumber",
+          "firstName",
+          "lastName",
+          "class"
+        ]
+      },
+      "ImportedGradeRowDto": {
+        "type": "object",
+        "properties": {
+          "rowNumber": {
+            "type": "number",
+            "description": "Row number in the spreadsheet, as Excel shows it.",
+            "example": 5
+          },
+          "classRead": {
+            "type": "string",
+            "nullable": true,
+            "description": "The class as written in the file.",
+            "example": "9A"
+          },
+          "registrationNumberRead": {
+            "type": "string",
+            "nullable": true,
+            "description": "The registration number as written in the file.",
+            "example": "2026-42"
+          },
+          "studentNameRead": {
+            "type": "string",
+            "nullable": true,
+            "description": "The student as written in the file.",
+            "example": "Popescu Ioana"
+          },
+          "gradeRead": {
+            "type": "string",
+            "nullable": true,
+            "description": "The grade as written in the file.",
+            "example": "7,50"
+          },
+          "grade": {
+            "type": "number",
+            "nullable": true,
+            "description": "The grade to give: a whole number from 1 to 10.",
+            "example": 8
+          },
+          "date": {
+            "type": "string",
+            "nullable": true,
+            "description": "The date from the file (YYYY-MM-DD), or null to use the date chosen on the page."
+          },
+          "student": {
+            "nullable": true,
+            "description": "The student the row belongs to, if found.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ImportStudentDto"
+              }
+            ]
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "description": "Anything the teacher should check."
+          }
+        },
+        "required": [
+          "rowNumber",
+          "classRead",
+          "registrationNumberRead",
+          "studentNameRead",
+          "gradeRead",
+          "grade",
+          "date",
+          "student",
+          "note"
+        ]
+      },
+      "GradeImportResultDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "classes": {
+            "description": "The classes of the import: the one asked for, or every class where the user can grade the subject.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassSummaryDto"
+            }
+          },
+          "students": {
+            "description": "Every student of those classes, to fix a row matched to the wrong student.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportStudentDto"
+            }
+          },
+          "fileName": {
+            "type": "string",
+            "example": "grades-9A-Mathematics.xlsx"
+          },
+          "rows": {
+            "description": "Rows with a grade, in file order. Nothing is saved yet.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportedGradeRowDto"
+            }
+          },
+          "skippedRows": {
+            "type": "number",
+            "description": "Rows without a grade (students who weren't graded), left out."
+          }
+        },
+        "required": [
+          "subject",
+          "classes",
+          "students",
+          "fileName",
+          "rows",
+          "skippedRows"
         ]
       }
     }

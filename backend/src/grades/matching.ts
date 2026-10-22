@@ -1,4 +1,11 @@
-import type { Confidence, RosterEntry } from './readers/test-reader';
+/** Matching names and grades written by hand (photos of tests, spreadsheets). */
+
+export type Confidence = 'high' | 'medium' | 'low';
+
+interface Person {
+  firstName: string;
+  lastName: string;
+}
 
 /** "Ștefan-Andrei  Huțan" -> ["stefan", "andrei", "hutan"] */
 export function nameTokens(name: string): string[] {
@@ -14,7 +21,7 @@ export function nameTokens(name: string): string[] {
  * Whether a name read from a paper plausibly belongs to a student: at least one
  * name matches, or an initial matches ("Popescu I." for "Popescu Ioana").
  */
-export function nameMatches(read: string, student: RosterEntry): boolean {
+export function nameMatches(read: string, student: Person): boolean {
   const readTokens = nameTokens(read);
   const studentTokens = nameTokens(`${student.firstName} ${student.lastName}`);
   return readTokens.some((token) =>
@@ -25,22 +32,32 @@ export function nameMatches(read: string, student: RosterEntry): boolean {
 }
 
 /**
- * Finds the student a name refers to when the reader couldn't: every word of
- * the name must match the student's first or last name. Null unless exactly
- * one student fits.
+ * The students a name can refer to: every word of the name must match the
+ * student's first or last name, in any order and without diacritics.
  */
-export function findStudentByName(
+export function studentsNamed<T extends Person>(
   read: string,
-  roster: RosterEntry[],
-): RosterEntry | null {
+  roster: T[],
+): T[] {
   const readTokens = nameTokens(read);
-  if (readTokens.length === 0) return null;
-  const matches = roster.filter((student) => {
+  if (readTokens.length === 0) return [];
+  return roster.filter((student) => {
     const studentTokens = nameTokens(
       `${student.firstName} ${student.lastName}`,
     );
     return readTokens.every((token) => studentTokens.includes(token));
   });
+}
+
+/**
+ * Finds the student a name refers to when the reader couldn't. Null unless
+ * exactly one student fits.
+ */
+export function findStudentByName<T extends Person>(
+  read: string,
+  roster: T[],
+): T | null {
+  const matches = studentsNamed(read, roster);
   return matches.length === 1 ? matches[0] : null;
 }
 
