@@ -4,10 +4,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { AuthUser } from '../auth/auth.types';
 import { Paginated, pageArgs, paginated } from '../common/dto/pagination.dto';
 import { personSelect, toPerson } from '../common/mappers';
 import { Prisma, Role } from '../generated/prisma/client';
+import {
+  DomainEvents,
+  type AssignmentChange,
+  type AssignmentsChangedEvent,
+} from '../events/domain-events';
 import { PrismaService } from '../prisma/prisma.service';
 import { StudentDto } from '../students/dto/student.dto';
 import { studentSelect, toStudentDto } from '../students/student.mapper';
@@ -31,7 +37,10 @@ type ClassRow = Prisma.ClassGetPayload<{ select: typeof classSelect }>;
 
 @Injectable()
 export class ClassesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventEmitter2,
+  ) {}
 
   /** Admins see every class, teachers only the classes they are assigned to. */
   async findAll(
@@ -126,6 +135,11 @@ export class ClassesService {
       data: { name: dto.name, homeroomTeacherId: dto.homeroomTeacherId },
       select: classSelect,
     });
+    await this.publishHomeroomChange(
+      schoolClass,
+      null,
+      dto.homeroomTeacherId ?? null,
+    );
     return toClassDto(schoolClass);
   }
 
@@ -136,12 +150,61 @@ export class ClassesService {
       await this.assertTeacherExists(dto.homeroomTeacherId);
     }
 
+    const before = await this.prisma.class.findUniqueOrThrow({
+      where: { id },
+      select: { homeroomTeacherId: true },
+    });
     const schoolClass = await this.prisma.class.update({
       where: { id },
       data: { name: dto.name, homeroomTeacherId: dto.homeroomTeacherId },
       select: classSelect,
     });
+    if (dto.homeroomTeacherId !== undefined) {
+      await this.publishHomeroomChange(
+        schoolClass,
+        before.homeroomTeacherId,
+        dto.homeroomTeacherId,
+      );
+    }
     return toClassDto(schoolClass);
+  }
+
+  /** Tells the teachers who became, or stopped being, the homeroom teacher. */
+  private async publishHomeroomChange(
+    schoolClass: { id: string; name: string },
+    fromTeacherId: string | null,
+    toTeacherId: string | null,
+  ): Promise<void> {
+    if (fromTeacherId === toTeacherId) return;
+    const ids = [fromTeacherId, toTeacherId].filter((id) => id !== null);
+    const teachers = await this.prisma.teacher.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, userId: true },
+    });
+    const userOf = (teacherId: string | null) =>
+      teachers.find((t) => t.id === teacherId)?.userId;
+
+    const changes: AssignmentChange[] = [];
+    const removed = userOf(fromTeacherId);
+    const added = userOf(toTeacherId);
+    const where = { classId: schoolClass.id, className: schoolClass.name };
+    if (removed) {
+      changes.push({
+        kind: 'homeroom-removed',
+        teacherUserId: removed,
+        ...where,
+      });
+    }
+    if (added) {
+      changes.push({
+        kind: 'homeroom-assigned',
+        teacherUserId: added,
+        ...where,
+      });
+    }
+    if (changes.length === 0) return;
+    const event: AssignmentsChangedEvent = { changes };
+    await this.events.emitAsync(DomainEvents.AssignmentsChanged, event);
   }
 
   /**

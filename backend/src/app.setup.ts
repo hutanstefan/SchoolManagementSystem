@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { SocketIoAdapter } from './common/socket-io.adapter';
 import { Env } from './config/env.validation';
 
 /**
@@ -24,6 +25,10 @@ export function configureApp(app: INestApplication): void {
     origin: config.get('CORS_ORIGINS', { infer: true }),
     credentials: true,
   });
+  // Live notifications (Socket.IO), allowed from the same origins.
+  app.useWebSocketAdapter(
+    new SocketIoAdapter(app, config.get('CORS_ORIGINS', { infer: true })),
+  );
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // strip properties that have no validation decorator

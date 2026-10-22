@@ -1,0 +1,35 @@
+meta {
+  name: My notifications (as student)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/notifications?pageSize=5
+  body: none
+  auth: bearer
+}
+
+params:query {
+  pageSize: 5
+}
+
+auth:bearer {
+  token: {{studentToken}}
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Newest first, with a title and a link", function () {
+    const { data } = res.getBody();
+    expect(data.length).to.be.greaterThan(0);
+    expect(data[0].title).to.be.a("string");
+    expect(data[0].link).to.equal("/student/grades");
+  });
+}
+
+docs {
+  The student's notifications, newest first; add unread=true for the unread ones. New ones are also pushed live over Socket.IO (path /api/socket.io, event "notification"), which Bruno can't show here.
+}

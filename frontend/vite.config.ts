@@ -42,6 +42,8 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
+        // Live notifications (Socket.IO under /api/socket.io)
+        ws: true,
       },
     },
   },

@@ -96,3 +96,26 @@ export function periodTime(period: number): string {
   const pad = (value: number) => String(value).padStart(2, '0')
   return `${pad(start)}:00–${pad(start)}:50`
 }
+
+/**
+ * How long ago something happened, for notifications: "just now",
+ * "5 min ago", "3 h ago", "yesterday", "17 Oct" (this year) or "17 Oct 2025".
+ */
+export function formatTimeAgo(value: string, now: Date = new Date()): string {
+  const then = new Date(value)
+  const minutes = Math.floor((now.getTime() - then.getTime()) / 60_000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24 && then.getDate() === now.getDate()) return `${hours} h ago`
+
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (then.toDateString() === yesterday.toDateString()) return 'yesterday'
+
+  return then.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    ...(then.getFullYear() !== now.getFullYear() && { year: 'numeric' }),
+  })
+}

@@ -31,6 +31,11 @@ export const queryKeys = {
     teacher: (id: string) => ['timetable', 'teacher', id] as const,
     me: ['timetable', 'me'] as const,
   },
+  notifications: {
+    all: ['notifications'] as const,
+    list: (params: object) => ['notifications', 'list', params] as const,
+    unreadCount: ['notifications', 'unread-count'] as const,
+  },
   grades: {
     all: ['grades'] as const,
     list: (params: object) => ['grades', 'list', params] as const,

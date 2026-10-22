@@ -8,7 +8,7 @@ A full-stack web application for managing students, teachers, classes and grades
 
 | Layer    | Technology                                                                                                 |
 | -------- | ---------------------------------------------------------------------------------------------------------- |
-| Backend  | NestJS 11, TypeScript (strict)                                                                             |
+| Backend  | NestJS 11, TypeScript (strict), Socket.IO (live notifications), event emitter (domain events)              |
 | Frontend | React 19, Vite, TypeScript, Tailwind CSS 4, shadcn/ui, React Router, TanStack Query, React Hook Form + Zod |
 | Database | PostgreSQL 16 (Docker), Prisma 7 ORM                                                                       |
 | Tooling  | ESLint + Prettier + Jest (API), Oxlint + Prettier + Vitest + Testing Library (web)                         |
@@ -113,6 +113,7 @@ erDiagram
     teachers |o--o{ grades : "gives"
     students ||--o{ grade_history : "audit of"
     users |o--o{ grade_history : "changed by"
+    users ||--o{ notifications : "receives"
 
     users {
         uuid id PK
@@ -177,6 +178,16 @@ erDiagram
         uuid changed_by_id FK "nullable"
         timestamp changed_at
     }
+    notifications {
+        uuid id PK
+        uuid user_id FK
+        enum type "GRADE_ADDED | GRADE_CHANGED | ... (6 kinds)"
+        string title
+        string body
+        string link "nullable"
+        timestamp read_at "null while unread"
+        timestamp created_at
+    }
 ```
 
 **Design decisions**
@@ -190,13 +201,14 @@ erDiagram
 - **Value ranges are enforced twice:** in the API validation and with database `CHECK` constraints (grade 1-10, period 1-8, hours per week 1-10).
 - **Averages are computed, never stored**, so they can never get out of sync with the grades. As in Romanian schools, each subject gets its own average, and the overall average is the mean of the subject averages.
 - **Every grade change is audited** in `grade_history`, written in the same transaction as the change (see [Grades and averages](#grades-and-averages)).
+- **Notifications are stored with their text**, written when the event happens, so they read the same later even if a subject is renamed or a lesson moves again.
 - **The timetable uses periods (1st to 8th lesson), not clock times.** That is how school timetables are read, and it keeps the overlap rules simple.
 
 **What happens on delete**
 
 | Deleted | Effect                                                                                 |
 | ------- | -------------------------------------------------------------------------------------- |
-| Student | Their grades and grade history are deleted too                                         |
+| Student | Their grades, grade history and notifications are deleted too                          |
 | Teacher | Their classes lose the homeroom teacher, their subjects become vacant, grades are kept |
 | Class   | Its students become unassigned, its teaching assignments and timetable are deleted     |
 | Subject | Blocked while it is taught in a class or has grades (`409 Conflict`)                   |
@@ -266,6 +278,11 @@ All endpoints are under `/api`. "Teacher (own)" means a teacher only sees the cl
 | GET    | `/grade-imports/options`            | Admin, Teacher                            | Subjects and classes the user can import grades for                        |
 | GET    | `/grade-imports/template`           | Admin, subject teacher                    | Excel template for one class or all classes of a subject                   |
 | POST   | `/grade-imports`                    | Admin, subject teacher                    | Read grades from a filled template or a CSV (saves nothing)                |
+| GET    | `/notifications`                    | Any logged-in                             | My notifications, newest first (paginated, `unread=true` filter)           |
+| GET    | `/notifications/unread-count`       | Any logged-in                             | How many are unread                                                        |
+| PATCH  | `/notifications/:id/read`           | Any logged-in (own only)                  | Mark one as read                                                           |
+| PATCH  | `/notifications/read-all`           | Any logged-in                             | Mark all as read                                                           |
+| WS     | `/api/socket.io`                    | Any logged-in (token in the handshake)    | Live `notification` events (Socket.IO)                                     |
 
 ### Conventions
 
@@ -323,6 +340,8 @@ The checks and the write run in one **serializable** transaction, so two admins 
 | Admin   | Dashboard, students, teachers, classes (students, subjects, timetable editor with conflict resolution, gradebook with test scanning and Excel import), subjects, all grades with history                  |
 | Teacher | Dashboard (today's lessons, classes, latest grades), my classes, class page (gradebook, students, timetable), **scan tests with AI**, **import grades from Excel**, a student's report card, my timetable |
 | Student | Dashboard (today's lessons, latest grades, profile), my grades (report card, averages by subject), my class (homeroom teacher, subjects and teachers), my timetable                                       |
+
+Teachers and students also have a **notification bell** in the header and a **Notifications** page (see [Notifications](#notifications-live)).
 
 The gradebook is one component shared by the admin and the teacher. A teacher sees only their own subjects (the homeroom teacher sees every subject of their class, read-only except their own), adds grades only in their subjects and changes only the grades they gave. The API enforces the same rules; the UI only hides what would be refused.
 
@@ -420,6 +439,34 @@ The API enforces the same rules (`replaceGradeId` must be a grade of that studen
 
 **Code:** `backend/src/grade-imports`, `frontend/src/features/grade-imports`, the shared review in `frontend/src/features/grades/review`.
 
+## Notifications (live)
+
+Students and teachers are told about what concerns them, as it happens: a toast pops up, the bell's counter goes up, and the page they are on refreshes its data (a student's dashboard shows the new grade without reloading).
+
+| Who              | Is told when                                                                                                       | Example                                                               |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| Student          | They get a grade, or one of their grades is changed or removed (also from a test scan or an Excel import)          | _New grade in Mathematics: 9_                                         |
+| Student          | Their class timetable changes: a lesson is added, moved, swapped, removed, changes room or gets a new teacher      | _Mathematics moved: Monday, period 1 → Tuesday, period 3._            |
+| Teacher          | One of their own lessons is added, moved or removed (with the class's name)                                        | _Mathematics in 9A moved_                                             |
+| Teacher          | They are given or lose a subject in a class, its weekly hours change, they become or stop being a homeroom teacher | _You teach Physics in 9A_                                             |
+| Homeroom teacher | A student of their class gets a failing grade (under 5), or an average drops under 5 after a change                | _Andrei Georgescu got a 4 in Mathematics. Their average is now 6.33._ |
+
+A change that touches many lessons (a swap, lowering the hours) is one notification listing the changes, not one per lesson. Nobody is told about their own action: the homeroom teacher who gives a 4 doesn't get an alert about it.
+
+**How it works**
+
+1. **Domain events.** The services that change data publish what happened after their transaction commits (`grades.changed`, `timetable.changed`, `assignments.changed`), with `@nestjs/event-emitter`. They don't know about notifications: the `notifications` module listens and decides who is told what (`notification-rules.listener.ts`). A failure there is logged and never undoes the change.
+2. **Timetable changes are compared, not guessed.** The timetable service takes a snapshot of the class's lessons before and after the change, in the same serializable transaction, and a pure function (`diffTimetable`) finds what was added, removed, moved, changed room or got a new teacher. Every operation (swap, replace, lowering the hours, a new teacher) is described correctly without special cases.
+3. **Saved, then pushed.** Notifications are saved in the `notifications` table, then sent over **Socket.IO** to every open tab of the user (each user has a room). Socket.IO runs under `/api/socket.io`, so the same nginx and Vite proxy rules serve it.
+4. **Authenticated connections.** The browser sends its access token in the handshake, checked exactly like an HTTP request (`AccessTokenService`, shared with the guard): wrong or expired token, no connection. On logout the server closes the user's open connections.
+5. **Nothing is missed.** After a reconnection (laptop asleep, network down) the app reloads the list, so a notification that arrived meanwhile shows up. Reading a notification in one tab updates the counter in the others.
+
+The wording of every notification is in one file of pure functions (`messages.ts`), unit-tested like the timetable comparison. The seed leaves each student's two latest grades as unread notifications, so the bell isn't empty on the first login.
+
+**Try it:** log in as `student@school.test` in one browser and as `teacher@school.test` in another (or a private window), then give the student a grade, or move one of 9A's lessons as `admin@school.test`.
+
+**Code:** `backend/src/notifications`, `backend/src/events`, `frontend/src/features/notifications`.
+
 ## Authentication and authorization
 
 - **Login** with email and password returns a signed JWT (`Authorization: Bearer <token>`), valid for 1 hour by default. The token only contains the user id and role.
@@ -460,4 +507,5 @@ The API validates its environment on startup and refuses to start if something i
 - **Refresh tokens** in an httpOnly cookie, so the access token can be short-lived (minutes) without logging users out every hour.
 - **httpOnly cookie for the token** instead of `localStorage`, with CSRF protection, so injected scripts can never read it.
 - **Per-device logout**: store a session id (`jti`) per login and revoke only that one, instead of all sessions of the user.
+- **Notifications by email or push** for users who aren't online, with a per-user setting, and a retention policy (e.g. delete read notifications after a school year). With several API instances, Socket.IO would need its Redis adapter, so a notification reaches a user connected to another instance.
 - **Test scanning for hundreds of schools**: today a scan is read while the request waits, which is fine for one school. At scale I would make it a background job: upload the photos to object storage (S3), put one job per photo in a queue (BullMQ on Redis), and let a pool of workers call the AI at the rate the account allows, with the same retry and fallback logic. The page would follow the progress over WebSocket, and a teacher could close it and come back. A paid AI tier (much higher limits) is still cheaper and more accurate than running a vision model on our own GPUs; self-hosting would make sense mainly if student data must not leave the school.

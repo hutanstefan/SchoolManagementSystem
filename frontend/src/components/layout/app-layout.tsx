@@ -10,6 +10,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { NotificationBell } from '@/features/notifications/notification-bell'
+import { useNotificationsSocket } from '@/features/notifications/use-notifications-socket'
 import { cn } from '@/lib/utils'
 import { NAV_ITEMS } from './nav'
 import { UserMenu } from './user-menu'
@@ -55,6 +57,9 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
 /** Sidebar on desktop, slide-out menu on mobile, page content on the right. */
 export function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const { user } = useAuth()
+  // Live notifications for teachers and students.
+  useNotificationsSocket()
 
   return (
     <div className="bg-muted/40 flex min-h-svh">
@@ -90,7 +95,8 @@ export function AppLayout() {
           <div className="md:hidden">
             <Brand />
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            {user && user.role !== 'ADMIN' && <NotificationBell />}
             <UserMenu />
           </div>
         </header>

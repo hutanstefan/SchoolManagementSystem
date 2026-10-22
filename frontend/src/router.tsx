@@ -55,6 +55,10 @@ const importGrades = () =>
   }))
 
 /** Shared by admins and teachers. */
+const notifications = () =>
+  import('@/features/notifications/notifications-page').then((m) => ({
+    Component: m.NotificationsPage,
+  }))
 const scanTests = () =>
   import('@/features/grade-scans/scan-tests-page').then((m) => ({
     Component: m.ScanTestsPage,
@@ -149,6 +153,7 @@ export const routes: RouteObject[] = [
           { path: 'grades/import', lazy: importGrades },
           { path: 'students/:id', lazy: teacher.student },
           { path: 'timetable', lazy: myTimetable },
+          { path: 'notifications', lazy: notifications },
         ],
       },
       {
@@ -163,6 +168,7 @@ export const routes: RouteObject[] = [
           { path: 'grades', lazy: student.grades },
           { path: 'class', lazy: student.class },
           { path: 'timetable', lazy: myTimetable },
+          { path: 'notifications', lazy: notifications },
         ],
       },
       { path: '*', element: <NotFoundPage /> },

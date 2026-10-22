@@ -4,12 +4,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { AuthUser } from '../auth/auth.types';
 import { ClassesService } from '../classes/classes.service';
 import { todayInSchool, toDateString } from '../common/dates';
 import { PersonSummaryDto } from '../common/dto/summaries.dto';
 import { Paginated, pageArgs, paginated } from '../common/dto/pagination.dto';
 import { personSelect, toPerson } from '../common/mappers';
+import {
+  DomainEvents,
+  type GradeChange,
+  type GradesChangedEvent,
+} from '../events/domain-events';
 import { GradeAction, Prisma, Role } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { minimumGrades, overallAverage, subjectAverage } from './averages';
@@ -60,7 +66,19 @@ export class GradesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly classes: ClassesService,
+    private readonly events: EventEmitter2,
   ) {}
+
+  /** Tells whoever listens (notifications) that grades changed. */
+  private async publish(
+    user: AuthUser,
+    subjectId: string,
+    changes: GradeChange[],
+  ): Promise<void> {
+    if (changes.length === 0) return;
+    const event: GradesChangedEvent = { actorId: user.id, subjectId, changes };
+    await this.events.emitAsync(DomainEvents.GradesChanged, event);
+  }
 
   // ---------------------------------------------------------------- writes
 
@@ -132,6 +150,15 @@ export class GradesService {
       });
       return created;
     });
+    await this.publish(user, dto.subjectId, [
+      {
+        kind: 'created',
+        gradeId: grade.id,
+        studentId: dto.studentId,
+        value: grade.value,
+        date: toDateString(date),
+      },
+    ]);
     return toGradeDto(grade);
   }
 
@@ -258,6 +285,33 @@ export class GradesService {
       return dto.grades.map((_, index) => ids.get(index)!);
     });
 
+    await this.publish(
+      user,
+      dto.subjectId,
+      dto.grades.map((g, index) => {
+        const date = g.date ?? batchDate;
+        const old = g.replaceGradeId
+          ? replacements.get(g.replaceGradeId)
+          : null;
+        return old
+          ? {
+              kind: 'updated' as const,
+              gradeId: saved[index],
+              studentId: g.studentId,
+              value: g.value,
+              date,
+              oldValue: old.value,
+              oldDate: toDateString(old.date),
+            }
+          : {
+              kind: 'created' as const,
+              gradeId: saved[index],
+              studentId: g.studentId,
+              value: g.value,
+              date,
+            };
+      }),
+    );
     return {
       count: saved.length,
       replaced: replacements.size,
@@ -402,6 +456,17 @@ export class GradesService {
       });
       return updated;
     });
+    await this.publish(user, current.subjectId, [
+      {
+        kind: 'updated',
+        gradeId: id,
+        studentId: current.studentId,
+        value: newValue,
+        date: toDateString(newDate),
+        oldValue: current.value,
+        oldDate: toDateString(current.date),
+      },
+    ]);
     return toGradeDto(grade);
   }
 
@@ -422,6 +487,15 @@ export class GradesService {
         },
       }),
       this.prisma.grade.delete({ where: { id } }),
+    ]);
+    await this.publish(user, current.subjectId, [
+      {
+        kind: 'deleted',
+        gradeId: id,
+        studentId: current.studentId,
+        value: current.value,
+        date: toDateString(current.date),
+      },
     ]);
   }
 

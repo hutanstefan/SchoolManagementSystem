@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { ClassesService } from '../classes/classes.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GradesService } from './grades.service';
@@ -16,9 +17,11 @@ describe('GradesService permissions', () => {
     gradeHistory: { create: jest.fn() },
     $transaction: jest.fn(),
   };
+  const events = { emitAsync: jest.fn() };
   const service = new GradesService(
     prisma as unknown as PrismaService,
     {} as ClassesService,
+    events as unknown as EventEmitter2,
   );
 
   const mihai = { id: 'user-mihai', role: 'TEACHER' as const };

@@ -1,0 +1,25 @@
+meta {
+  name: Read someone else's notification (404)
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/notifications/00000000-0000-4000-8000-000000000000/read
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{studentToken}}
+}
+
+tests {
+  test("Status is 404", function () {
+    expect(res.getStatus()).to.equal(404);
+  });
+}
+
+docs {
+  A user can only read their own notifications: any other id is "not found". PATCH /notifications/read-all marks all of them as read.
+}

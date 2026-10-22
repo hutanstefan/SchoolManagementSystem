@@ -16,6 +16,7 @@ import {
   Weekday,
   type ClassSubject,
 } from '../src/generated/prisma/client';
+import { gradeMessage } from '../src/notifications/messages';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -368,6 +369,7 @@ async function main(): Promise<void> {
     return `${year}-${String(number).padStart(4, '0')}`;
   };
 
+  const userIdByStudentId = new Map<string, string>();
   for (const [index, classId] of studentSlots.entries()) {
     const isMainStudent = index === 0;
     const firstName = isMainStudent ? 'Andrei' : faker.person.firstName();
@@ -396,6 +398,7 @@ async function main(): Promise<void> {
       },
     });
 
+    userIdByStudentId.set(student.id, student.userId);
     if (!classId) continue; // unassigned students have no grades yet
 
     // Each grade is given by the teacher who teaches that subject in the student's class.
@@ -441,10 +444,43 @@ async function main(): Promise<void> {
     })),
   });
 
+  // Each student's two latest grades wait as unread notifications, so the
+  // bell isn't empty on the first login. Same wording as live ones.
+  const subjectNameById = new Map(
+    [...subjects].map(([name, id]) => [id, name as string]),
+  );
+  const latestByStudent = new Map<string, typeof createdGrades>();
+  for (const grade of [...createdGrades].sort(
+    (a, b) => b.date.getTime() - a.date.getTime(),
+  )) {
+    const latest = latestByStudent.get(grade.studentId) ?? [];
+    if (latest.length < 2)
+      latestByStudent.set(grade.studentId, [...latest, grade]);
+  }
+  const notifications = await prisma.notification.createMany({
+    data: [...latestByStudent.values()].flat().map((grade) => ({
+      userId: userIdByStudentId.get(grade.studentId)!,
+      ...gradeMessage(
+        {
+          kind: 'created',
+          gradeId: grade.id,
+          studentId: grade.studentId,
+          value: grade.value,
+          date: grade.date.toISOString().slice(0, 10),
+        },
+        subjectNameById.get(grade.subjectId)!,
+      ),
+      link: '/student/grades',
+      // In the afternoon of the day the grade was given.
+      createdAt: new Date(grade.date.getTime() + 14 * 60 * 60 * 1000),
+    })),
+  });
+
   console.log(
     `Done: 1 admin, ${teacherIds.length} teachers, ${classIds.length} classes, ` +
       `${subjects.size} subjects, ${classSubjects.length} teaching assignments, ` +
-      `${timetable.length} timetable lessons, ${studentSlots.length} students, ${grades.length} grades.`,
+      `${timetable.length} timetable lessons, ${studentSlots.length} students, ${grades.length} grades, ` +
+      `${notifications.count} notifications.`,
   );
   console.log(
     `Login with admin@${EMAIL_DOMAIN}, teacher@${EMAIL_DOMAIN} or student@${EMAIL_DOMAIN} / ${DEFAULT_PASSWORD}`,

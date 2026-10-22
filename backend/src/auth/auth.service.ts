@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { Env } from '../config/env.validation';
+import { DomainEvents, type SessionEndedEvent } from '../events/domain-events';
 import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from './auth.types';
 import { AuthUserDto } from './dto/auth-user.dto';
@@ -43,6 +45,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService<Env, true>,
+    private readonly events: EventEmitter2,
   ) {}
 
   async login({ email, password }: LoginDto): Promise<LoginResponseDto> {
@@ -88,6 +91,10 @@ export class AuthService {
       where: { id: userId },
       data: { tokenVersion: { increment: 1 } },
     });
+    // Open WebSocket connections of the user are closed too.
+    await this.events.emitAsync(DomainEvents.SessionEnded, {
+      userId,
+    } satisfies SessionEndedEvent);
   }
 
   async getProfile(userId: string): Promise<AuthUserDto> {

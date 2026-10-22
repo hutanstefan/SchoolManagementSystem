@@ -26,6 +26,16 @@ enum GradeAction {
   DELETED
 }
 
+/// What a notification is about (picks its icon and wording in the app).
+enum NotificationType {
+  GRADE_ADDED
+  GRADE_CHANGED
+  GRADE_REMOVED
+  TIMETABLE_CHANGED
+  ASSIGNMENT_CHANGED
+  HOMEROOM_ALERT
+}
+
 enum Weekday {
   MONDAY
   TUESDAY
@@ -48,10 +58,11 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  student      Student?
-  teacher      Teacher?
+  student       Student?
+  teacher       Teacher?
   /// Grade changes made by this user.
-  gradeChanges GradeHistory[]
+  gradeChanges  GradeHistory[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -204,4 +215,25 @@ model GradeHistory {
   @@index([gradeId])
   @@index([studentId])
   @@map("grade_history")
+}
+
+/// Something that happened that a user should know about: a new grade, a
+/// timetable change... Shown in the app and pushed live over WebSocket.
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  title     String
+  body      String
+  /// Page of the app to open, e.g. "/student/grades".
+  link      String?
+  /// Null while unread.
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt])
+  @@map("notifications")
 }

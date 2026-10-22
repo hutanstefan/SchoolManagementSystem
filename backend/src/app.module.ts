@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { ClassSubjectsModule } from './class-subjects/class-subjects.module';
@@ -12,6 +13,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { validateEnv } from './config/env.validation';
 import { GradesModule } from './grades/grades.module';
 import { HealthModule } from './health/health.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { StudentsModule } from './students/students.module';
 import { SubjectsModule } from './subjects/subjects.module';
@@ -27,6 +29,8 @@ import { TimetableModule } from './timetable/timetable.module';
     }),
     // Default limit for every route; stricter limits are set per route (e.g. login).
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 120 }]),
+    // Domain events (a grade was given, the timetable changed...), see src/events.
+    EventEmitterModule.forRoot(),
     PrismaModule,
     AuthModule,
     HealthModule,
@@ -39,6 +43,7 @@ import { TimetableModule } from './timetable/timetable.module';
     GradesModule,
     GradeScansModule,
     GradeImportsModule,
+    NotificationsModule,
   ],
   providers: [
     // Global guards run in this order for every request:

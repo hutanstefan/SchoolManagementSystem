@@ -4,8 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { AuthUser } from '../auth/auth.types';
 import { ClassesService } from '../classes/classes.service';
+import { DomainEvents } from '../events/domain-events';
 import { Prisma, Role, Weekday } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { serializableTransaction } from '../prisma/serializable-transaction';
@@ -18,6 +20,7 @@ import {
   TimetableLessonDto,
   UpdateTimetableEntryDto,
 } from './dto/timetable.dto';
+import { snapshotLessons } from './lesson-snapshots';
 import { lessonSelect, toLesson, type LessonRow } from './lessons';
 import { TimetableConflictException } from './timetable-conflict.exception';
 import { assertClassIsFree, assertTeacherIsFree } from './timetable-conflicts';
@@ -33,6 +36,7 @@ export class TimetableService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly classes: ClassesService,
+    private readonly events: EventEmitter2,
   ) {}
 
   /** A class timetable: for admins, the class's teachers and its students. */
@@ -119,7 +123,7 @@ export class TimetableService {
   ): Promise<TimetableLessonDto> {
     await this.classes.assertExists(classId);
 
-    return serializableTransaction(this.prisma, async (tx) => {
+    return this.changeTimetable([classId], async (tx) => {
       const classSubject = await tx.classSubject.findUnique({
         where: { id: dto.classSubjectId },
         select: {
@@ -197,7 +201,13 @@ export class TimetableService {
     id: string,
     dto: UpdateTimetableEntryDto,
   ): Promise<TimetableLessonDto> {
-    return serializableTransaction(this.prisma, async (tx) => {
+    const lesson = await this.prisma.timetableEntry.findUnique({
+      where: { id },
+      select: { classId: true },
+    });
+    if (!lesson) throw new NotFoundException('Lesson not found');
+
+    return this.changeTimetable([lesson.classId], async (tx) => {
       const current = await tx.timetableEntry.findUnique({
         where: { id },
         select: {
@@ -290,10 +300,34 @@ export class TimetableService {
   async remove(id: string): Promise<void> {
     const lesson = await this.prisma.timetableEntry.findUnique({
       where: { id },
-      select: { id: true },
+      select: { classId: true },
     });
     if (!lesson) throw new NotFoundException('Lesson not found');
-    await this.prisma.timetableEntry.delete({ where: { id } });
+    await this.changeTimetable([lesson.classId], async (tx) => {
+      await tx.timetableEntry.delete({ where: { id } });
+    });
+  }
+
+  /**
+   * Runs a change of the timetable of some classes in a serializable
+   * transaction, then publishes the lessons before and after it, so students
+   * and teachers can be told what changed.
+   */
+  private async changeTimetable<T>(
+    classIds: string[],
+    change: (tx: Tx) => Promise<T>,
+  ): Promise<T> {
+    const { result, event } = await serializableTransaction(
+      this.prisma,
+      async (tx) => {
+        const before = await snapshotLessons(tx, classIds);
+        const result = await change(tx);
+        const after = await snapshotLessons(tx, classIds);
+        return { result, event: { classIds, before, after } };
+      },
+    );
+    await this.events.emitAsync(DomainEvents.TimetableChanged, event);
+    return result;
   }
 
   /**

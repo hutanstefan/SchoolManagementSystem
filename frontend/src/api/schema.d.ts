@@ -684,6 +684,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My notifications, newest first
+         * @description New ones are also pushed live over Socket.IO (path /api/socket.io, event "notification").
+         */
+        get: operations["NotificationsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many of my notifications are unread */
+        get: operations["NotificationsController_unreadCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Mark all my notifications as read */
+        patch: operations["NotificationsController_markAllRead"];
+        trace?: never;
+    };
+    "/api/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Mark one of my notifications as read */
+        patch: operations["NotificationsController_markRead"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1459,6 +1530,41 @@ export interface components {
             rows: components["schemas"]["ImportedGradeRowDto"][];
             /** @description Rows without a grade (students who weren't graded), left out. */
             skippedRows: number;
+        };
+        /** @enum {string} */
+        NotificationType: "GRADE_ADDED" | "GRADE_CHANGED" | "GRADE_REMOVED" | "TIMETABLE_CHANGED" | "ASSIGNMENT_CHANGED" | "HOMEROOM_ALERT";
+        NotificationDto: {
+            type: components["schemas"]["NotificationType"];
+            id: string;
+            title: string;
+            body: string;
+            /**
+             * @description The page of the app it is about.
+             * @example /student/grades
+             */
+            link: string | null;
+            /**
+             * Format: date-time
+             * @description Null while unread.
+             */
+            readAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PaginatedNotificationsDto: {
+            data: components["schemas"]["NotificationDto"][];
+            meta: components["schemas"]["PaginationMetaDto"];
+        };
+        UnreadCountDto: {
+            /** @example 3 */
+            count: number;
+        };
+        MarkAllReadResultDto: {
+            /**
+             * @description How many notifications were marked as read.
+             * @example 3
+             */
+            count: number;
         };
     };
     responses: never;
@@ -3909,6 +4015,97 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_list: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page (max 100). */
+                pageSize?: number;
+                /** @description Only unread notifications. */
+                unread?: true | false;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedNotificationsDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_unreadCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadCountDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_markAllRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkAllReadResultDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             404: {
                 headers: {

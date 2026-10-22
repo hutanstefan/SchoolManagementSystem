@@ -4,6 +4,7 @@ import {
   currentPeriod,
   formatAverage,
   formatDate,
+  formatTimeAgo,
   fullName,
   isPeriodOver,
   periodTime,
@@ -58,5 +59,20 @@ describe('format helpers', () => {
       'Ana Popescu',
     )
     expect(fullName(null)).toBe('—')
+  })
+
+  it('says how long ago something happened', () => {
+    const now = new Date(2026, 9, 22, 15, 0)
+    const ago = (minutes: number) =>
+      formatTimeAgo(
+        new Date(now.getTime() - minutes * 60_000).toISOString(),
+        now,
+      )
+    expect(ago(0)).toBe('just now')
+    expect(ago(5)).toBe('5 min ago')
+    expect(ago(3 * 60)).toBe('3 h ago')
+    expect(ago(20 * 60)).toBe('yesterday')
+    expect(ago(3 * 24 * 60)).toBe('19 Oct')
+    expect(ago(400 * 24 * 60)).toBe('17 Sept 2025')
   })
 })

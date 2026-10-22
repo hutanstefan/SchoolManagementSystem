@@ -1,3 +1,4 @@
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { TimetableConflictException } from './timetable-conflict.exception';
 import { ClassesService } from '../classes/classes.service';
@@ -43,9 +44,11 @@ describe('TimetableService.create', () => {
     $transaction: jest.fn((fn: (client: typeof tx) => unknown) => fn(tx)),
   };
   const classes = { assertExists: jest.fn() };
+  const events = { emitAsync: jest.fn() };
   const service = new TimetableService(
     prisma as unknown as PrismaService,
     classes as unknown as ClassesService,
+    events as unknown as EventEmitter2,
   );
 
   const dto = { classSubjectId: 'cs-math', day: 'MONDAY' as const, period: 5 };
@@ -56,11 +59,18 @@ describe('TimetableService.create', () => {
     class: { name: '9A' },
     subject: { name: 'Mathematics' },
   };
-  /** findMany is called for the teacher's clashes, then the subject's lessons. */
-  const mockFindMany = (teacherClashes: unknown[], scheduled: unknown[]) =>
-    tx.timetableEntry.findMany
-      .mockResolvedValueOnce(teacherClashes)
-      .mockResolvedValueOnce(scheduled);
+  /**
+   * findMany is called for the teacher's clashes, then the subject's lessons.
+   * The snapshots of the class timetable (before and after, for the
+   * notifications) are told apart by their `classId: { in }` filter.
+   */
+  const mockFindMany = (teacherClashes: unknown[], scheduled: unknown[]) => {
+    const answers = [teacherClashes, scheduled];
+    tx.timetableEntry.findMany.mockImplementation(
+      (args: { where?: { classId?: { in?: string[] } } }) =>
+        Promise.resolve(args.where?.classId?.in ? [] : answers.shift()),
+    );
+  };
 
   beforeEach(() => {
     jest.resetAllMocks();

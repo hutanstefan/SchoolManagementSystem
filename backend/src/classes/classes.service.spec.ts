@@ -1,3 +1,4 @@
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClassesService, compareClassNames } from './classes.service';
@@ -7,7 +8,10 @@ describe('ClassesService', () => {
     class: { findUnique: jest.fn(), count: jest.fn() },
     student: { findMany: jest.fn() },
   };
-  const service = new ClassesService(prisma as unknown as PrismaService);
+  const service = new ClassesService(
+    prisma as unknown as PrismaService,
+    { emitAsync: jest.fn() } as unknown as EventEmitter2,
+  );
   const teacher = { id: 'user-teacher', role: 'TEACHER' as const };
   const admin = { id: 'user-admin', role: 'ADMIN' as const };
 
