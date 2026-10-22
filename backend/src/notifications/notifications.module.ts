@@ -1,17 +1,12 @@
 import { Module } from '@nestjs/common';
-import { AuthModule } from '../auth/auth.module';
+import { RealtimeModule } from '../realtime/realtime.module';
 import { NotificationRulesListener } from './notification-rules.listener';
 import { NotificationsController } from './notifications.controller';
-import { NotificationsGateway } from './notifications.gateway';
 import { NotificationsService } from './notifications.service';
 
 @Module({
-  imports: [AuthModule],
+  imports: [RealtimeModule],
   controllers: [NotificationsController],
-  providers: [
-    NotificationsGateway,
-    NotificationsService,
-    NotificationRulesListener,
-  ],
+  providers: [NotificationsService, NotificationRulesListener],
 })
 export class NotificationsModule {}

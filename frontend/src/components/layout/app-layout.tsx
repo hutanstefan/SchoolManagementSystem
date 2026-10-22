@@ -10,6 +10,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { useChatUnreadCount } from '@/features/chat/api'
+import { useChatSocket } from '@/features/chat/use-chat-socket'
 import { NotificationBell } from '@/features/notifications/notification-bell'
 import { useNotificationsSocket } from '@/features/notifications/use-notifications-socket'
 import { cn } from '@/lib/utils'
@@ -33,7 +35,7 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav aria-label="Main" className="flex flex-col gap-1">
-      {NAV_ITEMS[user.role].map(({ label, to, icon: Icon, end }) => (
+      {NAV_ITEMS[user.role].map(({ label, to, icon: Icon, end, badge }) => (
         <NavLink
           key={to}
           to={to}
@@ -47,10 +49,23 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
           }
         >
           <Icon className="size-4" aria-hidden />
-          {label}
+          <span className="flex-1">{label}</span>
+          {badge === 'chat' && <ChatUnreadBadge />}
         </NavLink>
       ))}
     </nav>
+  )
+}
+
+function ChatUnreadBadge() {
+  const unread = useChatUnreadCount()
+  const count = unread.data ?? 0
+  if (count === 0) return null
+  return (
+    <span className="bg-primary text-primary-foreground flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums">
+      {count > 99 ? '99+' : count}
+      <span className="sr-only"> unread messages</span>
+    </span>
   )
 }
 
@@ -58,8 +73,9 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
 export function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { user } = useAuth()
-  // Live notifications for teachers and students.
+  // Live notifications and chat messages.
   useNotificationsSocket()
+  useChatSocket()
 
   return (
     <div className="bg-muted/40 flex min-h-svh">

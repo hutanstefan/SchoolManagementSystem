@@ -1,0 +1,37 @@
+meta {
+  name: Contacts (as student)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/chat/contacts
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{studentToken}}
+}
+
+script:post-response {
+  if (res.getStatus() < 300) {
+    const teacher = res.getBody().find((c) => c.role === "TEACHER");
+    bru.setVar("chatTeacherUserId", teacher.id);
+  }
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Only their teachers", function () {
+    const roles = res.getBody().map((c) => c.role);
+    expect(roles.length).to.be.greaterThan(0);
+    expect(roles.every((role) => role === "TEACHER")).to.equal(true);
+  });
+}
+
+docs {
+  A student can write to their teachers. Students talk to each other only in groups made by a teacher. Admins have no chat (403).
+}

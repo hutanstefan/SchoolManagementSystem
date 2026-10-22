@@ -31,6 +31,14 @@ export const queryKeys = {
     teacher: (id: string) => ['timetable', 'teacher', id] as const,
     me: ['timetable', 'me'] as const,
   },
+  chat: {
+    all: ['chat'] as const,
+    contacts: (search: string) => ['chat', 'contacts', search] as const,
+    conversations: ['chat', 'conversations'] as const,
+    conversation: (id: string) => ['chat', 'conversation', id] as const,
+    messages: (id: string) => ['chat', 'messages', id] as const,
+    unreadCount: ['chat', 'unread-count'] as const,
+  },
   notifications: {
     all: ['notifications'] as const,
     list: (params: object) => ['notifications', 'list', params] as const,

@@ -4,6 +4,7 @@ import {
   ClipboardList,
   GraduationCap,
   LayoutDashboard,
+  MessagesSquare,
   School,
   Users,
   type LucideIcon,
@@ -16,6 +17,8 @@ export interface NavItem {
   icon: LucideIcon
   /** Only active on an exact match (used for dashboards). */
   end?: boolean
+  /** Shows a live counter next to the label. */
+  badge?: 'chat'
 }
 
 export const NAV_ITEMS: Record<Role, NavItem[]> = {
@@ -31,11 +34,23 @@ export const NAV_ITEMS: Record<Role, NavItem[]> = {
     { label: 'Dashboard', to: '/teacher', icon: LayoutDashboard, end: true },
     { label: 'My classes', to: '/teacher/classes', icon: School },
     { label: 'My timetable', to: '/teacher/timetable', icon: CalendarDays },
+    {
+      label: 'Messages',
+      to: '/teacher/messages',
+      icon: MessagesSquare,
+      badge: 'chat',
+    },
   ],
   STUDENT: [
     { label: 'Dashboard', to: '/student', icon: LayoutDashboard, end: true },
     { label: 'My grades', to: '/student/grades', icon: ClipboardList },
     { label: 'My class', to: '/student/class', icon: School },
     { label: 'My timetable', to: '/student/timetable', icon: CalendarDays },
+    {
+      label: 'Messages',
+      to: '/student/messages',
+      icon: MessagesSquare,
+      badge: 'chat',
+    },
   ],
 }

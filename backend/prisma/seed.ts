@@ -476,15 +476,170 @@ async function main(): Promise<void> {
     })),
   });
 
+  const conversations = await seedChat(today);
+
   console.log(
     `Done: 1 admin, ${teacherIds.length} teachers, ${classIds.length} classes, ` +
       `${subjects.size} subjects, ${classSubjects.length} teaching assignments, ` +
       `${timetable.length} timetable lessons, ${studentSlots.length} students, ${grades.length} grades, ` +
-      `${notifications.count} notifications.`,
+      `${notifications.count} notifications, ${conversations} conversations.`,
   );
   console.log(
     `Login with admin@${EMAIL_DOMAIN}, teacher@${EMAIL_DOMAIN} or student@${EMAIL_DOMAIN} / ${DEFAULT_PASSWORD}`,
   );
+}
+
+/**
+ * A few conversations, so the chat isn't empty on the first login: the demo
+ * teacher with the demo student (one unread message for the student), a
+ * group for 9A and a chat between two teachers.
+ */
+async function seedChat(today: Date): Promise<number> {
+  const byEmail = async (email: string) =>
+    prisma.user.findUniqueOrThrow({
+      where: { email },
+      select: { id: true, firstName: true, lastName: true },
+    });
+  const mihai = await byEmail(`teacher@${EMAIL_DOMAIN}`);
+  const andrei = await byEmail(`student@${EMAIL_DOMAIN}`);
+  const colleague = await prisma.user.findFirstOrThrow({
+    where: { role: Role.TEACHER, id: { not: mihai.id } },
+    orderBy: { lastName: 'asc' },
+    select: { id: true, firstName: true, lastName: true },
+  });
+  const class9A = await prisma.student.findMany({
+    where: { class: { name: '9A' } },
+    select: { userId: true, user: { select: { firstName: true } } },
+    orderBy: { user: { lastName: 'asc' } },
+  });
+
+  // Earlier today, minute by minute (never in the future).
+  const at = (minutesAgo: number) =>
+    new Date(today.getTime() - minutesAgo * 60_000);
+  type Line = [from: string, body: string, minutesAgo: number];
+
+  const conversation = async (options: {
+    type: 'DIRECT' | 'GROUP';
+    name?: string;
+    owner: string;
+    members: string[];
+    lines: Line[];
+    /** Members who read everything (the others have unread messages). */
+    readBy: string[];
+    system?: string;
+  }) => {
+    const all = [options.owner, ...options.members];
+    const last = options.lines[options.lines.length - 1]!;
+    const first = options.lines[0]!;
+    await prisma.conversation.create({
+      data: {
+        type: options.type,
+        name: options.name,
+        directKey:
+          options.type === 'DIRECT' ? [...all].sort().join(':') : undefined,
+        createdById: options.owner,
+        createdAt: at(first[2] + 1),
+        lastMessageAt: at(last[2]),
+        members: {
+          create: all.map((userId) => ({
+            userId,
+            role:
+              options.type === 'GROUP' && userId === options.owner
+                ? 'OWNER'
+                : 'MEMBER',
+            joinedAt: at(first[2] + 1),
+            lastReadAt: options.readBy.includes(userId) ? at(last[2]) : null,
+          })),
+        },
+        messages: {
+          create: [
+            ...(options.system
+              ? [
+                  {
+                    senderId: options.owner,
+                    kind: 'SYSTEM' as const,
+                    body: options.system,
+                    createdAt: at(first[2] + 1),
+                  },
+                ]
+              : []),
+            ...options.lines.map(([from, body, minutesAgo]) => ({
+              senderId: from,
+              body,
+              createdAt: at(minutesAgo),
+            })),
+          ],
+        },
+      },
+    });
+  };
+
+  await conversation({
+    type: 'DIRECT',
+    owner: andrei.id,
+    members: [mihai.id],
+    readBy: [mihai.id],
+    lines: [
+      [
+        andrei.id,
+        'Good morning! Could I take the Maths test next week? I was ill on Friday.',
+        180,
+      ],
+      [
+        mihai.id,
+        "Hi Andrei, of course. Come on Tuesday after the 4th period, we'll do it in room 101.",
+        150,
+      ],
+      [mihai.id, 'Please bring the medical note on Tuesday.', 149],
+    ],
+  });
+
+  const [first, second] = class9A.filter((s) => s.userId !== andrei.id);
+  const groupName = '9A · Mathematics';
+  await conversation({
+    type: 'GROUP',
+    name: groupName,
+    owner: mihai.id,
+    members: class9A.map((s) => s.userId),
+    readBy: [mihai.id, andrei.id],
+    system: `${mihai.firstName} ${mihai.lastName} created the group “${groupName}”`,
+    lines: [
+      [
+        mihai.id,
+        'Hello everyone! I will post homework and test dates here.',
+        300,
+      ],
+      [
+        mihai.id,
+        'Test on Friday: chapter 3, linear equations. Exercises 1-12 on page 54 for practice.',
+        299,
+      ],
+      [first!.userId, 'Will we have the formulas sheet during the test?', 240],
+      [
+        mihai.id,
+        'No formulas sheet this time, but the test only covers what we did in class.',
+        230,
+      ],
+      [second!.userId, 'Thank you!', 228],
+    ],
+  });
+
+  await conversation({
+    type: 'DIRECT',
+    owner: colleague.id,
+    members: [mihai.id],
+    readBy: [colleague.id, mihai.id],
+    lines: [
+      [
+        colleague.id,
+        'Hi Mihai, can we swap rooms on Thursday? I need the projector in 101.',
+        400,
+      ],
+      [mihai.id, 'Sure, no problem. I will take 103.', 390],
+    ],
+  });
+
+  return 3;
 }
 
 main()

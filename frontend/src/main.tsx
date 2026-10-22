@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { createQueryClient } from '@/lib/query-client'
+import { RealtimeProvider } from '@/realtime/realtime-provider'
 import { router } from '@/router'
 import './index.css'
 
@@ -17,10 +18,12 @@ createRoot(document.getElementById('root')!).render(
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <TooltipProvider>
-            <RouterProvider router={router} />
-          </TooltipProvider>
-          <Toaster richColors closeButton />
+          <RealtimeProvider>
+            <TooltipProvider>
+              <RouterProvider router={router} />
+            </TooltipProvider>
+            <Toaster richColors closeButton />
+          </RealtimeProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>

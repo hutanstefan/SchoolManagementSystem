@@ -36,6 +36,25 @@ enum NotificationType {
   HOMEROOM_ALERT
 }
 
+enum ConversationType {
+  /// Two people.
+  DIRECT
+  /// Created by a teacher or an admin, with any number of members.
+  GROUP
+}
+
+enum ChatRole {
+  /// The creator of a group: renames it, adds and removes members, deletes it.
+  OWNER
+  MEMBER
+}
+
+enum MessageKind {
+  TEXT
+  /// Written by the app: "Mihai Ionescu added Ana Pop".
+  SYSTEM
+}
+
 enum Weekday {
   MONDAY
   TUESDAY
@@ -58,11 +77,14 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  student       Student?
-  teacher       Teacher?
+  student              Student?
+  teacher              Teacher?
   /// Grade changes made by this user.
-  gradeChanges  GradeHistory[]
-  notifications Notification[]
+  gradeChanges         GradeHistory[]
+  notifications        Notification[]
+  createdConversations Conversation[]
+  chatMemberships      ConversationMember[]
+  messages             Message[]
 
   @@map("users")
 }
@@ -236,4 +258,60 @@ model Notification {
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, readAt])
   @@map("notifications")
+}
+
+/// A chat: a direct conversation between two people, or a group.
+model Conversation {
+  id            String           @id @default(uuid()) @db.Uuid
+  type          ConversationType
+  /// Groups only.
+  name          String?
+  /// Direct conversations only: the two user ids, sorted and joined, so two
+  /// people have at most one direct conversation.
+  directKey     String?          @unique @map("direct_key")
+  createdById   String?          @map("created_by_id") @db.Uuid
+  createdAt     DateTime         @default(now()) @map("created_at")
+  /// For sorting the list: the latest message, or the creation.
+  lastMessageAt DateTime         @default(now()) @map("last_message_at")
+
+  createdBy User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  members   ConversationMember[]
+  messages  Message[]
+
+  @@index([lastMessageAt])
+  @@map("conversations")
+}
+
+model ConversationMember {
+  conversationId String    @map("conversation_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  role           ChatRole  @default(MEMBER)
+  joinedAt       DateTime  @default(now()) @map("joined_at")
+  /// Messages after this are unread; null = nothing read yet.
+  lastReadAt     DateTime? @map("last_read_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId])
+  @@map("conversation_members")
+}
+
+model Message {
+  id             String      @id @default(uuid()) @db.Uuid
+  conversationId String      @map("conversation_id") @db.Uuid
+  /// Null if the sender's account was deleted.
+  senderId       String?     @map("sender_id") @db.Uuid
+  kind           MessageKind @default(TEXT)
+  body           String
+  createdAt      DateTime    @default(now()) @map("created_at")
+  /// Deleted by the sender: the text is gone, the place in the thread stays.
+  deletedAt      DateTime?   @map("deleted_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User?        @relation(fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@map("messages")
 }

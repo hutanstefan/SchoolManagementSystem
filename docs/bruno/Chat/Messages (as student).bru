@@ -1,0 +1,33 @@
+meta {
+  name: Messages (as student)
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/chat/conversations/{{conversationId}}/messages?limit=30
+  body: none
+  auth: bearer
+}
+
+params:query {
+  limit: 30
+}
+
+auth:bearer {
+  token: {{studentToken}}
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Oldest first, the new one last", function () {
+    const { data } = res.getBody();
+    expect(data[data.length - 1].body).to.equal("Hello! Is the test on Friday?");
+  });
+}
+
+docs {
+  Newest page first, each page oldest message first. Pass before=<id of the oldest message loaded> for the previous page.
+}

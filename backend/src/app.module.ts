@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
+import { ChatModule } from './chat/chat.module';
 import { ClassSubjectsModule } from './class-subjects/class-subjects.module';
 import { ClassesModule } from './classes/classes.module';
 import { GradeImportsModule } from './grade-imports/grade-imports.module';
@@ -44,6 +45,7 @@ import { TimetableModule } from './timetable/timetable.module';
     GradeScansModule,
     GradeImportsModule,
     NotificationsModule,
+    ChatModule,
   ],
   providers: [
     // Global guards run in this order for every request:

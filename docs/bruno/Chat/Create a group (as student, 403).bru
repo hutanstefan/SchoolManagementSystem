@@ -1,0 +1,32 @@
+meta {
+  name: Create a group (as student, 403)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/chat/conversations/group
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{studentToken}}
+}
+
+body:json {
+  {
+    "name": "Study group",
+    "memberIds": ["{{chatTeacherUserId}}"]
+  }
+}
+
+tests {
+  test("Status is 403", function () {
+    expect(res.getStatus()).to.equal(403);
+  });
+}
+
+docs {
+  Only teachers create groups.
+}

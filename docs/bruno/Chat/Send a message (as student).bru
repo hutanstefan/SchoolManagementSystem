@@ -1,0 +1,38 @@
+meta {
+  name: Send a message (as student)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/chat/conversations/{{conversationId}}/messages
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{studentToken}}
+}
+
+body:json {
+  {
+    "body": "Hello! Is the test on Friday?"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() < 300) bru.setVar("chatMessageId", res.getBody().id);
+}
+
+tests {
+  test("Status is 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Saved as written", function () {
+    expect(res.getBody().body).to.equal("Hello! Is the test on Friday?");
+  });
+}
+
+docs {
+  The message is also pushed live to the other person over Socket.IO (event "chat:message"). At most 30 messages a minute.
+}

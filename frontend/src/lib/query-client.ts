@@ -12,6 +12,8 @@ declare module '@tanstack/react-query' {
        * offering to resolve them, so no error toast for those.
        */
       handlesConflicts?: boolean
+      /** Background calls (e.g. "mark as read"): no error toast. */
+      silent?: boolean
     }
   }
 }
@@ -35,6 +37,7 @@ export function createQueryClient(): QueryClient {
     // Every failed or successful change shows a toast, so pages don't repeat this logic.
     mutationCache: new MutationCache({
       onError: (error, _variables, _context, mutation) => {
+        if (mutation.meta?.silent) return
         const handled =
           mutation.meta?.handlesConflicts &&
           error instanceof ApiError &&

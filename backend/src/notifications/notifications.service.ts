@@ -7,7 +7,7 @@ import {
   NotificationDto,
   NotificationQueryDto,
 } from './dto/notification.dto';
-import { NotificationsGateway, ServerEvents } from './notifications.gateway';
+import { RealtimeGateway, ServerEvents } from '../realtime/realtime.gateway';
 
 export interface NewNotification {
   userId: string;
@@ -32,7 +32,7 @@ const notificationSelect = {
 export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly gateway: NotificationsGateway,
+    private readonly gateway: RealtimeGateway,
   ) {}
 
   /** Saves the notifications and pushes each one to its user's open tabs. */

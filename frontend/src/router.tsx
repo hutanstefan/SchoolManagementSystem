@@ -55,6 +55,10 @@ const importGrades = () =>
   }))
 
 /** Shared by admins and teachers. */
+const messages = () =>
+  import('@/features/chat/messages-page').then((m) => ({
+    Component: m.MessagesPage,
+  }))
 const notifications = () =>
   import('@/features/notifications/notifications-page').then((m) => ({
     Component: m.NotificationsPage,
@@ -154,6 +158,8 @@ export const routes: RouteObject[] = [
           { path: 'students/:id', lazy: teacher.student },
           { path: 'timetable', lazy: myTimetable },
           { path: 'notifications', lazy: notifications },
+          { path: 'messages', lazy: messages },
+          { path: 'messages/:conversationId', lazy: messages },
         ],
       },
       {
@@ -169,6 +175,8 @@ export const routes: RouteObject[] = [
           { path: 'class', lazy: student.class },
           { path: 'timetable', lazy: myTimetable },
           { path: 'notifications', lazy: notifications },
+          { path: 'messages', lazy: messages },
+          { path: 'messages/:conversationId', lazy: messages },
         ],
       },
       { path: '*', element: <NotFoundPage /> },

@@ -1,0 +1,38 @@
+meta {
+  name: Open conversation with a teacher (as student)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/chat/conversations/direct
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{studentToken}}
+}
+
+body:json {
+  {
+    "userId": "{{chatTeacherUserId}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() < 300) bru.setVar("conversationId", res.getBody().id);
+}
+
+tests {
+  test("Status is 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("A direct conversation", function () {
+    expect(res.getBody().type).to.equal("DIRECT");
+  });
+}
+
+docs {
+  Returns the existing conversation with that person, or creates it. There is one per pair of people.
+}

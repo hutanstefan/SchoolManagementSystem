@@ -16,20 +16,44 @@ export const ServerEvents = {
   Notification: 'notification',
   /** Notifications were marked as read in another tab: refresh the counter. */
   NotificationsRead: 'notifications:read',
+  /** A new chat message: { conversationId, message: MessageDto }. */
+  ChatMessage: 'chat:message',
+  /** A message was deleted: { conversationId, messageId }. */
+  ChatMessageDeleted: 'chat:message-deleted',
+  /** Someone read a conversation: { conversationId, userId, lastReadAt }. */
+  ChatRead: 'chat:read',
+  /** Someone is typing: { conversationId, user: { id, firstName } }. */
+  ChatTyping: 'chat:typing',
+  /**
+   * A conversation was created, renamed, deleted or its members changed:
+   * { conversationId }. The client reloads it (404 = no longer a member).
+   */
+  ChatConversation: 'chat:conversation',
+} as const;
+
+/** Events a browser tab sends to the server. */
+export const ClientEvents = {
+  /** "I'm typing" in a conversation: { conversationId }. */
+  ChatTyping: 'chat:typing',
 } as const;
 
 const roomOf = (userId: string) => `user:${userId}`;
 
+/** The user a connection belongs to (set when it is accepted). */
+export function userOf(socket: Socket): AuthUser | undefined {
+  return (socket.data as { user?: AuthUser }).user;
+}
+
 /**
  * The live connection of every logged-in browser tab (Socket.IO, at
- * /api/socket.io; CORS and path are set by SocketIoAdapter). A tab proves
- * who it is with its access token in the handshake, checked exactly like an
- * HTTP request; it then joins its user's room, so every tab of that user
- * gets the user's notifications.
+ * /api/socket.io; CORS and path are set by SocketIoAdapter), shared by
+ * notifications and chat. A tab proves who it is with its access token in
+ * the handshake, checked exactly like an HTTP request; it then joins its
+ * user's room, so every tab of that user gets what is sent to the user.
  */
 @WebSocketGateway()
-export class NotificationsGateway implements OnGatewayInit {
-  private readonly logger = new Logger(NotificationsGateway.name);
+export class RealtimeGateway implements OnGatewayInit {
+  private readonly logger = new Logger(RealtimeGateway.name);
 
   @WebSocketServer()
   private readonly server?: Server;
@@ -54,6 +78,12 @@ export class NotificationsGateway implements OnGatewayInit {
   /** Sends an event to every open tab of a user. */
   sendToUser(userId: string, event: string, payload: unknown): void {
     this.server?.to(roomOf(userId)).emit(event, payload);
+  }
+
+  /** Sends an event to every open tab of some users (once per tab). */
+  sendToUsers(userIds: string[], event: string, payload: unknown): void {
+    if (userIds.length === 0) return;
+    this.server?.to(userIds.map(roomOf)).emit(event, payload);
   }
 
   /** After a logout, the user's open connections are closed too. */

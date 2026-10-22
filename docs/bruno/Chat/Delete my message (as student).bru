@@ -1,0 +1,25 @@
+meta {
+  name: Delete my message (as student)
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/chat/messages/{{chatMessageId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{studentToken}}
+}
+
+tests {
+  test("Status is 204", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  Senders can delete their own messages; "Message deleted" stays in its place in the thread. Also cleans up after the requests above.
+}
