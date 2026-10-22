@@ -460,6 +460,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/classes/{id}/grades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give grades to many students of a class at once
+         * @description One subject and date for the whole batch, one grade per student. Every entry is checked first and the batch is saved in one transaction: all grades or none. Used when grades are read from photos of tests.
+         */
+        post: operations["GradesController_createMany"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/grades/{id}": {
         parameters: {
             query?: never;
@@ -538,6 +558,26 @@ export interface paths {
         get: operations["GradesController_gradebook"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/classes/{id}/grade-scans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read grades from photos of tests (AI)
+         * @description An AI model (Gemini or Claude, see AI_PROVIDER) reads the student name and the final grade on each photo and matches the name to a student of the class. Nothing is saved and the photos are not stored: review the result, then save the grades with POST /classes/:id/grades. Without an AI key the results are simulated (mode "demo"). Teachers can only scan tests of a subject they teach in the class.
+         */
+        post: operations["GradeScansController_scan"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1010,6 +1050,35 @@ export interface components {
              */
             date?: string;
         };
+        BatchGradeDto: {
+            /** Format: uuid */
+            studentId: string;
+            /** @example 9 */
+            value: number;
+        };
+        CreateGradesBatchDto: {
+            /**
+             * Format: uuid
+             * @description The subject every grade in the batch is for.
+             */
+            subjectId: string;
+            /**
+             * @description Date of every grade in the batch: YYYY-MM-DD, today or earlier. Defaults to today.
+             * @example 2026-10-20
+             */
+            date?: string;
+            /** @description One grade per student; a student can appear only once. */
+            grades: components["schemas"]["BatchGradeDto"][];
+        };
+        GradesBatchResultDto: {
+            /**
+             * @description Number of grades created.
+             * @example 24
+             */
+            count: number;
+            /** @description Ids of the created grades, in the order they were sent. */
+            gradeIds: string[];
+        };
         UpdateGradeDto: {
             /** @example 10 */
             value?: number;
@@ -1058,6 +1127,58 @@ export interface components {
             /** @example 5 */
             minimumGrades: number;
             students: components["schemas"]["GradebookRowDto"][];
+        };
+        ScannedTestDto: {
+            /**
+             * @description "read" when the photo was read, "failed" when it could not be.
+             * @enum {string}
+             */
+            status: "read" | "failed";
+            /** @enum {string} */
+            confidence: "high" | "medium" | "low";
+            /** @description Position of the photo in the upload, from 0. */
+            index: number;
+            /** @example IMG_2041.jpg */
+            fileName: string;
+            /** @description Why the photo could not be read. */
+            error: string | null;
+            /** @description The student the test belongs to, if found in the class. */
+            student: components["schemas"]["PersonSummaryDto"] | null;
+            /**
+             * @description The name as written on the test.
+             * @example Popescu Ioana
+             */
+            studentNameRead: string | null;
+            /**
+             * @description The grade as written on the test, possibly with decimals.
+             * @example 9.5
+             */
+            gradeRead: number | null;
+            /**
+             * @description The grade to give: a whole number from 1 to 10.
+             * @example 10
+             */
+            grade: number | null;
+            /** @description Anything the teacher should check. */
+            note: string | null;
+            /** @description The model that read this photo (a fallback model if the main one was busy). */
+            readBy: string | null;
+        };
+        GradeScanResultDto: {
+            /**
+             * @description "ai" when an AI model read the photos, "demo" when the results are simulated.
+             * @enum {string}
+             */
+            mode: "ai" | "demo";
+            /**
+             * @description The AI model that read the photos.
+             * @example gemini-3.8-flash
+             */
+            model: string | null;
+            class: components["schemas"]["ClassSummaryDto"];
+            subject: components["schemas"]["SubjectSummaryDto"];
+            /** @description One entry per photo, in upload order. Nothing is saved yet. */
+            tests: components["schemas"]["ScannedTestDto"][];
         };
     };
     responses: never;
@@ -2915,6 +3036,56 @@ export interface operations {
             };
         };
     };
+    GradesController_createMany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGradesBatchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradesBatchResultDto"];
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
     GradesController_remove: {
         parameters: {
             query?: never;
@@ -3140,6 +3311,77 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    GradeScansController_scan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: uuid */
+                    subjectId: string;
+                    /** @description Photos of graded tests, one test per photo: JPEG, PNG, WebP or GIF, at most 20 photos of 8 MB each. */
+                    images: string[];
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradeScanResultDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description A photo is larger than 8 MB or there are more than 20 */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -48,6 +48,12 @@ const admin = {
     })),
 }
 
+/** Shared by admins and teachers. */
+const scanTests = () =>
+  import('@/features/grade-scans/scan-tests-page').then((m) => ({
+    Component: m.ScanTestsPage,
+  }))
+
 const teacher = {
   dashboard: () =>
     import('@/features/teacher-portal/teacher-dashboard-page').then((m) => ({
@@ -116,6 +122,7 @@ export const routes: RouteObject[] = [
           { path: 'teachers/:id', lazy: admin.teacher },
           { path: 'classes', lazy: admin.classes },
           { path: 'classes/:id', lazy: admin.class },
+          { path: 'classes/:id/scan', lazy: scanTests },
           { path: 'subjects', lazy: admin.subjects },
           { path: 'grades', lazy: admin.grades },
         ],
@@ -131,6 +138,7 @@ export const routes: RouteObject[] = [
           { index: true, lazy: teacher.dashboard },
           { path: 'classes', lazy: teacher.classes },
           { path: 'classes/:id', lazy: teacher.class },
+          { path: 'classes/:id/scan', lazy: scanTests },
           { path: 'students/:id', lazy: teacher.student },
           { path: 'timetable', lazy: myTimetable },
         ],

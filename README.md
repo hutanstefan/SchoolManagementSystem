@@ -49,7 +49,7 @@ Open **http://localhost:8080** and log in with one of the [test accounts](#test-
 | `api`      | The NestJS API (port 3000), started once the migrations succeeded; production dependencies only, runs as a non-root user     |
 | `web`      | nginx (port 8080) serving the built React app and forwarding `/api` (REST and WebSockets) to the API                         |
 
-The services start in order: the migrations wait for a healthy database, the API for the migrations to succeed and the web app for a healthy API. The defaults work out of the box; to change ports or the JWT secret, copy `.env.example` to `.env`. To start over with fresh demo data: `docker compose down -v`.
+The services start in order: the migrations wait for a healthy database, the API for the migrations to succeed and the web app for a healthy API. The defaults work out of the box; to change ports or the JWT secret, copy `.env.example` to `.env`. The API container also reads `backend/.env` if it exists (that's where the AI keys go, see [Reading grades from photos](#reading-grades-from-photos-of-tests-ai)). To start over with fresh demo data: `docker compose down -v`.
 
 ## Local development (hot reload)
 
@@ -211,53 +211,55 @@ erDiagram
 
 All endpoints are under `/api`. "Teacher (own)" means a teacher only sees the classes they teach or are homeroom teacher of; any other class returns `403`.
 
-| Method | Path                                | Access                                    | Description                                                            |
-| ------ | ----------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------- |
-| GET    | `/health`                           | Public                                    | API and database status                                                |
-| POST   | `/auth/login`                       | Public                                    | Log in, returns a JWT (max 5 attempts/min)                             |
-| GET    | `/auth/me`                          | Any logged-in                             | The current user with their role and profile                           |
-| POST   | `/auth/logout`                      | Any logged-in                             | Log out: revokes every token of the user (all devices)                 |
-| GET    | `/students`                         | Admin                                     | List students (paginated, search, class filter)                        |
-| POST   | `/students`                         | Admin                                     | Create a student account, optionally in a class                        |
-| GET    | `/students/:id`                     | Admin                                     | Student details                                                        |
-| PATCH  | `/students/:id`                     | Admin                                     | Update a student, move or unassign, reset password                     |
-| DELETE | `/students/:id`                     | Admin                                     | Delete a student and their grades                                      |
-| GET    | `/teachers`                         | Admin                                     | List teachers (paginated, search)                                      |
-| GET    | `/teachers/me`                      | Teacher                                   | My profile, homeroom classes and teaching assignments                  |
-| POST   | `/teachers`                         | Admin                                     | Create a teacher account                                               |
-| GET    | `/teachers/:id`                     | Admin                                     | Teacher details, homeroom classes and subjects                         |
-| PATCH  | `/teachers/:id`                     | Admin                                     | Update a teacher, reset password                                       |
-| DELETE | `/teachers/:id`                     | Admin                                     | Delete a teacher (their grades are kept)                               |
-| GET    | `/classes`                          | Admin, Teacher (own)                      | List classes (paginated, natural order 9A → 12A)                       |
-| POST   | `/classes`                          | Admin                                     | Create a class                                                         |
-| GET    | `/classes/:id`                      | Admin, Teacher (own), Student (own class) | Class details with subjects and teachers                               |
-| PATCH  | `/classes/:id`                      | Admin                                     | Rename, change homeroom teacher                                        |
-| DELETE | `/classes/:id`                      | Admin                                     | Delete a class (students become unassigned)                            |
-| GET    | `/classes/:id/students`             | Admin, Teacher (own)                      | Students enrolled in the class                                         |
-| POST   | `/classes/:id/students`             | Admin                                     | Assign several students to the class at once                           |
-| DELETE | `/classes/:id/students/:studentId`  | Admin                                     | Remove a student from the class                                        |
-| GET    | `/subjects`                         | Any logged-in                             | List subjects                                                          |
-| GET    | `/subjects/:id`                     | Any logged-in                             | Subject details                                                        |
-| POST   | `/subjects`                         | Admin                                     | Create a subject                                                       |
-| PATCH  | `/subjects/:id`                     | Admin                                     | Rename a subject                                                       |
-| DELETE | `/subjects/:id`                     | Admin                                     | Delete a subject (blocked while in use: `409`)                         |
-| POST   | `/classes/:id/subjects`             | Admin                                     | Add a subject to a class, with its teacher and weekly hours            |
-| PATCH  | `/class-subjects/:id`               | Admin                                     | Change the teacher or the weekly hours (checked against the timetable) |
-| DELETE | `/class-subjects/:id`               | Admin                                     | Remove a subject from a class with its lessons (grades are kept)       |
-| GET    | `/classes/:id/timetable`            | Admin, Teacher (own), Student (own class) | Weekly timetable of a class                                            |
-| GET    | `/teachers/:id/timetable`           | Admin                                     | Weekly timetable of a teacher                                          |
-| GET    | `/timetable/me`                     | Teacher, Student                          | My lessons (teacher) or my class timetable (student)                   |
-| POST   | `/classes/:id/timetable`            | Admin                                     | Add a lesson (409 on any conflict)                                     |
-| PATCH  | `/timetable-entries/:id`            | Admin                                     | Move a lesson to another slot or room                                  |
-| DELETE | `/timetable-entries/:id`            | Admin                                     | Remove a lesson                                                        |
-| GET    | `/grades`                           | Admin, Teacher (own)                      | List grades (paginated, filter by class, subject, student)             |
-| POST   | `/grades`                           | Admin, Teacher (own)                      | Give a grade (teachers: only their subject in that class)              |
-| PATCH  | `/grades/:id`                       | Admin, Teacher (own grades)               | Change the value or date of a grade                                    |
-| DELETE | `/grades/:id`                       | Admin, Teacher (own grades)               | Delete a grade (kept in the history)                                   |
-| GET    | `/grades/:id/history`               | Admin                                     | Who created, changed or deleted a grade, and when                      |
-| GET    | `/grades/me`                        | Student                                   | My grades, subject averages and overall average                        |
-| GET    | `/students/:id/grades`              | Admin, Teacher (own)                      | A student's grades and averages                                        |
-| GET    | `/classes/:id/gradebook?subjectId=` | Admin, subject teacher, homeroom teacher  | All students of a class with their grades in one subject               |
+| Method | Path                                | Access                                    | Description                                                               |
+| ------ | ----------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------- |
+| GET    | `/health`                           | Public                                    | API and database status                                                   |
+| POST   | `/auth/login`                       | Public                                    | Log in, returns a JWT (max 5 attempts/min)                                |
+| GET    | `/auth/me`                          | Any logged-in                             | The current user with their role and profile                              |
+| POST   | `/auth/logout`                      | Any logged-in                             | Log out: revokes every token of the user (all devices)                    |
+| GET    | `/students`                         | Admin                                     | List students (paginated, search, class filter)                           |
+| POST   | `/students`                         | Admin                                     | Create a student account, optionally in a class                           |
+| GET    | `/students/:id`                     | Admin                                     | Student details                                                           |
+| PATCH  | `/students/:id`                     | Admin                                     | Update a student, move or unassign, reset password                        |
+| DELETE | `/students/:id`                     | Admin                                     | Delete a student and their grades                                         |
+| GET    | `/teachers`                         | Admin                                     | List teachers (paginated, search)                                         |
+| GET    | `/teachers/me`                      | Teacher                                   | My profile, homeroom classes and teaching assignments                     |
+| POST   | `/teachers`                         | Admin                                     | Create a teacher account                                                  |
+| GET    | `/teachers/:id`                     | Admin                                     | Teacher details, homeroom classes and subjects                            |
+| PATCH  | `/teachers/:id`                     | Admin                                     | Update a teacher, reset password                                          |
+| DELETE | `/teachers/:id`                     | Admin                                     | Delete a teacher (their grades are kept)                                  |
+| GET    | `/classes`                          | Admin, Teacher (own)                      | List classes (paginated, natural order 9A → 12A)                          |
+| POST   | `/classes`                          | Admin                                     | Create a class                                                            |
+| GET    | `/classes/:id`                      | Admin, Teacher (own), Student (own class) | Class details with subjects and teachers                                  |
+| PATCH  | `/classes/:id`                      | Admin                                     | Rename, change homeroom teacher                                           |
+| DELETE | `/classes/:id`                      | Admin                                     | Delete a class (students become unassigned)                               |
+| GET    | `/classes/:id/students`             | Admin, Teacher (own)                      | Students enrolled in the class                                            |
+| POST   | `/classes/:id/students`             | Admin                                     | Assign several students to the class at once                              |
+| DELETE | `/classes/:id/students/:studentId`  | Admin                                     | Remove a student from the class                                           |
+| GET    | `/subjects`                         | Any logged-in                             | List subjects                                                             |
+| GET    | `/subjects/:id`                     | Any logged-in                             | Subject details                                                           |
+| POST   | `/subjects`                         | Admin                                     | Create a subject                                                          |
+| PATCH  | `/subjects/:id`                     | Admin                                     | Rename a subject                                                          |
+| DELETE | `/subjects/:id`                     | Admin                                     | Delete a subject (blocked while in use: `409`)                            |
+| POST   | `/classes/:id/subjects`             | Admin                                     | Add a subject to a class, with its teacher and weekly hours               |
+| PATCH  | `/class-subjects/:id`               | Admin                                     | Change the teacher or the weekly hours (checked against the timetable)    |
+| DELETE | `/class-subjects/:id`               | Admin                                     | Remove a subject from a class with its lessons (grades are kept)          |
+| GET    | `/classes/:id/timetable`            | Admin, Teacher (own), Student (own class) | Weekly timetable of a class                                               |
+| GET    | `/teachers/:id/timetable`           | Admin                                     | Weekly timetable of a teacher                                             |
+| GET    | `/timetable/me`                     | Teacher, Student                          | My lessons (teacher) or my class timetable (student)                      |
+| POST   | `/classes/:id/timetable`            | Admin                                     | Add a lesson (409 on any conflict)                                        |
+| PATCH  | `/timetable-entries/:id`            | Admin                                     | Move a lesson to another slot or room                                     |
+| DELETE | `/timetable-entries/:id`            | Admin                                     | Remove a lesson                                                           |
+| GET    | `/grades`                           | Admin, Teacher (own)                      | List grades (paginated, filter by class, subject, student)                |
+| POST   | `/grades`                           | Admin, Teacher (own)                      | Give a grade (teachers: only their subject in that class)                 |
+| PATCH  | `/grades/:id`                       | Admin, Teacher (own grades)               | Change the value or date of a grade                                       |
+| DELETE | `/grades/:id`                       | Admin, Teacher (own grades)               | Delete a grade (kept in the history)                                      |
+| GET    | `/grades/:id/history`               | Admin                                     | Who created, changed or deleted a grade, and when                         |
+| GET    | `/grades/me`                        | Student                                   | My grades, subject averages and overall average                           |
+| GET    | `/students/:id/grades`              | Admin, Teacher (own)                      | A student's grades and averages                                           |
+| GET    | `/classes/:id/gradebook?subjectId=` | Admin, subject teacher, homeroom teacher  | All students of a class with their grades in one subject                  |
+| POST   | `/classes/:id/grades`               | Admin, subject teacher                    | Give grades to many students at once, all or none (used by test scanning) |
+| POST   | `/classes/:id/grade-scans`          | Admin, subject teacher                    | Read student and grade from photos of tests with AI (saves nothing)       |
 
 ### Conventions
 
@@ -296,11 +298,11 @@ The checks and the write run in one **serializable** transaction, so two admins 
 
 **Pages per role**
 
-| Role    | Pages                                                                                                                                                               |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Admin   | Dashboard, students, teachers, classes (students, subjects, timetable editor, gradebook), subjects, all grades with history                                         |
-| Teacher | Dashboard (today's lessons, classes, latest grades), my classes, class page (gradebook, students, timetable), a student's report card, my timetable                 |
-| Student | Dashboard (today's lessons, latest grades, profile), my grades (report card, averages by subject), my class (homeroom teacher, subjects and teachers), my timetable |
+| Role    | Pages                                                                                                                                                                       |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Admin   | Dashboard, students, teachers, classes (students, subjects, timetable editor, gradebook), subjects, all grades with history                                                 |
+| Teacher | Dashboard (today's lessons, classes, latest grades), my classes, class page (gradebook, students, timetable), **scan tests with AI**, a student's report card, my timetable |
+| Student | Dashboard (today's lessons, latest grades, profile), my grades (report card, averages by subject), my class (homeroom teacher, subjects and teachers), my timetable         |
 
 The gradebook is one component shared by the admin and the teacher. A teacher sees only their own subjects (the homeroom teacher sees every subject of their class, read-only except their own), adds grades only in their subjects and changes only the grades they gave. The API enforces the same rules; the UI only hides what would be refused.
 
@@ -332,6 +334,40 @@ The gradebook is one component shared by the admin and the teacher. A teacher se
 **Audit log**
 
 Every grade change writes a row in `grade_history` (who, when, action, old and new value and date) **in the same transaction** as the change itself, so a grade can never change without a trace. The history references the grade by id without a foreign key, so it survives when the grade is deleted.
+
+## Reading grades from photos of tests (AI)
+
+A teacher grades a stack of paper tests, takes a photo of each one, and gets the grades into the gradebook without typing them.
+
+1. In the gradebook, pick a subject and click **Scan tests**, then add the photos (one test per photo, up to 20). The browser shrinks each photo to 2000 px and turns it into a JPEG before upload, so a 5 MB phone photo becomes about 300 KB.
+2. For each photo, an AI model with vision reads the name written on the test and the final grade. It gets the numbered list of the class's students to match the name against, never their ids or the file name, and must answer in a fixed JSON schema. Up to 4 photos are read in parallel.
+3. The API **checks the answer instead of trusting it**: the answer must match the schema, the student number must exist, the name on the paper must fit that student (otherwise the confidence drops to low), names are compared without diacritics and in any order, and the grade must be 1–10. A grade with decimals is rounded like averages (7.50 → 8).
+4. The teacher sees every photo next to what was read, with the confidence and notes ("grade crossed out and rewritten"), and can change the student or the grade, or leave a photo out. Saving is blocked while a row has no student, no grade, or the same student as another photo.
+5. **Save** sends all the grades with `POST /classes/:id/grades`, in one transaction: all of them are saved, or none.
+
+**Choosing the AI.** The reader is an interface (`TestReader`) with three implementations, picked by `AI_PROVIDER` (default `auto`):
+
+| Provider         | Key                 | Default model      | Notes                                                                                                                         |
+| ---------------- | ------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Google Gemini    | `GEMINI_API_KEY`    | `gemini-3.8-flash` | Free tier ([get a key](https://aistudio.google.com/apikey)); on the free tier Google may use the data to improve its products |
+| Anthropic Claude | `ANTHROPIC_API_KEY` | `claude-haiku-5-5` | Paid, a fraction of a cent per photo; data not used for training                                                              |
+| Demo             | none                | —                  | Simulated results, clearly labelled in the page, so the flow works without any key                                            |
+
+With `auto`, Gemini is used if its key is set, else Claude, else the demo. Both AI readers share the same prompt and the same answer schema (`readers/prompt.ts`), so they are interchangeable. For real student data I would use a paid tier, where the data is not used for training.
+
+**When the AI is busy or rate-limited** (free tiers allow only a few requests per minute), a photo doesn't simply fail. The models form a chain (`ResilientTestReader`): `GEMINI_MODEL`, then `GEMINI_FALLBACK_MODELS`, then Claude if its key is set.
+
+1. On a limit (`429`) or an outage (`5xx`, network error), the next model is tried right away. On the free tier every model has its own quota, so a second model usually answers.
+2. A model that can't work (bad key, unknown model, answer not matching the schema) is skipped for that photo.
+3. If every model is busy, it waits as long as the API asked (`Retry-After`, or Gemini's `retryDelay`), or 2 s, 4 s, 8 s… and tries again, for at most `AI_RETRY_SECONDS` (60) per photo.
+4. Only `AI_CONCURRENCY` photos (2) are read at the same time, and the browser sends them 4 per request, so each request stays short and the page shows progress.
+5. Photos that still fail are marked in the table, with a **Retry failed photos** button that sends only those again. The page says which model read a photo when it wasn't the main one.
+
+**Privacy and limits.** Photos are only held in memory while they are read: they are not stored, and nothing is saved before the teacher confirms. Uploads are checked by their content (magic bytes), not by their name; scanning is limited to 10 requests per minute, and a teacher can only scan tests of a subject they teach.
+
+**Try it.** Sample photos of graded Maths tests for class 9A are in [`docs/sample-tests`](docs/sample-tests), including a decimal grade and a corrected grade. Add a key to `backend/.env` (used both by `npm run start:dev` and by Docker), log in as `teacher@school.test` and open 9A → Gradebook → Mathematics → Scan tests.
+
+**Code:** `backend/src/grade-scans`, `frontend/src/features/grade-scans`.
 
 ## Authentication and authorization
 
@@ -373,3 +409,4 @@ The API validates its environment on startup and refuses to start if something i
 - **Refresh tokens** in an httpOnly cookie, so the access token can be short-lived (minutes) without logging users out every hour.
 - **httpOnly cookie for the token** instead of `localStorage`, with CSRF protection, so injected scripts can never read it.
 - **Per-device logout**: store a session id (`jti`) per login and revoke only that one, instead of all sessions of the user.
+- **Test scanning for hundreds of schools**: today a scan is read while the request waits, which is fine for one school. At scale I would make it a background job: upload the photos to object storage (S3), put one job per photo in a queue (BullMQ on Redis), and let a pool of workers call the AI at the rate the account allows, with the same retry and fallback logic. The page would follow the progress over WebSocket, and a teacher could close it and come back. A paid AI tier (much higher limits) is still cheaper and more accurate than running a vision model on our own GPUs; self-hosting would make sense mainly if student data must not leave the school.

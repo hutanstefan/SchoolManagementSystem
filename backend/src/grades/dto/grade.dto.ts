@@ -1,6 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayNotEmpty,
+  IsArray,
   IsDateString,
   IsIn,
   IsInt,
@@ -8,6 +11,7 @@ import {
   IsUUID,
   Max,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import {
   PaginationMetaDto,
@@ -46,6 +50,51 @@ export class CreateGradeDto {
   @IsDateString({ strict: true })
   @IsNotFutureDate()
   date?: string;
+}
+
+export class BatchGradeDto {
+  @IsUUID()
+  studentId!: string;
+
+  /** @example 9 */
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  value!: number;
+}
+
+/** Up to this many grades are saved in one batch. */
+export const MAX_BATCH_GRADES = 100;
+
+export class CreateGradesBatchDto {
+  /** The subject every grade in the batch is for. */
+  @IsUUID()
+  subjectId!: string;
+
+  /**
+   * Date of every grade in the batch: YYYY-MM-DD, today or earlier. Defaults to today.
+   * @example 2026-10-20
+   */
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @IsNotFutureDate()
+  date?: string;
+
+  /** One grade per student; a student can appear only once. */
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(MAX_BATCH_GRADES)
+  @ValidateNested({ each: true })
+  @Type(() => BatchGradeDto)
+  grades!: BatchGradeDto[];
+}
+
+export class GradesBatchResultDto {
+  /** Number of grades created. @example 24 */
+  count!: number;
+  /** Ids of the created grades, in the order they were sent. */
+  gradeIds!: string[];
 }
 
 export class UpdateGradeDto {

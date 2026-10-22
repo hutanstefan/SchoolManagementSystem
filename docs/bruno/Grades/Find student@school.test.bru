@@ -15,7 +15,10 @@ params:query {
 }
 
 script:post-response {
-  if (res.getStatus() < 300) bru.setVar("gradeStudentId", res.getBody().data[0].id);
+  if (res.getStatus() < 300) {
+    bru.setVar("gradeStudentId", res.getBody().data[0].id);
+    bru.setVar("gradeClassId", res.getBody().data[0].class.id);
+  }
 }
 
 tests {

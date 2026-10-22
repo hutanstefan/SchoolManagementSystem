@@ -4,6 +4,8 @@ import { Test } from '@nestjs/testing';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/app.setup';
+import { DemoTestReader } from '../src/grade-scans/readers/demo-test-reader';
+import { TEST_READER } from '../src/grade-scans/readers/test-reader';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 /**
@@ -19,7 +21,11 @@ export type TestApp = INestApplication<App>;
 export async function createTestApp(): Promise<TestApp> {
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
-  }).compile();
+  })
+    // Tests never call the real AI API, even if ANTHROPIC_API_KEY is set.
+    .overrideProvider(TEST_READER)
+    .useValue(new DemoTestReader())
+    .compile();
   const app = moduleRef.createNestApplication<TestApp>();
   configureApp(app);
   await app.init();

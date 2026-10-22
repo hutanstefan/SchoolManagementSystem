@@ -2755,6 +2755,83 @@
         ]
       }
     },
+    "/api/classes/{id}/grades": {
+      "post": {
+        "description": "One subject and date for the whole batch, one grade per student. Every entry is checked first and the batch is saved in one transaction: all grades or none. Used when grades are read from photos of tests.",
+        "operationId": "GradesController_createMany",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGradesBatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GradesBatchResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Give grades to many students of a class at once",
+        "tags": [
+          "Grades"
+        ]
+      }
+    },
     "/api/grades/{id}": {
       "patch": {
         "description": "Teachers can only change grades they gave.",
@@ -3099,6 +3176,121 @@
         "summary": "Gradebook of a subject in a class",
         "tags": [
           "Grades"
+        ]
+      }
+    },
+    "/api/classes/{id}/grade-scans": {
+      "post": {
+        "description": "An AI model (Gemini or Claude, see AI_PROVIDER) reads the student name and the final grade on each photo and matches the name to a student of the class. Nothing is saved and the photos are not stored: review the result, then save the grades with POST /classes/:id/grades. Without an AI key the results are simulated (mode \"demo\"). Teachers can only scan tests of a subject they teach in the class.",
+        "operationId": "GradeScansController_scan",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "subjectId",
+                  "images"
+                ],
+                "properties": {
+                  "subjectId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "images": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    },
+                    "description": "Photos of graded tests, one test per photo: JPEG, PNG, WebP or GIF, at most 20 photos of 8 MB each."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GradeScanResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "A photo is larger than 8 MB or there are more than 20",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read grades from photos of tests (AI)",
+        "tags": [
+          "Grade scans (AI)"
         ]
       }
     }
@@ -4386,6 +4578,73 @@
           "value"
         ]
       },
+      "BatchGradeDto": {
+        "type": "object",
+        "properties": {
+          "studentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "value": {
+            "type": "number",
+            "example": 9,
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "studentId",
+          "value"
+        ]
+      },
+      "CreateGradesBatchDto": {
+        "type": "object",
+        "properties": {
+          "subjectId": {
+            "type": "string",
+            "description": "The subject every grade in the batch is for.",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "description": "Date of every grade in the batch: YYYY-MM-DD, today or earlier. Defaults to today.",
+            "example": "2026-10-20"
+          },
+          "grades": {
+            "description": "One grade per student; a student can appear only once.",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchGradeDto"
+            }
+          }
+        },
+        "required": [
+          "subjectId",
+          "grades"
+        ]
+      },
+      "GradesBatchResultDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "Number of grades created.",
+            "example": 24
+          },
+          "gradeIds": {
+            "description": "Ids of the created grades, in the order they were sent.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "count",
+          "gradeIds"
+        ]
+      },
       "UpdateGradeDto": {
         "type": "object",
         "properties": {
@@ -4572,6 +4831,130 @@
           "hoursPerWeek",
           "minimumGrades",
           "students"
+        ]
+      },
+      "ScannedTestDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "\"read\" when the photo was read, \"failed\" when it could not be.",
+            "enum": [
+              "read",
+              "failed"
+            ],
+            "type": "string"
+          },
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "type": "string"
+          },
+          "index": {
+            "type": "number",
+            "description": "Position of the photo in the upload, from 0."
+          },
+          "fileName": {
+            "type": "string",
+            "example": "IMG_2041.jpg"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why the photo could not be read."
+          },
+          "student": {
+            "nullable": true,
+            "description": "The student the test belongs to, if found in the class.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonSummaryDto"
+              }
+            ]
+          },
+          "studentNameRead": {
+            "type": "string",
+            "nullable": true,
+            "description": "The name as written on the test.",
+            "example": "Popescu Ioana"
+          },
+          "gradeRead": {
+            "type": "number",
+            "nullable": true,
+            "description": "The grade as written on the test, possibly with decimals.",
+            "example": 9.5
+          },
+          "grade": {
+            "type": "number",
+            "nullable": true,
+            "description": "The grade to give: a whole number from 1 to 10.",
+            "example": 10
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "description": "Anything the teacher should check."
+          },
+          "readBy": {
+            "type": "string",
+            "nullable": true,
+            "description": "The model that read this photo (a fallback model if the main one was busy)."
+          }
+        },
+        "required": [
+          "status",
+          "confidence",
+          "index",
+          "fileName",
+          "error",
+          "student",
+          "studentNameRead",
+          "gradeRead",
+          "grade",
+          "note",
+          "readBy"
+        ]
+      },
+      "GradeScanResultDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "description": "\"ai\" when an AI model read the photos, \"demo\" when the results are simulated.",
+            "enum": [
+              "ai",
+              "demo"
+            ],
+            "type": "string"
+          },
+          "model": {
+            "type": "string",
+            "nullable": true,
+            "description": "The AI model that read the photos.",
+            "example": "gemini-3.8-flash"
+          },
+          "class": {
+            "$ref": "#/components/schemas/ClassSummaryDto"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "tests": {
+            "description": "One entry per photo, in upload order. Nothing is saved yet.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScannedTestDto"
+            }
+          }
+        },
+        "required": [
+          "mode",
+          "model",
+          "class",
+          "subject",
+          "tests"
         ]
       }
     }

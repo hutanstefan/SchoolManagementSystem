@@ -31,10 +31,12 @@ import { Paginated } from '../common/dto/pagination.dto';
 import { Role } from '../generated/prisma/enums';
 import {
   CreateGradeDto,
+  CreateGradesBatchDto,
   GradebookDto,
   GradeDto,
   GradeHistoryEntryDto,
   GradeQueryDto,
+  GradesBatchResultDto,
   PaginatedGradesDto,
   StudentGradesReportDto,
   UpdateGradeDto,
@@ -94,6 +96,23 @@ export class GradesController {
     @Body() dto: CreateGradeDto,
   ): Promise<GradeDto> {
     return this.gradesService.create(user, dto);
+  }
+
+  @Post('classes/:id/grades')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiOperation({
+    summary: 'Give grades to many students of a class at once',
+    description:
+      'One subject and date for the whole batch, one grade per student. Every entry is checked first and the batch is saved in one transaction: all grades or none. Used when grades are read from photos of tests.',
+  })
+  @ApiCreatedResponse({ type: GradesBatchResultDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto })
+  createMany(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) classId: string,
+    @Body() dto: CreateGradesBatchDto,
+  ): Promise<GradesBatchResultDto> {
+    return this.gradesService.createMany(user, classId, dto);
   }
 
   @Patch('grades/:id')

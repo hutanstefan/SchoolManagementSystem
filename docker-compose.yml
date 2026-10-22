@@ -41,6 +41,12 @@ services:
       context: ./backend
       target: runtime
     restart: unless-stopped
+    # The same backend/.env as local development (AI keys and models). The
+    # values under `environment` below win, so the container always talks to
+    # the postgres service and runs in production mode.
+    env_file:
+      - path: ./backend/.env
+        required: false
     environment:
       <<: *database-url
       JWT_SECRET: ${JWT_SECRET:-docker-demo-secret-change-me-0123456789abcdefghij}
@@ -48,6 +54,8 @@ services:
       CORS_ORIGINS: http://localhost:${WEB_PORT:-8080}
       # Behind nginx: rate limits use the real client IP.
       TRUST_PROXY: 1
+      NODE_ENV: production
+      PORT: 3000
     ports:
       - '${API_PORT:-3000}:3000'
     depends_on:
@@ -62,6 +70,9 @@ services:
     depends_on:
       api:
         condition: service_healthy
+        # When the API is recreated (e.g. `docker compose up -d --build api`),
+        # restart nginx too instead of leaving it stopped.
+        restart: true
 
 volumes:
   postgres-data:

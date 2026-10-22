@@ -8,7 +8,7 @@ export function SubmitButton({
   ...props
 }: ComponentProps<typeof Button> & { pending?: boolean }) {
   return (
-    <Button type="submit" disabled={pending || props.disabled} {...props}>
+    <Button type="submit" {...props} disabled={pending || props.disabled}>
       {pending && <LoaderCircle className="animate-spin" aria-hidden />}
       {children}
     </Button>

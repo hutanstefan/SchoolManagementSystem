@@ -973,7 +973,10 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "if (pm.response.code < 300) pm.collectionVariables.set('gradeStudentId', pm.response.json().data[0].id);"
+                  "if (pm.response.code < 300) {",
+                  "  pm.collectionVariables.set('gradeStudentId', pm.response.json().data[0].id);",
+                  "  pm.collectionVariables.set('gradeClassId', pm.response.json().data[0].class.id);",
+                  "}"
                 ]
               }
             }
@@ -1458,6 +1461,163 @@
               ]
             },
             "description": "Uses the student token and class id saved by Login as student (for My grades). A student can open their own class (subjects, teachers, homeroom teacher); any other class returns 403."
+          }
+        },
+        {
+          "name": "Give grades in bulk (as teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Created one grade', () => pm.expect(pm.response.json().count).to.equal(1));",
+                  "if (pm.response.code < 300) pm.collectionVariables.set('bulkGradeId', pm.response.json().gradeIds[0]);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/classes/{{gradeClassId}}/grades",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "classes",
+                "{{gradeClassId}}",
+                "grades"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subjectId\": \"{{mathSubjectId}}\",\n  \"grades\": [\n    { \"studentId\": \"{{gradeStudentId}}\", \"value\": 9 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Saves the grades of many students of a class in one transaction: all or none. This is how the reviewed results of \"Scan tests\" are saved. The next request deletes the grade again."
+          }
+        },
+        {
+          "name": "Delete bulk grade (as teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/grades/{{bulkGradeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grades",
+                "{{bulkGradeId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Scan tests (AI)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('One result per photo, matched to a student', () => {",
+                  "  const tests = pm.response.json().tests;",
+                  "  pm.expect(tests.length).to.equal(2);",
+                  "  pm.expect(tests[0].student.lastName).to.equal('Banica');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/classes/{{gradeClassId}}/grade-scans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "classes",
+                "{{gradeClassId}}",
+                "grade-scans"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "subjectId",
+                  "value": "{{mathSubjectId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "../sample-tests/test-banica.jpg"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "../sample-tests/test-craciun.jpg"
+                }
+              ]
+            },
+            "description": "Sends two sample photos from docs/sample-tests (paths relative to docs/postman; in the Postman app, set docs/postman as the working directory or pick the files again). Claude reads the student and the grade on each one, or simulated results in demo mode without ANTHROPIC_API_KEY. Nothing is saved: the reviewed results are saved with \"Give grades in bulk\"."
           }
         }
       ]

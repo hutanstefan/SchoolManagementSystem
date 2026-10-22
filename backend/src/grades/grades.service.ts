@@ -15,11 +15,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { minimumGrades, overallAverage, subjectAverage } from './averages';
 import {
   CreateGradeDto,
+  CreateGradesBatchDto,
   GradebookDto,
   GradeDto,
   GradeEntryDto,
   GradeHistoryEntryDto,
   GradeQueryDto,
+  GradesBatchResultDto,
   StudentGradesReportDto,
   SubjectGradesDto,
   UpdateGradeDto,
@@ -131,6 +133,114 @@ export class GradesService {
       return created;
     });
     return toGradeDto(grade);
+  }
+
+  /**
+   * Grades for many students of one class in one subject, e.g. read from
+   * photos of tests or from a spreadsheet. Saved together or not at all: one
+   * invalid entry rejects the whole batch.
+   */
+  async createMany(
+    user: AuthUser,
+    classId: string,
+    dto: CreateGradesBatchDto,
+  ): Promise<GradesBatchResultDto> {
+    const { className, teacherId } = await this.assertCanGrade(
+      user,
+      classId,
+      dto.subjectId,
+    );
+
+    const studentIds = dto.grades.map((g) => g.studentId);
+    if (new Set(studentIds).size !== studentIds.length) {
+      throw new BadRequestException(
+        'Each student can appear only once in a batch',
+      );
+    }
+    const enrolled = await this.prisma.student.count({
+      where: { id: { in: studentIds }, classId },
+    });
+    if (enrolled !== studentIds.length) {
+      throw new BadRequestException(
+        `${studentIds.length - enrolled} of the students are not in ${className}`,
+      );
+    }
+
+    const date = new Date(dto.date ?? todayInSchool());
+    const created = await this.prisma.$transaction(async (tx) => {
+      const grades = await tx.grade.createManyAndReturn({
+        data: dto.grades.map((g) => ({
+          studentId: g.studentId,
+          subjectId: dto.subjectId,
+          teacherId,
+          value: g.value,
+          date,
+        })),
+        select: { id: true, studentId: true, value: true },
+      });
+      await tx.gradeHistory.createMany({
+        data: grades.map((grade) => ({
+          gradeId: grade.id,
+          studentId: grade.studentId,
+          subjectId: dto.subjectId,
+          action: GradeAction.CREATED,
+          newValue: grade.value,
+          newDate: date,
+          changedById: user.id,
+        })),
+      });
+      return grades;
+    });
+    // createManyAndReturn keeps the input order on PostgreSQL.
+    return { count: created.length, gradeIds: created.map((g) => g.id) };
+  }
+
+  /**
+   * Checks that the user may grade a subject in a class: admins always, a
+   * teacher only if they teach it there. Returns the names (for messages) and
+   * the subject's teacher, who the grades are attributed to.
+   */
+  async assertCanGrade(
+    user: AuthUser,
+    classId: string,
+    subjectId: string,
+  ): Promise<{
+    className: string;
+    subjectName: string;
+    teacherId: string | null;
+  }> {
+    const [schoolClass, subject] = await Promise.all([
+      this.prisma.class.findUnique({
+        where: { id: classId },
+        select: { name: true },
+      }),
+      this.prisma.subject.findUnique({
+        where: { id: subjectId },
+        select: { name: true },
+      }),
+    ]);
+    if (!schoolClass) throw new NotFoundException('Class not found');
+    if (!subject) throw new NotFoundException('Subject not found');
+
+    const assignment = await this.prisma.classSubject.findUnique({
+      where: { classId_subjectId: { classId, subjectId } },
+      select: { teacher: { select: { id: true, userId: true } } },
+    });
+    if (!assignment) {
+      throw new BadRequestException(
+        `${subject.name} is not taught in ${schoolClass.name}`,
+      );
+    }
+    if (user.role === Role.TEACHER && assignment.teacher?.userId !== user.id) {
+      throw new ForbiddenException(
+        `You don't teach ${subject.name} in ${schoolClass.name}`,
+      );
+    }
+    return {
+      className: schoolClass.name,
+      subjectName: subject.name,
+      teacherId: assignment.teacher?.id ?? null,
+    };
   }
 
   /** Teachers can only change grades they gave themselves. */

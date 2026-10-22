@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { ClassSubjectsModule } from './class-subjects/class-subjects.module';
 import { ClassesModule } from './classes/classes.module';
+import { GradeScansModule } from './grade-scans/grade-scans.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { validateEnv } from './config/env.validation';
@@ -35,6 +36,7 @@ import { TimetableModule } from './timetable/timetable.module';
     ClassSubjectsModule,
     TimetableModule,
     GradesModule,
+    GradeScansModule,
   ],
   providers: [
     // Global guards run in this order for every request:

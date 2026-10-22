@@ -7,5 +7,6 @@ import { GradesService } from './grades.service';
   imports: [ClassesModule],
   controllers: [GradesController],
   providers: [GradesService],
+  exports: [GradesService],
 })
 export class GradesModule {}

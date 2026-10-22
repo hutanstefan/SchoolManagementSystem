@@ -1,0 +1,36 @@
+meta {
+  name: Scan tests (AI)
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/classes/{{gradeClassId}}/grade-scans
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+body:multipart-form {
+  subjectId: {{mathSubjectId}}
+  images: @file(../sample-tests/test-banica.jpg)
+  images: @file(../sample-tests/test-craciun.jpg)
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("One result per photo, matched to a student", function () {
+    const tests = res.getBody().tests;
+    expect(tests.length).to.equal(2);
+    expect(tests[0].student.lastName).to.equal("Banica");
+  });
+}
+
+docs {
+  Sends two sample photos from docs/sample-tests. Claude reads the student and the grade on each one (or simulated results in demo mode, without ANTHROPIC_API_KEY). Nothing is saved: the reviewed results are saved with "Give grades in bulk".
+}

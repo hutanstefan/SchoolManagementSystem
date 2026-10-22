@@ -1,6 +1,6 @@
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, ScanLine, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { BackLink } from '@/components/back-link'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { PageHeader } from '@/components/page-header'
@@ -94,6 +94,14 @@ export function ClassDetailPage() {
             canAddGrades={() => true}
             canEditGrade={() => true}
             studentLink={(studentId) => `/admin/students/${studentId}`}
+            initialSubjectId={searchParams.get('subject')}
+            actions={(subjectId) => (
+              <Button asChild variant="outline">
+                <Link to={`/admin/classes/${c.id}/scan?subject=${subjectId}`}>
+                  <ScanLine aria-hidden /> Scan tests
+                </Link>
+              </Button>
+            )}
           />
         </TabsContent>
       </Tabs>

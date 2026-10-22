@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { DataTable, type Column } from '@/components/data-table'
 import { EmptyState } from '@/components/states'
@@ -37,6 +37,8 @@ export function Gradebook({
   canAddGrades,
   canEditGrade,
   studentLink,
+  initialSubjectId,
+  actions,
 }: {
   classId: string
   /** Subjects to choose from (a teacher only sees their own). */
@@ -44,8 +46,16 @@ export function Gradebook({
   canAddGrades: (gradebook: GradebookData) => boolean
   canEditGrade: (grade: GradeEntry) => boolean
   studentLink?: (studentId: string) => string
+  /** Subject to open first (e.g. from the URL), if it is in the list. */
+  initialSubjectId?: string | null
+  /** Extra buttons for the open subject, shown when the user can grade it. */
+  actions?: (subjectId: string) => ReactNode
 }) {
-  const [chosenSubjectId, setChosenSubjectId] = useState<string | null>(null)
+  const [chosenSubjectId, setChosenSubjectId] = useState<string | null>(
+    subjects.some((s) => s.subject.id === initialSubjectId)
+      ? (initialSubjectId ?? null)
+      : null,
+  )
   const subjectId = chosenSubjectId ?? subjects[0]?.subject.id ?? null
   const gradebook = useGradebook(classId, subjectId)
   const [dialog, setDialog] = useState<GradeDialogState | null>(null)
@@ -160,21 +170,24 @@ export function Gradebook({
   return (
     <Card className="gap-0 py-0">
       <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
-        <Select
-          value={subjectId ?? undefined}
-          onValueChange={setChosenSubjectId}
-        >
-          <SelectTrigger className="sm:w-56" aria-label="Subject">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {subjects.map((a) => (
-              <SelectItem key={a.subject.id} value={a.subject.id}>
-                {a.subject.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            value={subjectId ?? undefined}
+            onValueChange={setChosenSubjectId}
+          >
+            <SelectTrigger className="sm:w-56" aria-label="Subject">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {subjects.map((a) => (
+                <SelectItem key={a.subject.id} value={a.subject.id}>
+                  {a.subject.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {canAdd && subjectId && actions?.(subjectId)}
+        </div>
         {data && (
           <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
             <span>

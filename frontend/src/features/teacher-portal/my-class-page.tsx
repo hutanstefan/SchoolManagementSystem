@@ -1,9 +1,11 @@
+import { ScanLine } from 'lucide-react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { BackLink } from '@/components/back-link'
 import { DataTable, type Column } from '@/components/data-table'
 import { PageHeader } from '@/components/page-header'
 import { ErrorState, LoadingBlock } from '@/components/states'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useClass, useClassStudents } from '@/features/classes/api'
@@ -89,6 +91,14 @@ export function MyClassPage() {
             canAddGrades={(gradebook) => gradebook.teacher?.id === me}
             canEditGrade={(grade) => grade.teacher?.id === me}
             studentLink={(studentId) => `/teacher/students/${studentId}`}
+            initialSubjectId={searchParams.get('subject')}
+            actions={(subjectId) => (
+              <Button asChild variant="outline">
+                <Link to={`/teacher/classes/${c.id}/scan?subject=${subjectId}`}>
+                  <ScanLine aria-hidden /> Scan tests
+                </Link>
+              </Button>
+            )}
           />
         </TabsContent>
         <TabsContent value="students">

@@ -1,0 +1,41 @@
+meta {
+  name: Give grades in bulk (as teacher)
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/classes/{{gradeClassId}}/grades
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+body:json {
+  {
+    "subjectId": "{{mathSubjectId}}",
+    "grades": [
+      { "studentId": "{{gradeStudentId}}", "value": 9 }
+    ]
+  }
+}
+
+script:post-response {
+  if (res.getStatus() < 300) bru.setVar("bulkGradeId", res.getBody().gradeIds[0]);
+}
+
+tests {
+  test("Status is 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Created one grade", function () {
+    expect(res.getBody().count).to.equal(1);
+  });
+}
+
+docs {
+  Saves the grades of many students of a class in one transaction: all or none. This is how the reviewed results of "Scan tests" are saved. The next request deletes the grade again.
+}
