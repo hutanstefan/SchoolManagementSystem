@@ -23,7 +23,13 @@ import {
   SubjectSummaryDto,
 } from '../../common/dto/summaries.dto';
 import { IsNotFutureDate } from '../../common/validators/is-not-future-date.validator';
-import { GradeAction, Role } from '../../generated/prisma/enums';
+import { GradeAction, Role, YearOutcome } from '../../generated/prisma/enums';
+import {
+  PeriodDto,
+  SchoolYearDto,
+} from '../../school-years/dto/school-year.dto';
+import type { Semester } from '../../school-years/school-year';
+import { OptionalNotNull } from '../../common/validators/optional-not-null';
 
 export class CreateGradeDto {
   @IsUUID()
@@ -50,6 +56,16 @@ export class CreateGradeDto {
   @IsDateString({ strict: true })
   @IsNotFutureDate()
   date?: string;
+
+  /**
+   * 1 or 2. Defaults to the current semester. Only admins can add grades
+   * to a semester that has ended.
+   */
+  @ApiPropertyOptional({ enum: [1, 2] })
+  @IsOptional()
+  @Type(() => Number)
+  @IsIn([1, 2])
+  semester?: Semester;
 }
 
 export class BatchGradeDto {
@@ -99,6 +115,16 @@ export class CreateGradesBatchDto {
   @IsNotFutureDate()
   date?: string;
 
+  /**
+   * 1 or 2. Defaults to the current semester. Only admins can add grades
+   * to a semester that has ended.
+   */
+  @ApiPropertyOptional({ enum: [1, 2] })
+  @IsOptional()
+  @Type(() => Number)
+  @IsIn([1, 2])
+  semester?: Semester;
+
   /** One grade per student; a student can appear only once. */
   @IsArray()
   @ArrayNotEmpty()
@@ -119,7 +145,7 @@ export class GradesBatchResultDto {
 
 export class UpdateGradeDto {
   /** @example 10 */
-  @IsOptional()
+  @OptionalNotNull()
   @Type(() => Number)
   @IsInt()
   @Min(1)
@@ -127,7 +153,7 @@ export class UpdateGradeDto {
   value?: number;
 
   /** @example 2026-10-19 */
-  @IsOptional()
+  @OptionalNotNull()
   @IsDateString({ strict: true })
   @IsNotFutureDate()
   date?: string;
@@ -136,6 +162,18 @@ export class UpdateGradeDto {
 export const GRADE_SORT_FIELDS = ['date', 'value', 'createdAt'] as const;
 
 export class GradeQueryDto extends PaginationQueryDto {
+  /** The school year; the open one when omitted. */
+  @IsOptional()
+  @IsUUID()
+  schoolYearId?: string;
+
+  /** 1 or 2; the year's current semester when omitted. */
+  @ApiPropertyOptional({ enum: [1, 2] })
+  @IsOptional()
+  @Type(() => Number)
+  @IsIn([1, 2])
+  semester?: Semester;
+
   /** Field to sort by (newest first by default). */
   @ApiPropertyOptional({ enum: GRADE_SORT_FIELDS, default: 'date' })
   @IsOptional()
@@ -161,6 +199,18 @@ export class GradeQueryDto extends PaginationQueryDto {
   studentId?: string;
 }
 
+export class GradebookQueryDto {
+  @IsUUID()
+  subjectId!: string;
+
+  /** 1 or 2; the class's current semester when omitted. */
+  @ApiPropertyOptional({ enum: [1, 2] })
+  @IsOptional()
+  @Type(() => Number)
+  @IsIn([1, 2])
+  semester?: Semester;
+}
+
 export class GradeDto {
   id!: string;
   /** @example 9 */
@@ -168,9 +218,13 @@ export class GradeDto {
   /** @example 2026-10-20 */
   date!: string;
   student!: PersonSummaryDto;
-  /** The student's current class. */
+  /** The student's class in the grade's school year. */
   class!: ClassSummaryDto | null;
   subject!: SubjectSummaryDto;
+  schoolYearId!: string;
+  /** @example 1 */
+  @ApiProperty({ enum: [1, 2] })
+  semester!: Semester;
   /** Who gave the grade. Null if that teacher was deleted. */
   teacher!: PersonSummaryDto | null;
   createdAt!: Date;
@@ -221,6 +275,9 @@ export class StudentGradesReportDto {
   student!: PersonSummaryDto;
   /** Number in the school register (nr. matricol). @example 2026-0042 */
   registrationNumber!: string;
+  /** The year and semester of the report. */
+  period!: PeriodDto;
+  /** The student's class that year. */
   class!: ClassSummaryDto | null;
   /** Every subject of the class (and any other subject the student has grades in). */
   subjects!: SubjectGradesDto[];
@@ -247,6 +304,12 @@ export class GradebookRowDto {
 /** One subject of one class: every student with their grades and average. */
 export class GradebookDto {
   class!: ClassSummaryDto;
+  period!: PeriodDto;
+  /**
+   * True when the user can't add or change grades here: a closed year, or
+   * (for a teacher) a semester that has ended.
+   */
+  readOnly!: boolean;
   subject!: SubjectSummaryDto;
   teacher!: PersonSummaryDto | null;
   /** @example 4 */
@@ -282,4 +345,35 @@ export class GradeHistoryEntryDto {
   /** Null if that account was deleted. */
   changedBy!: GradeChangedByDto | null;
   changedAt!: Date;
+}
+
+export class SubjectYearDto {
+  subject!: SubjectSummaryDto;
+  /** Rounded average of each semester. @example 7 */
+  semester1!: number | null;
+  /** @example 8 */
+  semester2!: number | null;
+  /** Mean of the two semester averages. @example 7.5 */
+  annual!: number | null;
+  /** Grade of the re-exam (corigență), if the student took one. */
+  reexamGrade!: number | null;
+  /** The re-exam grade, else the annual average. */
+  final!: number | null;
+  /** Final average of at least 5. */
+  passed!: boolean;
+}
+
+/** A student's whole school year: both semesters and the annual averages. */
+export class StudentYearReportDto {
+  student!: PersonSummaryDto;
+  /** @example 2026-0042 */
+  registrationNumber!: string;
+  schoolYear!: SchoolYearDto;
+  class!: ClassSummaryDto | null;
+  subjects!: SubjectYearDto[];
+  /** Mean of the final subject averages; null while one is missing. @example 8.42 */
+  generalAverage!: number | null;
+  /** How the year ended (closed years). */
+  @ApiProperty({ enum: YearOutcome, enumName: 'YearOutcome', nullable: true })
+  outcome!: YearOutcome | null;
 }

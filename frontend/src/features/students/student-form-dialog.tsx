@@ -48,7 +48,7 @@ export function StudentFormDialog({
   student: Student | null
 }) {
   const isEdit = student !== null
-  const classes = useAllClasses()
+  const classes = useAllClasses('open')
   const create = useCreateStudent()
   const update = useUpdateStudent()
 

@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect } from 'react'
 import type { Schemas } from '@/api/client'
 import { Button } from '@/components/ui/button'
 
@@ -9,7 +10,15 @@ export function PaginationBar({
   meta: Schemas['PaginationMetaDto'] | undefined
   onPageChange: (page: number) => void
 }) {
-  if (!meta || meta.total === 0) return null
+  // Deleting the last rows of the last page leaves us past the end: go back
+  // to the new last page instead of showing an empty one.
+  const pastTheEnd =
+    meta !== undefined && meta.total > 0 && meta.page > meta.totalPages
+  useEffect(() => {
+    if (pastTheEnd) onPageChange(meta.totalPages)
+  }, [pastTheEnd, meta?.totalPages, onPageChange])
+
+  if (!meta || meta.total === 0 || pastTheEnd) return null
 
   const first = (meta.page - 1) * meta.pageSize + 1
   const last = Math.min(meta.page * meta.pageSize, meta.total)

@@ -1,0 +1,21 @@
+meta {
+  name: Current year
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/school-years/current
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("It is open, in semester 1 or 2", function () {
+    expect(res.getBody().status).to.equal("ACTIVE");
+    expect([1, 2]).to.include(res.getBody().currentSemester);
+  });
+}

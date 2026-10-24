@@ -17,6 +17,13 @@ const badgeVariants = cva(
           'border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         ghost: '[a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         link: 'text-primary underline-offset-4 [a&]:hover:underline',
+        // Soft, tinted badges for statuses.
+        'primary-soft': 'bg-primary/10 text-primary',
+        'success-soft':
+          'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+        'warning-soft': 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+        'destructive-soft':
+          'bg-destructive/10 text-destructive dark:text-red-300',
       },
     },
     defaultVariants: {

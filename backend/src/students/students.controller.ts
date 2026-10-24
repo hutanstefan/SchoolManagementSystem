@@ -30,10 +30,12 @@ import { Role } from '../generated/prisma/enums';
 import {
   CreateStudentDto,
   PaginatedStudentsDto,
+  StudentDetailDto,
   StudentDto,
   StudentQueryDto,
   UpdateStudentDto,
 } from './dto/student.dto';
+import { YearQueryDto } from '../school-years/dto/school-year.dto';
 import { StudentsService } from './students.service';
 
 @ApiTags('Students')
@@ -58,11 +60,18 @@ export class StudentsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get a student' })
-  @ApiOkResponse({ type: StudentDto })
+  @ApiOperation({
+    summary: 'Get a student',
+    description:
+      'With their class in the school year asked for (the open one by default) and their classes year by year.',
+  })
+  @ApiOkResponse({ type: StudentDetailDto })
   @ApiNotFoundResponse({ type: ErrorResponseDto })
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<StudentDto> {
-    return this.studentsService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: YearQueryDto,
+  ): Promise<StudentDetailDto> {
+    return this.studentsService.findOne(id, query.schoolYearId);
   }
 
   @Post()

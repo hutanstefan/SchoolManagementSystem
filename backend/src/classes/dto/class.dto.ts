@@ -1,4 +1,5 @@
-import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { SchoolYearStatus } from '../../generated/prisma/enums';
 import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -44,11 +45,19 @@ export class CreateClassDto {
   homeroomTeacherId?: string | null;
 }
 
-export class UpdateClassDto extends PartialType(CreateClassDto) {}
+export class UpdateClassDto extends PartialType(CreateClassDto, {
+  // A field that is sent must be valid: null is not \"leave as is\".
+  skipNullProperties: false,
+}) {}
 
 export const CLASS_SORT_FIELDS = ['name', 'createdAt'] as const;
 
 export class ClassQueryDto extends PaginationQueryDto {
+  /** Classes of this school year; the open one when omitted. */
+  @IsOptional()
+  @IsUUID()
+  schoolYearId?: string;
+
   /** Field to sort by. */
   @ApiPropertyOptional({ enum: CLASS_SORT_FIELDS, default: 'name' })
   @IsOptional()
@@ -66,10 +75,22 @@ export class AssignStudentsDto {
   studentIds!: string[];
 }
 
+export class ClassYearDto {
+  id!: string;
+  /** @example 2026–2027 */
+  name!: string;
+  @ApiProperty({ enum: SchoolYearStatus, enumName: 'SchoolYearStatus' })
+  status!: SchoolYearStatus;
+}
+
 export class ClassDto {
   id!: string;
   /** @example 9A */
   name!: string;
+  /** The grade, from the name ("9A" is in grade 9); null if it has none. @example 9 */
+  gradeLevel!: number | null;
+  /** Classes belong to one school year. A closed year can only be viewed. */
+  schoolYear!: ClassYearDto;
   /** Homeroom teacher (diriginte), or null. */
   homeroomTeacher!: PersonSummaryDto | null;
   /** @example 10 */

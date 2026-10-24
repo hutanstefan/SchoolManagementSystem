@@ -14,8 +14,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-school}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-school}
       POSTGRES_DB: ${POSTGRES_DB:-school_db}
+    # Only reachable from this computer (for local development and DB tools).
     ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -56,8 +57,11 @@ services:
       TRUST_PROXY: 1
       NODE_ENV: production
       PORT: 3000
+    # The browser goes through nginx (port 8080). This port is only for API
+    # tools on this computer: the API trusts nginx's X-Forwarded-For, so it
+    # must not be reachable directly from other machines.
     ports:
-      - '${API_PORT:-3000}:3000'
+      - '127.0.0.1:${API_PORT:-3000}:3000'
     depends_on:
       migrate:
         condition: service_completed_successfully

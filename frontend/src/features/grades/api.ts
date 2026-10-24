@@ -7,16 +7,22 @@ import {
 import { api, unwrap, type Schemas } from '@/api/client'
 import { queryKeys } from '@/api/query-keys'
 import type { operations } from '@/api/schema'
+import type { Semester } from '@/features/school-years/api'
+import { usePeriod, usePeriodQuery } from '@/periods/period-context'
 
 export type Grade = Schemas['GradeDto']
 export type GradeEntry = Schemas['GradeEntryDto']
 export type Gradebook = Schemas['GradebookDto']
 export type StudentReport = Schemas['StudentGradesReportDto']
+export type StudentYearReport = Schemas['StudentYearReportDto']
+export type SubjectYear = Schemas['SubjectYearDto']
 export type GradeQuery = NonNullable<
   operations['GradesController_findAll']['parameters']['query']
 >
 
-export function useGrades(query: GradeQuery) {
+/** Grades of the period picked in the sidebar (unless the query says). */
+export function useGrades(filters: GradeQuery) {
+  const query = { ...usePeriodQuery(), ...filters }
   return useQuery({
     queryKey: queryKeys.grades.list(query),
     queryFn: () => unwrap(api.GET('/api/grades', { params: { query } })),
@@ -37,35 +43,75 @@ export function useGradeHistory(id: string | null) {
   })
 }
 
-export function useGradebook(classId: string, subjectId: string | null) {
+/** A class's grades in a subject; the class's current semester by default. */
+export function useGradebook(
+  classId: string,
+  subjectId: string | null,
+  semester?: Semester,
+) {
   return useQuery({
-    queryKey: queryKeys.grades.gradebook(classId, subjectId ?? ''),
+    queryKey: queryKeys.grades.gradebook(classId, subjectId ?? '', semester),
     queryFn: () =>
       unwrap(
         api.GET('/api/classes/{id}/gradebook', {
-          params: { path: { id: classId }, query: { subjectId: subjectId! } },
+          params: {
+            path: { id: classId },
+            query: { subjectId: subjectId!, semester },
+          },
         }),
       ),
     enabled: subjectId !== null,
+    placeholderData: keepPreviousData,
   })
 }
 
 export function useStudentReport(studentId: string) {
+  const query = usePeriodQuery()
   return useQuery({
-    queryKey: queryKeys.grades.studentReport(studentId),
+    queryKey: queryKeys.grades.studentReport(studentId, query),
     queryFn: () =>
       unwrap(
         api.GET('/api/students/{id}/grades', {
-          params: { path: { id: studentId } },
+          params: { path: { id: studentId }, query },
         }),
       ),
+    placeholderData: keepPreviousData,
   })
 }
 
 export function useMyReport() {
+  const query = usePeriodQuery()
   return useQuery({
-    queryKey: queryKeys.grades.myReport,
-    queryFn: () => unwrap(api.GET('/api/grades/me')),
+    queryKey: queryKeys.grades.myReport(query),
+    queryFn: () => unwrap(api.GET('/api/grades/me', { params: { query } })),
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** A student's whole year of the picked period: both semesters and results. */
+export function useStudentYear(studentId: string, enabled = true) {
+  const schoolYearId = usePeriod().year?.id
+  return useQuery({
+    queryKey: queryKeys.grades.studentYear(studentId, schoolYearId),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/students/{id}/grades/year', {
+          params: { path: { id: studentId }, query: { schoolYearId } },
+        }),
+      ),
+    enabled,
+  })
+}
+
+export function useMyYear(enabled = true) {
+  const schoolYearId = usePeriod().year?.id
+  return useQuery({
+    queryKey: queryKeys.grades.myYear(schoolYearId),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/grades/me/year', { params: { query: { schoolYearId } } }),
+      ),
+    enabled,
   })
 }
 

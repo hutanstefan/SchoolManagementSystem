@@ -8,6 +8,7 @@ import {
 import { fullName } from '@/lib/format'
 import type { Schemas } from '@/api/client'
 import { AverageCell, GradeChip } from './grade-badges'
+import { SubjectIcon } from '@/features/subjects/subject-icon'
 
 type SubjectGrades = Schemas['SubjectGradesDto']
 
@@ -15,10 +16,13 @@ const columns: Column<SubjectGrades>[] = [
   {
     header: 'Subject',
     cell: (row) => (
-      <div>
-        <div className="font-medium">{row.subject.name}</div>
-        <div className="text-muted-foreground text-xs">
-          {row.teacher ? fullName(row.teacher) : 'No teacher assigned'}
+      <div className="flex items-center gap-3">
+        <SubjectIcon subject={row.subject} />
+        <div className="min-w-0">
+          <div className="font-medium">{row.subject.name}</div>
+          <div className="text-muted-foreground text-xs">
+            {row.teacher ? fullName(row.teacher) : 'No teacher assigned'}
+          </div>
         </div>
       </div>
     ),

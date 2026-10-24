@@ -8,16 +8,41 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { AuthUser } from '../auth/auth.types';
 import { ClassesService } from '../classes/classes.service';
 import { todayInSchool, toDateString } from '../common/dates';
-import { PersonSummaryDto } from '../common/dto/summaries.dto';
+import {
+  PersonSummaryDto,
+  SubjectSummaryDto,
+} from '../common/dto/summaries.dto';
 import { Paginated, pageArgs, paginated } from '../common/dto/pagination.dto';
-import { personSelect, toPerson } from '../common/mappers';
+import {
+  personSelect,
+  subjectSummarySelect,
+  toPerson,
+} from '../common/mappers';
 import {
   DomainEvents,
   type GradeChange,
   type GradesChangedEvent,
 } from '../events/domain-events';
-import { GradeAction, Prisma, Role } from '../generated/prisma/client';
+import {
+  GradeAction,
+  Prisma,
+  Role,
+  SchoolYearStatus,
+} from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PeriodQueryDto } from '../school-years/dto/school-year.dto';
+import { yearResult } from '../school-years/promotion';
+import {
+  nextClassName,
+  schoolYearSelect,
+  type SchoolYearRow,
+  type Semester,
+} from '../school-years/school-year';
+import {
+  SchoolYearsService,
+  toSchoolYearDto,
+  type Period,
+} from '../school-years/school-years.service';
 import { minimumGrades, overallAverage, subjectAverage } from './averages';
 import {
   CreateGradeDto,
@@ -29,6 +54,7 @@ import {
   GradeQueryDto,
   GradesBatchResultDto,
   StudentGradesReportDto,
+  StudentYearReportDto,
   SubjectGradesDto,
   UpdateGradeDto,
 } from './dto/grade.dto';
@@ -37,12 +63,22 @@ const gradeSelect = {
   id: true,
   value: true,
   date: true,
+  schoolYearId: true,
+  semester: true,
   createdAt: true,
   updatedAt: true,
   student: {
-    select: { ...personSelect, class: { select: { id: true, name: true } } },
+    select: {
+      ...personSelect,
+      enrollments: {
+        select: {
+          schoolYearId: true,
+          class: { select: { id: true, name: true } },
+        },
+      },
+    },
   },
-  subject: { select: { id: true, name: true } },
+  subject: { select: subjectSummarySelect },
   teacher: { select: personSelect },
 } as const satisfies Prisma.GradeSelect;
 
@@ -61,22 +97,35 @@ type GradeEntryRow = Prisma.GradeGetPayload<{
   select: typeof gradeEntrySelect;
 }>;
 
+/**
+ * Grades: each one counts for a school year and a semester. New grades go to
+ * the open year; teachers write in the current semester only, admins can
+ * also correct an ended one; a closed year is read-only.
+ */
 @Injectable()
 export class GradesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly classes: ClassesService,
     private readonly events: EventEmitter2,
+    private readonly years: SchoolYearsService,
   ) {}
 
   /** Tells whoever listens (notifications) that grades changed. */
   private async publish(
     user: AuthUser,
     subjectId: string,
+    period: { schoolYearId: string; semester: number },
     changes: GradeChange[],
   ): Promise<void> {
     if (changes.length === 0) return;
-    const event: GradesChangedEvent = { actorId: user.id, subjectId, changes };
+    const event: GradesChangedEvent = {
+      actorId: user.id,
+      subjectId,
+      schoolYearId: period.schoolYearId,
+      semester: period.semester,
+      changes,
+    };
     await this.events.emitAsync(DomainEvents.GradesChanged, event);
   }
 
@@ -87,10 +136,14 @@ export class GradesService {
    * Admins can grade any student; the grade is attributed to the subject's teacher.
    */
   async create(user: AuthUser, dto: CreateGradeDto): Promise<GradeDto> {
+    const year = await this.years.active();
+    const semester = dto.semester ?? (year.currentSemester as Semester);
+    this.years.assertGradesWritable(user, year, semester);
+
     const [student, subject] = await Promise.all([
       this.prisma.student.findUnique({
         where: { id: dto.studentId },
-        select: { classId: true, class: { select: { name: true } } },
+        select: { id: true },
       }),
       this.prisma.subject.findUnique({
         where: { id: dto.subjectId },
@@ -99,14 +152,17 @@ export class GradesService {
     ]);
     if (!student) throw new NotFoundException('Student not found');
     if (!subject) throw new NotFoundException('Subject not found');
-    if (!student.classId || !student.class) {
-      throw new BadRequestException('The student is not enrolled in any class');
+    const schoolClass = await this.years.classOf(dto.studentId, year.id);
+    if (!schoolClass) {
+      throw new BadRequestException(
+        'The student is not enrolled in a class this school year',
+      );
     }
 
     const assignment = await this.prisma.classSubject.findUnique({
       where: {
         classId_subjectId: {
-          classId: student.classId,
+          classId: schoolClass.id,
           subjectId: dto.subjectId,
         },
       },
@@ -114,12 +170,12 @@ export class GradesService {
     });
     if (!assignment) {
       throw new BadRequestException(
-        `${subject.name} is not taught in ${student.class.name}`,
+        `${subject.name} is not taught in ${schoolClass.name}`,
       );
     }
     if (user.role === Role.TEACHER && assignment.teacher?.userId !== user.id) {
       throw new ForbiddenException(
-        `You don't teach ${subject.name} in ${student.class.name}`,
+        `You don't teach ${subject.name} in ${schoolClass.name}`,
       );
     }
 
@@ -132,6 +188,8 @@ export class GradesService {
           studentId: dto.studentId,
           subjectId: dto.subjectId,
           teacherId: assignment.teacher?.id ?? null,
+          schoolYearId: year.id,
+          semester,
           value: dto.value,
           date,
         },
@@ -150,15 +208,20 @@ export class GradesService {
       });
       return created;
     });
-    await this.publish(user, dto.subjectId, [
-      {
-        kind: 'created',
-        gradeId: grade.id,
-        studentId: dto.studentId,
-        value: grade.value,
-        date: toDateString(date),
-      },
-    ]);
+    await this.publish(
+      user,
+      dto.subjectId,
+      { schoolYearId: year.id, semester },
+      [
+        {
+          kind: 'created',
+          gradeId: grade.id,
+          studentId: dto.studentId,
+          value: grade.value,
+          date: toDateString(date),
+        },
+      ],
+    );
     return toGradeDto(grade);
   }
 
@@ -166,8 +229,8 @@ export class GradesService {
    * Grades for many students in one subject, e.g. read from photos of tests
    * or from a spreadsheet. With a class, every student must be in it; without
    * one (an import for several classes), the user must be allowed to grade
-   * the subject in each student's class. Saved together or not at all: one
-   * invalid entry rejects the whole batch.
+   * the subject in each student's class of the open year. Saved together or
+   * not at all: one invalid entry rejects the whole batch.
    */
   async createMany(
     user: AuthUser,
@@ -177,6 +240,9 @@ export class GradesService {
     const classCheck = classId
       ? await this.assertCanGrade(user, classId, dto.subjectId)
       : null;
+    const year = classCheck?.schoolYear ?? (await this.years.active());
+    const semester = dto.semester ?? (year.currentSemester as Semester);
+    this.years.assertGradesWritable(user, year, semester);
 
     const studentIds = dto.grades.map((g) => g.studentId);
     if (new Set(studentIds).size !== studentIds.length) {
@@ -186,9 +252,17 @@ export class GradesService {
     }
     const students = await this.prisma.student.findMany({
       where: { id: { in: studentIds } },
-      select: { id: true, classId: true },
+      select: {
+        id: true,
+        enrollments: {
+          where: { schoolYearId: year.id },
+          select: { classId: true },
+        },
+      },
     });
-    const classOf = new Map(students.map((s) => [s.id, s.classId]));
+    const classOf = new Map(
+      students.map((s) => [s.id, s.enrollments[0]?.classId ?? null]),
+    );
 
     // The teacher each grade is attributed to: the subject's teacher in the
     // student's class.
@@ -207,12 +281,12 @@ export class GradesService {
           `${studentIds.length - students.length} of the students don't exist`,
         );
       }
-      if (students.some((s) => s.classId === null)) {
+      if ([...classOf.values()].some((id) => id === null)) {
         throw new BadRequestException(
-          'Every student must be enrolled in a class',
+          'Every student must be enrolled in a class this school year',
         );
       }
-      for (const id of new Set(students.map((s) => s.classId!))) {
+      for (const id of new Set([...classOf.values()] as string[])) {
         const { teacherId } = await this.assertCanGrade(
           user,
           id,
@@ -224,7 +298,10 @@ export class GradesService {
     const teacherOf = (studentId: string) =>
       teacherByClass.get(classOf.get(studentId)!) ?? null;
 
-    const replacements = await this.findReplacements(user, dto);
+    const replacements = await this.findReplacements(user, dto, {
+      schoolYearId: year.id,
+      semester,
+    });
     const batchDate = dto.date ?? todayInSchool();
 
     const saved = await this.prisma.$transaction(async (tx) => {
@@ -239,6 +316,8 @@ export class GradesService {
           studentId: g.studentId,
           subjectId: dto.subjectId,
           teacherId: teacherOf(g.studentId),
+          schoolYearId: year.id,
+          semester,
           value: g.value,
           date: new Date(g.date ?? batchDate),
         })),
@@ -288,6 +367,7 @@ export class GradesService {
     await this.publish(
       user,
       dto.subjectId,
+      { schoolYearId: year.id, semester },
       dto.grades.map((g, index) => {
         const date = g.date ?? batchDate;
         const old = g.replaceGradeId
@@ -321,11 +401,12 @@ export class GradesService {
 
   /**
    * The grades a batch wants to replace: each must exist, belong to that
-   * student and subject, and (for a teacher) have been given by them.
+   * student, subject and semester, and (for a teacher) have been given by them.
    */
   private async findReplacements(
     user: AuthUser,
     dto: CreateGradesBatchDto,
+    period: { schoolYearId: string; semester: number },
   ): Promise<Map<string, { value: number; date: Date }>> {
     const wanted = dto.grades.filter((g) => g.replaceGradeId);
     const ids = wanted.map((g) => g.replaceGradeId!);
@@ -342,6 +423,8 @@ export class GradesService {
         date: true,
         studentId: true,
         subjectId: true,
+        schoolYearId: true,
+        semester: true,
         teacher: { select: { userId: true } },
       },
     });
@@ -351,10 +434,12 @@ export class GradesService {
       if (
         !grade ||
         grade.studentId !== entry.studentId ||
-        grade.subjectId !== dto.subjectId
+        grade.subjectId !== dto.subjectId ||
+        grade.schoolYearId !== period.schoolYearId ||
+        grade.semester !== period.semester
       ) {
         throw new BadRequestException(
-          "A grade to replace doesn't exist or belongs to another student or subject",
+          "A grade to replace doesn't exist or belongs to another student, subject or semester",
         );
       }
       if (user.role === Role.TEACHER && grade.teacher?.userId !== user.id) {
@@ -365,9 +450,8 @@ export class GradesService {
   }
 
   /**
-   * Checks that the user may grade a subject in a class: admins always, a
-   * teacher only if they teach it there. Returns the names (for messages) and
-   * the subject's teacher, who the grades are attributed to.
+   * Checks that the user may grade a subject in a class: the class's year
+   * must be open; admins always, a teacher only a subject they teach there.
    */
   async assertCanGrade(
     user: AuthUser,
@@ -376,20 +460,23 @@ export class GradesService {
   ): Promise<{
     className: string;
     subjectName: string;
+    subject: SubjectSummaryDto;
     teacherId: string | null;
+    schoolYear: SchoolYearRow;
   }> {
     const [schoolClass, subject] = await Promise.all([
       this.prisma.class.findUnique({
         where: { id: classId },
-        select: { name: true },
+        select: { name: true, schoolYear: { select: schoolYearSelect } },
       }),
       this.prisma.subject.findUnique({
         where: { id: subjectId },
-        select: { name: true },
+        select: subjectSummarySelect,
       }),
     ]);
     if (!schoolClass) throw new NotFoundException('Class not found');
     if (!subject) throw new NotFoundException('Subject not found');
+    this.years.assertOpen(schoolClass.schoolYear);
 
     const assignment = await this.prisma.classSubject.findUnique({
       where: { classId_subjectId: { classId, subjectId } },
@@ -408,7 +495,9 @@ export class GradesService {
     return {
       className: schoolClass.name,
       subjectName: subject.name,
+      subject,
       teacherId: assignment.teacher?.id ?? null,
+      schoolYear: schoolClass.schoolYear,
     };
   }
 
@@ -456,7 +545,7 @@ export class GradesService {
       });
       return updated;
     });
-    await this.publish(user, current.subjectId, [
+    await this.publish(user, current.subjectId, current, [
       {
         kind: 'updated',
         gradeId: id,
@@ -488,7 +577,7 @@ export class GradesService {
       }),
       this.prisma.grade.delete({ where: { id } }),
     ]);
-    await this.publish(user, current.subjectId, [
+    await this.publish(user, current.subjectId, current, [
       {
         kind: 'deleted',
         gradeId: id,
@@ -502,16 +591,20 @@ export class GradesService {
   // ----------------------------------------------------------------- reads
 
   /**
-   * Paginated grades. Admins see everything. Teachers see the grades of the
-   * subjects they teach in each class, every grade of their homeroom classes,
-   * and every grade they gave themselves.
+   * Paginated grades of a school year and semester. Admins see everything.
+   * Teachers see the grades of the subjects they teach in each class, every
+   * grade of their homeroom classes, and every grade they gave themselves.
    */
   async findAll(
     user: AuthUser,
     query: GradeQueryDto,
   ): Promise<Paginated<GradeDto>> {
+    const { year, semester } = await this.years.resolvePeriod(query);
     const filters: Prisma.GradeWhereInput[] = [
-      query.classId ? { student: { classId: query.classId } } : {},
+      { schoolYearId: year.id, semester },
+      query.classId
+        ? { student: { enrollments: { some: { classId: query.classId } } } }
+        : {},
       query.subjectId ? { subjectId: query.subjectId } : {},
       query.studentId ? { studentId: query.studentId } : {},
       query.search
@@ -530,7 +623,7 @@ export class GradesService {
         : {},
     ];
     if (user.role === Role.TEACHER) {
-      filters.push(await this.teacherScope(user.id));
+      filters.push(await this.teacherScope(user.id, year.id));
     }
     const where: Prisma.GradeWhereInput = { AND: filters };
 
@@ -546,60 +639,80 @@ export class GradesService {
     return paginated(rows.map(toGradeDto), total, query);
   }
 
-  /** The logged-in student's own report card. */
-  async myReport(user: AuthUser): Promise<StudentGradesReportDto> {
-    const student = await this.prisma.student.findUnique({
-      where: { userId: user.id },
-      select: { id: true },
-    });
-    if (!student) throw new NotFoundException('Student profile not found');
-    return this.buildReport(student.id);
+  /** The logged-in student's own report card for a semester. */
+  async myReport(
+    user: AuthUser,
+    query: PeriodQueryDto,
+  ): Promise<StudentGradesReportDto> {
+    const studentId = await this.studentIdOf(user);
+    return this.buildReport(studentId, await this.years.resolvePeriod(query));
+  }
+
+  /** The logged-in student's whole year: both semesters and annual averages. */
+  async myYear(
+    user: AuthUser,
+    schoolYearId?: string,
+  ): Promise<StudentYearReportDto> {
+    const studentId = await this.studentIdOf(user);
+    return this.buildYearReport(
+      studentId,
+      await this.years.resolveYear(schoolYearId),
+    );
   }
 
   /** A student's report card, for admins and the teachers of their class. */
   async studentReport(
     user: AuthUser,
     studentId: string,
+    query: PeriodQueryDto,
   ): Promise<StudentGradesReportDto> {
-    const student = await this.prisma.student.findUnique({
-      where: { id: studentId },
-      select: { classId: true },
-    });
-    if (!student) throw new NotFoundException('Student not found');
+    const period = await this.years.resolvePeriod(query);
+    await this.assertCanSeeStudent(user, studentId, period.year.id);
+    return this.buildReport(studentId, period);
+  }
 
-    if (user.role === Role.TEACHER) {
-      if (!student.classId) {
-        throw new ForbiddenException('You are not assigned to this student');
-      }
-      await this.classes.assertCanView(user, student.classId);
-    }
-    return this.buildReport(studentId);
+  /** A student's whole year, for admins and the teachers of their class. */
+  async studentYear(
+    user: AuthUser,
+    studentId: string,
+    schoolYearId?: string,
+  ): Promise<StudentYearReportDto> {
+    const year = await this.years.resolveYear(schoolYearId);
+    await this.assertCanSeeStudent(user, studentId, year.id);
+    return this.buildYearReport(studentId, year);
   }
 
   /**
-   * The gradebook of one subject in one class. Open to admins, to the teacher
-   * of that subject and to the class's homeroom teacher.
+   * The gradebook of one subject in one class, for a semester of the class's
+   * year. Open to admins, to the teacher of that subject and to the class's
+   * homeroom teacher.
    */
   async gradebook(
     user: AuthUser,
     classId: string,
     subjectId: string,
+    semester?: Semester,
   ): Promise<GradebookDto> {
     const schoolClass = await this.prisma.class.findUnique({
       where: { id: classId },
       select: {
         id: true,
         name: true,
+        schoolYear: { select: schoolYearSelect },
         homeroomTeacher: { select: { userId: true } },
       },
     });
     if (!schoolClass) throw new NotFoundException('Class not found');
+    const { year, semester: shown } = await this.years.resolvePeriod({
+      schoolYearId: schoolClass.schoolYear.id,
+      semester,
+    });
 
     const assignment = await this.prisma.classSubject.findUnique({
       where: { classId_subjectId: { classId, subjectId } },
       select: {
         hoursPerWeek: true,
-        subject: { select: { id: true, name: true } },
+        subject: { select: subjectSummarySelect },
         teacher: { select: { ...personSelect, userId: true } },
       },
     });
@@ -607,9 +720,10 @@ export class GradesService {
       throw new NotFoundException('This subject is not taught in this class');
     }
 
+    const teachesIt = assignment.teacher?.userId === user.id;
     if (
       user.role === Role.TEACHER &&
-      assignment.teacher?.userId !== user.id &&
+      !teachesIt &&
       schoolClass.homeroomTeacher?.userId !== user.id
     ) {
       throw new ForbiddenException(
@@ -618,19 +732,30 @@ export class GradesService {
     }
 
     const students = await this.prisma.student.findMany({
-      where: { classId },
+      where: { enrollments: { some: { classId } } },
       select: { ...personSelect, registrationNumber: true },
       orderBy: [{ user: { lastName: 'asc' } }, { user: { firstName: 'asc' } }],
     });
     const grades = await this.prisma.grade.findMany({
-      where: { subjectId, studentId: { in: students.map((s) => s.id) } },
+      where: {
+        subjectId,
+        schoolYearId: year.id,
+        semester: shown,
+        studentId: { in: students.map((s) => s.id) },
+      },
       select: gradeEntrySelect,
       orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
     });
 
+    const writable =
+      year.status === SchoolYearStatus.ACTIVE &&
+      (user.role === Role.ADMIN ||
+        (teachesIt && shown === year.currentSemester));
     const minimum = minimumGrades(assignment.hoursPerWeek);
     return {
       class: { id: schoolClass.id, name: schoolClass.name },
+      period: { schoolYear: toSchoolYearDto(year), semester: shown },
+      readOnly: !writable,
       subject: assignment.subject,
       teacher: toPerson(assignment.teacher),
       hoursPerWeek: assignment.hoursPerWeek,
@@ -678,6 +803,39 @@ export class GradesService {
 
   // --------------------------------------------------------------- helpers
 
+  private async studentIdOf(user: AuthUser): Promise<string> {
+    const student = await this.prisma.student.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    if (!student) throw new NotFoundException('Student profile not found');
+    return student.id;
+  }
+
+  /** Admins see every student; teachers the students of their classes that year. */
+  private async assertCanSeeStudent(
+    user: AuthUser,
+    studentId: string,
+    schoolYearId: string,
+  ): Promise<void> {
+    const student = await this.prisma.student.findUnique({
+      where: { id: studentId },
+      select: { id: true },
+    });
+    if (!student) throw new NotFoundException('Student not found');
+    if (user.role !== Role.TEACHER) return;
+
+    const schoolClass = await this.years.classOf(studentId, schoolYearId);
+    if (!schoolClass) {
+      throw new ForbiddenException('You are not assigned to this student');
+    }
+    await this.classes.assertCanView(user, schoolClass.id);
+  }
+
+  /**
+   * A grade that may be changed: in the open year, in the current semester
+   * (admins: also an ended one), and for a teacher, one they gave.
+   */
   private async findForChange(user: AuthUser, id: string) {
     const grade = await this.prisma.grade.findUnique({
       where: { id },
@@ -686,6 +844,9 @@ export class GradesService {
         date: true,
         studentId: true,
         subjectId: true,
+        schoolYearId: true,
+        semester: true,
+        schoolYear: { select: schoolYearSelect },
         teacher: { select: { userId: true } },
       },
     });
@@ -693,68 +854,92 @@ export class GradesService {
     if (user.role === Role.TEACHER && grade.teacher?.userId !== user.id) {
       throw new ForbiddenException('You can only change grades you gave');
     }
+    this.years.assertGradesWritable(user, grade.schoolYear, grade.semester);
     return grade;
   }
 
-  /** Grades a teacher may see (see findAll). */
-  private async teacherScope(userId: string): Promise<Prisma.GradeWhereInput> {
+  /** Grades a teacher may see in a school year (see findAll). */
+  private async teacherScope(
+    userId: string,
+    schoolYearId: string,
+  ): Promise<Prisma.GradeWhereInput> {
     const [assignments, homeroomClasses] = await Promise.all([
       this.prisma.classSubject.findMany({
-        where: { teacher: { userId } },
+        where: { teacher: { userId }, class: { schoolYearId } },
         select: { classId: true, subjectId: true },
       }),
       this.prisma.class.findMany({
-        where: { homeroomTeacher: { userId } },
+        where: { homeroomTeacher: { userId }, schoolYearId },
         select: { id: true },
       }),
     ]);
+    const inClass = (classId: string) => ({
+      student: { enrollments: { some: { classId } } },
+    });
 
     return {
       OR: [
         ...assignments.map((a) => ({
           subjectId: a.subjectId,
-          student: { classId: a.classId },
+          ...inClass(a.classId),
         })),
-        ...homeroomClasses.map((c) => ({ student: { classId: c.id } })),
+        ...homeroomClasses.map((c) => inClass(c.id)),
         { teacher: { userId } },
       ],
     };
   }
 
-  private async buildReport(
-    studentId: string,
-  ): Promise<StudentGradesReportDto> {
+  /** The student, with their class of that year and its subjects. */
+  private async studentInYear(studentId: string, schoolYearId: string) {
     const student = await this.prisma.student.findUniqueOrThrow({
       where: { id: studentId },
       select: {
         ...personSelect,
         registrationNumber: true,
-        class: {
+        enrollments: {
+          where: { schoolYearId },
           select: {
-            id: true,
-            name: true,
-            subjects: {
+            outcome: true,
+            class: {
               select: {
-                hoursPerWeek: true,
-                subject: { select: { id: true, name: true } },
-                teacher: { select: personSelect },
+                id: true,
+                name: true,
+                subjects: {
+                  select: {
+                    hoursPerWeek: true,
+                    subject: { select: subjectSummarySelect },
+                    teacher: { select: personSelect },
+                  },
+                },
               },
             },
           },
         },
       },
     });
+    const enrollment = student.enrollments[0] ?? null;
+    return { student, enrollment, schoolClass: enrollment?.class ?? null };
+  }
+
+  private async buildReport(
+    studentId: string,
+    { year, semester }: Period,
+  ): Promise<StudentGradesReportDto> {
+    const { student, schoolClass } = await this.studentInYear(
+      studentId,
+      year.id,
+    );
     const grades = await this.prisma.grade.findMany({
-      where: { studentId },
+      where: { studentId, schoolYearId: year.id, semester },
       select: {
         ...gradeEntrySelect,
-        subject: { select: { id: true, name: true } },
+        subject: { select: subjectSummarySelect },
       },
       orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
     });
 
-    // Subjects of the current class, plus any subject graded in a previous class.
-    const classSubjects = student.class?.subjects ?? [];
+    // Subjects of the class, plus any subject graded in another class that year.
+    const classSubjects = schoolClass?.subjects ?? [];
     const subjectIds = new Set(classSubjects.map((cs) => cs.subject.id));
     const extraSubjects = [
       ...new Map(
@@ -765,7 +950,7 @@ export class GradesService {
     ];
 
     const reportSubjects: {
-      subject: { id: string; name: string };
+      subject: (typeof extraSubjects)[number];
       teacher: PersonSummaryDto | null;
       hoursPerWeek: number | null;
     }[] = [
@@ -800,11 +985,73 @@ export class GradesService {
     return {
       student: toPerson(student),
       registrationNumber: student.registrationNumber,
-      class: student.class
-        ? { id: student.class.id, name: student.class.name }
+      period: { schoolYear: toSchoolYearDto(year), semester },
+      class: schoolClass
+        ? { id: schoolClass.id, name: schoolClass.name }
         : null,
       subjects,
       overallAverage: overallAverage(subjects.map((s) => s.roundedAverage)),
+    };
+  }
+
+  private async buildYearReport(
+    studentId: string,
+    year: SchoolYearRow,
+  ): Promise<StudentYearReportDto> {
+    const { student, enrollment, schoolClass } = await this.studentInYear(
+      studentId,
+      year.id,
+    );
+    const [grades, reexams] = await Promise.all([
+      this.prisma.grade.findMany({
+        where: { studentId, schoolYearId: year.id },
+        select: {
+          semester: true,
+          value: true,
+          subject: { select: subjectSummarySelect },
+        },
+      }),
+      this.prisma.reexam.findMany({
+        where: { studentId, schoolYearId: year.id },
+        select: { subjectId: true, grade: true },
+      }),
+    ]);
+    const subjects = new Map(
+      [
+        ...(schoolClass?.subjects.map((s) => s.subject) ?? []),
+        ...grades.map((g) => g.subject),
+      ].map((s) => [s.id, s]),
+    );
+    const result = yearResult(
+      [...subjects.keys()].map((subjectId) => ({
+        subjectId,
+        semester1: grades
+          .filter((g) => g.subject.id === subjectId && g.semester === 1)
+          .map((g) => g.value),
+        semester2: grades
+          .filter((g) => g.subject.id === subjectId && g.semester === 2)
+          .map((g) => g.value),
+        reexamGrade:
+          reexams.find((r) => r.subjectId === subjectId)?.grade ?? null,
+      })),
+      schoolClass ? nextClassName(schoolClass.name) === null : false,
+    );
+
+    return {
+      student: toPerson(student),
+      registrationNumber: student.registrationNumber,
+      schoolYear: toSchoolYearDto(year),
+      class: schoolClass
+        ? { id: schoolClass.id, name: schoolClass.name }
+        : null,
+      subjects: result.subjects
+        .map(({ subjectId, ...rest }) => ({
+          subject: subjects.get(subjectId)!,
+          ...rest,
+        }))
+        .sort((a, b) => a.subject.name.localeCompare(b.subject.name)),
+      generalAverage: result.generalAverage,
+      outcome: enrollment?.outcome ?? null,
     };
   }
 }
@@ -824,8 +1071,12 @@ function toGradeDto(row: GradeRow): GradeDto {
     value: row.value,
     date: toDateString(row.date),
     student: toPerson(row.student),
-    class: row.student.class,
+    class:
+      row.student.enrollments.find((e) => e.schoolYearId === row.schoolYearId)
+        ?.class ?? null,
     subject: row.subject,
+    schoolYearId: row.schoolYearId,
+    semester: row.semester as Semester,
     teacher: toPerson(row.teacher),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

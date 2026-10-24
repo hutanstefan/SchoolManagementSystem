@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { JwtService } from '@nestjs/jwt';
 import {
   type OnGatewayInit,
   WebSocketGateway,
@@ -39,6 +40,9 @@ export const ClientEvents = {
 
 const roomOf = (userId: string) => `user:${userId}`;
 
+/** setTimeout can't wait longer than this (about 24 days). */
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
 /** The user a connection belongs to (set when it is accepted). */
 export function userOf(socket: Socket): AuthUser | undefined {
   return (socket.data as { user?: AuthUser }).user;
@@ -58,7 +62,10 @@ export class RealtimeGateway implements OnGatewayInit {
   @WebSocketServer()
   private readonly server?: Server;
 
-  constructor(private readonly accessTokens: AccessTokenService) {}
+  constructor(
+    private readonly accessTokens: AccessTokenService,
+    private readonly jwt: JwtService,
+  ) {}
 
   afterInit(server: Server): void {
     // Runs before a connection is accepted: no valid token, no connection.
@@ -68,11 +75,28 @@ export class RealtimeGateway implements OnGatewayInit {
         .verify(typeof token === 'string' ? token : null)
         .then(async (user: AuthUser) => {
           (socket.data as { user?: AuthUser }).user = user;
+          this.closeWhenTokenExpires(socket, token as string);
           await socket.join(roomOf(user.id));
           next();
         })
         .catch((error: Error) => next(new Error(error.message)));
     });
+  }
+
+  /**
+   * The token is checked once, when the tab connects; the connection must not
+   * outlive it. The browser then gets a 401 on its next request and logs out.
+   */
+  private closeWhenTokenExpires(socket: Socket, token: string): void {
+    const exp = this.jwt.decode<{ exp?: number } | null>(token)?.exp;
+    if (exp === undefined) return;
+    const remaining = exp * 1000 - Date.now();
+    if (remaining > MAX_TIMER_MS) return;
+    const timer = setTimeout(
+      () => socket.disconnect(true),
+      Math.max(0, remaining),
+    );
+    socket.once('disconnect', () => clearTimeout(timer));
   }
 
   /** Sends an event to every open tab of a user. */

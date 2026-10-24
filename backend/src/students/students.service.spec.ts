@@ -1,8 +1,9 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as bcrypt from 'bcrypt';
-import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import type { SchoolYearsService } from '../school-years/school-years.service';
 import { StudentsService } from './students.service';
 
 describe('StudentsService', () => {
@@ -10,10 +11,15 @@ describe('StudentsService', () => {
     user: { findUnique: jest.fn() },
     class: { findUnique: jest.fn() },
     student: { create: jest.fn(), findFirst: jest.fn() },
+    $queryRaw: jest.fn(),
   };
   const service = new StudentsService(
     prisma as unknown as PrismaService,
-    new UsersService(prisma as unknown as PrismaService),
+    new UsersService(prisma as unknown as PrismaService, new EventEmitter2()),
+    {
+      active: () =>
+        Promise.resolve({ id: 'year-2026', startYear: 2026, status: 'ACTIVE' }),
+    } as unknown as SchoolYearsService,
   );
 
   const dto = {
@@ -28,7 +34,7 @@ describe('StudentsService', () => {
     id: 'student-1',
     registrationNumber: '2026-0042',
     dateOfBirth: new Date('2011-02-03T00:00:00.000Z'),
-    class: null,
+    enrollments: [],
     user: {
       id: 'user-1',
       email: dto.email,
@@ -45,13 +51,14 @@ describe('StudentsService', () => {
     prisma.student.findFirst.mockResolvedValue({
       registrationNumber: '2026-0041',
     });
+    prisma.$queryRaw.mockResolvedValue([{ last_number: 42 }]);
     prisma.student.create.mockResolvedValue(createdRow);
 
     const result = await service.create(dto);
 
     const { data } = prisma.student.create.mock.calls[0][0];
-    // The next number of this year, after the highest one.
-    expect(data.registrationNumber).toMatch(/^\d{4}-\d{4}$/);
+    // The year's next number, from the counter.
+    expect(data.registrationNumber).toMatch(/^\d{4}-0042$/);
     expect(data.user.create).toMatchObject({
       email: dto.email,
       role: 'STUDENT',
@@ -69,25 +76,23 @@ describe('StudentsService', () => {
     });
   });
 
-  it('takes the next number when another student got that one first', async () => {
+  it("asks the counter for the year's next number, at least the highest + 1", async () => {
     prisma.user.findUnique.mockResolvedValue(null);
-    prisma.student.findFirst
-      .mockResolvedValueOnce({ registrationNumber: '2026-0041' })
-      .mockResolvedValueOnce({ registrationNumber: '2026-0042' });
-    prisma.student.create
-      .mockRejectedValueOnce(
-        new Prisma.PrismaClientKnownRequestError('Unique constraint', {
-          code: 'P2002',
-          clientVersion: 'test',
-        }),
-      )
-      .mockResolvedValueOnce(createdRow);
+    prisma.student.findFirst.mockResolvedValue({
+      registrationNumber: '2026-0041',
+    });
+    prisma.$queryRaw.mockResolvedValue([{ last_number: 57 }]);
+    prisma.student.create.mockResolvedValue(createdRow);
 
     await service.create(dto);
 
-    expect(prisma.student.create).toHaveBeenCalledTimes(2);
-    const second = prisma.student.create.mock.calls[1][0].data;
-    expect(second.registrationNumber.slice(5)).toBe('0043');
+    // Tagged template: [strings, year, highest + 1].
+    const [, , afterHighest] = prisma.$queryRaw.mock.calls[0] as unknown[];
+    expect(afterHighest).toBe(42);
+    // A deleted student's number is not given again: the counter is ahead.
+    expect(
+      prisma.student.create.mock.calls[0][0].data.registrationNumber,
+    ).toMatch(/-0057$/);
   });
 
   it('rejects an email that is already used', async () => {

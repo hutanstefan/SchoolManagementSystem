@@ -7,6 +7,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import {
   cleanupTestData,
   createTestApp,
+  currentClass,
   loginAs,
   TestApp,
   uniqueClassName,
@@ -20,6 +21,7 @@ interface Notification {
   body: string;
   link: string | null;
   readAt: string | null;
+  createdAt: string;
 }
 
 /** The next `event` on a socket, or an error after 5 s. */
@@ -66,12 +68,13 @@ describe('Notifications (e2e)', () => {
     return socket;
   };
 
+  /** The user's notifications sent during this test run (not the seeded ones). */
   const notificationsOf = async (token: string, query = '') =>
     (
       await as(token)(api().get(`/api/notifications?pageSize=100${query}`))
         .expect(200)
         .then((res) => res.body as { data: Notification[] })
-    ).data;
+    ).data.filter((n) => new Date(n.createdAt) >= startedAt);
 
   const giveGrade = async (token: string, value: number) => {
     const { body } = await as(token)(
@@ -95,10 +98,10 @@ describe('Notifications (e2e)', () => {
     ]);
     const student = await prisma.student.findFirstOrThrow({
       where: { user: { email: 'student@school.test' } },
-      select: { id: true, classId: true },
+      select: { id: true },
     });
     studentId = student.id;
-    class9A = student.classId!;
+    class9A = (await currentClass(app, '9A')).id;
     maths = (
       await prisma.subject.findFirstOrThrow({ where: { name: 'Mathematics' } })
     ).id;
@@ -285,6 +288,60 @@ describe('Notifications (e2e)', () => {
       const closed = next<string>(socket, 'disconnect');
       await as(token)(api().post('/api/auth/logout')).expect(204);
       expect(await closed).toBe('io server disconnect');
+    });
+
+    it('closes them when an admin resets the password or deletes the account', async () => {
+      const { body: created } = await as(adminToken)(
+        api()
+          .post('/api/students')
+          .send({
+            email: `${uniqueName('student')}@school.test`,
+            password: 'Welcome123',
+            firstName: 'Test',
+            lastName: 'Student',
+            dateOfBirth: '2011-05-14',
+          }),
+      ).expect(201);
+      const tokenOf = (ver: number) =>
+        app
+          .get(JwtService)
+          .signAsync({ sub: created.userId, role: 'STUDENT', ver });
+
+      const first = connect(await tokenOf(0));
+      await next(first, 'connect');
+      const reset = next<string>(first, 'disconnect');
+      await as(adminToken)(
+        api()
+          .patch(`/api/students/${created.id}`)
+          .send({ password: 'NewPass123' }),
+      ).expect(200);
+      expect(await reset).toBe('io server disconnect');
+
+      const second = connect(await tokenOf(1));
+      await next(second, 'connect');
+      const deleted = next<string>(second, 'disconnect');
+      await as(adminToken)(api().delete(`/api/students/${created.id}`)).expect(
+        204,
+      );
+      expect(await deleted).toBe('io server disconnect');
+    });
+
+    it('closes a connection when its token expires', async () => {
+      const jwt = app.get(JwtService);
+      const { sub, role, ver } = jwt.decode<{
+        sub: string;
+        role: string;
+        ver: number;
+      }>(studentToken);
+      const shortLived = await jwt.signAsync(
+        { sub, role, ver },
+        { expiresIn: 2 },
+      );
+      const socket = connect(shortLived);
+      await next(socket, 'connect');
+      expect(await next<string>(socket, 'disconnect')).toBe(
+        'io server disconnect',
+      );
     });
   });
 });

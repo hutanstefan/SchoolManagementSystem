@@ -7,6 +7,7 @@ import {
 import { api, unwrap, type Schemas } from '@/api/client'
 import { queryKeys } from '@/api/query-keys'
 import type { operations } from '@/api/schema'
+import { usePeriod } from '@/periods/period-context'
 
 export type Teacher = Schemas['TeacherDto']
 export type TeacherDetail = Schemas['TeacherDetailDto']
@@ -27,19 +28,38 @@ export function useAllTeachers() {
   return useTeachers({ pageSize: 100, sort: 'lastName' })
 }
 
+/** A teacher with their classes and subjects in the picked year. */
 export function useTeacher(id: string) {
+  const schoolYearId = usePeriod().year?.id
   return useQuery({
-    queryKey: queryKeys.teachers.detail(id),
+    queryKey: queryKeys.teachers.detail(id, schoolYearId),
     queryFn: () =>
-      unwrap(api.GET('/api/teachers/{id}', { params: { path: { id } } })),
+      unwrap(
+        api.GET('/api/teachers/{id}', {
+          params: { path: { id }, query: { schoolYearId } },
+        }),
+      ),
+    placeholderData: keepPreviousData,
   })
 }
 
-/** The logged-in teacher with their classes and subjects (teacher only). */
-export function useMyTeacherProfile(options: { enabled?: boolean } = {}) {
+/**
+ * The logged-in teacher with their classes and subjects (teacher only), in
+ * the picked year or, with `'open'`, in the year that can still change.
+ */
+export function useMyTeacherProfile(
+  options: { enabled?: boolean; year?: 'open' } = {},
+) {
+  const period = usePeriod()
+  const schoolYearId =
+    options.year === 'open' ? period.activeYear?.id : period.year?.id
   return useQuery({
-    queryKey: queryKeys.teachers.me,
-    queryFn: () => unwrap(api.GET('/api/teachers/me')),
+    queryKey: queryKeys.teachers.meIn(schoolYearId),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/teachers/me', { params: { query: { schoolYearId } } }),
+      ),
+    placeholderData: keepPreviousData,
     staleTime: 5 * 60 * 1000,
     enabled: options.enabled ?? true,
   })

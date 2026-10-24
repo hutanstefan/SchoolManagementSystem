@@ -1,6 +1,336 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/api/school-years": {
+      "get": {
+        "description": "Admins get every year. Teachers and students get the years they had classes in, and the open one. Closed years are a read-only archive.",
+        "operationId": "SchoolYearsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SchoolYearSummaryDto"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "School years I can look at, newest first",
+        "tags": [
+          "School years"
+        ]
+      }
+    },
+    "/api/school-years/current": {
+      "get": {
+        "operationId": "SchoolYearsController_current",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchoolYearDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The open school year and its current semester",
+        "tags": [
+          "School years"
+        ]
+      }
+    },
+    "/api/school-years/current/end-semester": {
+      "post": {
+        "description": "New grades go to the second semester. Teachers can no longer change the grades of the first one; admins still can.",
+        "operationId": "SchoolYearsController_endSemester",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchoolYearDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The second semester has already started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "End the first semester",
+        "tags": [
+          "School years"
+        ]
+      }
+    },
+    "/api/school-years/current/closing": {
+      "get": {
+        "description": "Every student with their annual general average, the subjects they failed (annual average under 5, or none) and what the Romanian rules suggest: PROMOTED, GRADUATED (final grade), REEXAM (one or two subjects failed: re-exam results needed) or REPEATING (three or more, or a failed re-exam). Only in the second semester.",
+        "operationId": "SchoolYearsController_closingPreview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClosingPreviewDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Still in the first semester",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Preview the end of the school year",
+        "tags": [
+          "School years"
+        ]
+      }
+    },
+    "/api/school-years/current/reexams": {
+      "put": {
+        "description": "Only for a subject the student failed this year. The grade replaces the annual average of the subject.",
+        "operationId": "SchoolYearsController_saveReexam",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveReexamDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record the grade of a re-exam (examen de corigență)",
+        "tags": [
+          "School years"
+        ]
+      }
+    },
+    "/api/school-years/current/reexams/{studentId}/{subjectId}": {
+      "delete": {
+        "operationId": "SchoolYearsController_removeReexam",
+        "parameters": [
+          {
+            "name": "studentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove the grade of a re-exam",
+        "tags": [
+          "School years"
+        ]
+      }
+    },
+    "/api/school-years/current/close": {
+      "post": {
+        "description": "Records every outcome (the suggestion, or the decision sent for a student), archives the year (read-only) and opens the next: each class continues a grade higher (\"9A\" becomes \"10A\") with its homeroom teacher, subjects and teachers and its promoted students; students repeating the year join the class of their grade; graduates leave. Optionally opens empty first-grade classes. The timetable is not copied.",
+        "operationId": "SchoolYearsController_close",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseYearDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseYearResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Re-exam results or decisions are missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Close the school year and open the next one",
+        "tags": [
+          "School years"
+        ]
+      }
+    },
     "/api/auth/login": {
       "post": {
         "operationId": "AuthController_login",
@@ -177,6 +507,16 @@
             }
           },
           {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "description": "The school year whose classes are shown; the open one when omitted.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "classId",
             "required": false,
             "in": "query",
@@ -190,7 +530,7 @@
             "name": "unassigned",
             "required": false,
             "in": "query",
-            "description": "Only students without a class.",
+            "description": "Only students without a class that year (graduates excluded).",
             "schema": {
               "type": "boolean",
               "enum": [
@@ -330,6 +670,7 @@
     },
     "/api/students/{id}": {
       "get": {
+        "description": "With their class in the school year asked for (the open one by default) and their classes year by year.",
         "operationId": "StudentsController_findOne",
         "parameters": [
           {
@@ -337,6 +678,15 @@
             "required": true,
             "in": "path",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -347,7 +697,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StudentDto"
+                  "$ref": "#/components/schemas/StudentDetailDto"
                 }
               }
             }
@@ -715,9 +1065,19 @@
     },
     "/api/teachers/me": {
       "get": {
-        "description": "The logged-in teacher with their homeroom classes and teaching assignments.",
+        "description": "The logged-in teacher with their homeroom classes and teaching assignments in a school year (the open one by default).",
         "operationId": "TeachersController_findMe",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -770,6 +1130,15 @@
             "required": true,
             "in": "path",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -970,7 +1339,7 @@
     },
     "/api/classes": {
       "get": {
-        "description": "Admins get every class. Teachers get only the classes they teach or are homeroom teacher of.",
+        "description": "The open year by default (`schoolYearId` for another). Admins get every class; teachers the classes they teach or are homeroom teacher of; students their own class.",
         "operationId": "ClassesController_findAll",
         "parameters": [
           {
@@ -1027,6 +1396,16 @@
             }
           },
           {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "description": "Classes of this school year; the open one when omitted.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "search",
             "required": false,
             "in": "query",
@@ -1074,7 +1453,7 @@
             "bearer": []
           }
         ],
-        "summary": "List classes",
+        "summary": "List the classes of a school year",
         "tags": [
           "Classes"
         ]
@@ -1798,7 +2177,7 @@
             "bearer": []
           }
         ],
-        "summary": "Rename a subject",
+        "summary": "Rename a subject or change its colour",
         "tags": [
           "Subjects"
         ]
@@ -2097,7 +2476,17 @@
       "get": {
         "description": "Teachers get the lessons they teach. Students get their class's timetable (empty if they have no class).",
         "operationId": "TimetableController_forCurrentUser",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -2302,6 +2691,15 @@
             "required": true,
             "in": "path",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -2586,7 +2984,30 @@
       "get": {
         "description": "Grades per subject with the subject average (two decimals and rounded to a whole grade, as in Romanian schools) and the overall average.",
         "operationId": "GradesController_myReport",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "semester",
+            "required": false,
+            "in": "query",
+            "description": "1 or 2. Defaults to the year's current semester (2 for a closed year).",
+            "schema": {
+              "type": "number",
+              "enum": [
+                1,
+                2
+              ]
+            }
+          },
+          {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -2625,6 +3046,64 @@
           }
         ],
         "summary": "My grades (student)",
+        "tags": [
+          "Grades"
+        ]
+      }
+    },
+    "/api/grades/me/year": {
+      "get": {
+        "description": "Both semester averages of every subject, the annual averages, re-exams, the annual general average and, for a closed year, how it ended.",
+        "operationId": "GradesController_myYear",
+        "parameters": [
+          {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentYearReportDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "My whole school year",
         "tags": [
           "Grades"
         ]
@@ -2675,6 +3154,19 @@
             }
           },
           {
+            "name": "semester",
+            "required": false,
+            "in": "query",
+            "description": "1 or 2; the year's current semester when omitted.",
+            "schema": {
+              "type": "number",
+              "enum": [
+                1,
+                2
+              ]
+            }
+          },
+          {
             "name": "sort",
             "required": false,
             "in": "query",
@@ -2687,6 +3179,16 @@
                 "value",
                 "createdAt"
               ]
+            }
+          },
+          {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "description": "The school year; the open one when omitted.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
             }
           },
           {
@@ -3198,6 +3700,28 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "semester",
+            "required": false,
+            "in": "query",
+            "description": "1 or 2. Defaults to the year's current semester (2 for a closed year).",
+            "schema": {
+              "type": "number",
+              "enum": [
+                1,
+                2
+              ]
+            }
+          },
+          {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3253,6 +3777,82 @@
         ]
       }
     },
+    "/api/students/{id}/grades/year": {
+      "get": {
+        "description": "Semester and annual averages per subject, re-exams, the annual general average and the outcome of a closed year. Teachers: students of their classes that year.",
+        "operationId": "GradesController_studentYear",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentYearReportDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A student's whole school year",
+        "tags": [
+          "Grades"
+        ]
+      }
+    },
     "/api/classes/{id}/gradebook": {
       "get": {
         "description": "Every student of the class with their grades and average in that subject. Open to admins, the subject teacher and the homeroom teacher.",
@@ -3267,10 +3867,24 @@
             }
           },
           {
+            "name": "semester",
+            "required": false,
+            "in": "query",
+            "description": "1 or 2; the class's current semester when omitted.",
+            "schema": {
+              "type": "number",
+              "enum": [
+                1,
+                2
+              ]
+            }
+          },
+          {
             "name": "subjectId",
             "required": true,
             "in": "query",
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -4777,6 +5391,128 @@
           "Chat"
         ]
       }
+    },
+    "/api/stats/school": {
+      "get": {
+        "description": "Of a school year and semester (the current ones by default): average, grade distribution, averages per class and subject, students at risk and grades given per week.",
+        "operationId": "StatsController_school",
+        "parameters": [
+          {
+            "name": "semester",
+            "required": false,
+            "in": "query",
+            "description": "1 or 2. Defaults to the year's current semester (2 for a closed year).",
+            "schema": {
+              "type": "number",
+              "enum": [
+                1,
+                2
+              ]
+            }
+          },
+          {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchoolStatsDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The whole school at a glance (admin dashboard)",
+        "tags": [
+          "Stats"
+        ]
+      }
+    },
+    "/api/stats/teaching": {
+      "get": {
+        "description": "For each subject the teacher teaches in a class: the class average, students at risk and students missing grades.",
+        "operationId": "StatsController_teaching",
+        "parameters": [
+          {
+            "name": "semester",
+            "required": false,
+            "in": "query",
+            "description": "1 or 2. Defaults to the year's current semester (2 for a closed year).",
+            "schema": {
+              "type": "number",
+              "enum": [
+                1,
+                2
+              ]
+            }
+          },
+          {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeachingStatsDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "My classes at a glance (teacher dashboard)",
+        "tags": [
+          "Stats"
+        ]
+      }
     }
   },
   "info": {
@@ -4796,6 +5532,494 @@
       }
     },
     "schemas": {
+      "ErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "example": 404
+          },
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "object",
+            "description": "A message, or a list of validation messages.",
+            "example": "Student not found"
+          },
+          "path": {
+            "type": "string",
+            "example": "/api/students/0b39a733-7b2b-45e6-9d19-7938ad3af0b6"
+          },
+          "timestamp": {
+            "type": "string",
+            "example": "2026-10-20T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "statusCode",
+          "error",
+          "message",
+          "path",
+          "timestamp"
+        ]
+      },
+      "SchoolYearStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "CLOSED"
+        ]
+      },
+      "OutcomeCountsDto": {
+        "type": "object",
+        "properties": {
+          "promoted": {
+            "type": "number",
+            "example": 47
+          },
+          "repeating": {
+            "type": "number",
+            "example": 2
+          },
+          "graduated": {
+            "type": "number",
+            "example": 10
+          }
+        },
+        "required": [
+          "promoted",
+          "repeating",
+          "graduated"
+        ]
+      },
+      "SchoolYearSummaryDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SchoolYearStatus"
+              }
+            ]
+          },
+          "currentSemester": {
+            "description": "1 or 2: new grades go to this semester.",
+            "example": 1,
+            "enum": [
+              1,
+              2
+            ],
+            "type": "number"
+          },
+          "classCount": {
+            "type": "number",
+            "example": 6
+          },
+          "studentCount": {
+            "type": "number",
+            "description": "Students enrolled in a class that year.",
+            "example": 60
+          },
+          "outcomes": {
+            "nullable": true,
+            "description": "For a closed year: how it ended for its students.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutcomeCountsDto"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "startYear": {
+            "type": "number",
+            "example": 2026
+          },
+          "name": {
+            "type": "string",
+            "example": "2026–2027"
+          },
+          "semester1EndedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "closedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "currentSemester",
+          "classCount",
+          "studentCount",
+          "outcomes",
+          "id",
+          "startYear",
+          "name",
+          "semester1EndedAt",
+          "closedAt"
+        ]
+      },
+      "SchoolYearDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SchoolYearStatus"
+              }
+            ]
+          },
+          "currentSemester": {
+            "description": "1 or 2: new grades go to this semester.",
+            "example": 1,
+            "enum": [
+              1,
+              2
+            ],
+            "type": "number"
+          },
+          "id": {
+            "type": "string"
+          },
+          "startYear": {
+            "type": "number",
+            "example": 2026
+          },
+          "name": {
+            "type": "string",
+            "example": "2026–2027"
+          },
+          "semester1EndedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "closedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "currentSemester",
+          "id",
+          "startYear",
+          "name",
+          "semester1EndedAt",
+          "closedAt"
+        ]
+      },
+      "ClassSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "9A"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "SubjectColor": {
+        "type": "string",
+        "enum": [
+          "INDIGO",
+          "VIOLET",
+          "PINK",
+          "ROSE",
+          "ORANGE",
+          "AMBER",
+          "LIME",
+          "EMERALD",
+          "TEAL",
+          "SKY"
+        ],
+        "description": "Its colour in the app, chosen by the admin."
+      },
+      "SubjectSummaryDto": {
+        "type": "object",
+        "properties": {
+          "color": {
+            "description": "Its colour in the app, chosen by the admin.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubjectColor"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "Mathematics"
+          }
+        },
+        "required": [
+          "color",
+          "id",
+          "name"
+        ]
+      },
+      "SubjectYearResultDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "semester1": {
+            "type": "number",
+            "nullable": true,
+            "description": "Rounded semester averages.",
+            "example": 7
+          },
+          "semester2": {
+            "type": "number",
+            "nullable": true,
+            "example": 8
+          },
+          "annual": {
+            "type": "number",
+            "nullable": true,
+            "description": "Mean of the semester averages.",
+            "example": 7.5
+          },
+          "reexamGrade": {
+            "type": "number",
+            "nullable": true,
+            "description": "Grade of the re-exam, when there was one."
+          },
+          "final": {
+            "type": "number",
+            "nullable": true,
+            "description": "The re-exam grade if any, else the annual average."
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "subject",
+          "semester1",
+          "semester2",
+          "annual",
+          "reexamGrade",
+          "final",
+          "passed"
+        ]
+      },
+      "ClosingStudentDto": {
+        "type": "object",
+        "properties": {
+          "suggestedOutcome": {
+            "enum": [
+              "PROMOTED",
+              "GRADUATED",
+              "REPEATING",
+              "REEXAM"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Andrei"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Georgescu"
+          },
+          "registrationNumber": {
+            "type": "string",
+            "example": "2026-0001"
+          },
+          "generalAverage": {
+            "type": "number",
+            "nullable": true,
+            "description": "Annual general average; null while a subject has none.",
+            "example": 8.42
+          },
+          "failedSubjects": {
+            "description": "Subjects with an annual average under 5 (or none), with re-exams.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectYearResultDto"
+            }
+          }
+        },
+        "required": [
+          "suggestedOutcome",
+          "id",
+          "firstName",
+          "lastName",
+          "registrationNumber",
+          "generalAverage",
+          "failedSubjects"
+        ]
+      },
+      "ClosingClassDto": {
+        "type": "object",
+        "properties": {
+          "class": {
+            "$ref": "#/components/schemas/ClassSummaryDto"
+          },
+          "nextClassName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Where its students go next year; null for the final grade (they graduate)."
+          },
+          "students": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClosingStudentDto"
+            }
+          }
+        },
+        "required": [
+          "class",
+          "nextClassName",
+          "students"
+        ]
+      },
+      "ClosingPreviewDto": {
+        "type": "object",
+        "properties": {
+          "schoolYear": {
+            "$ref": "#/components/schemas/SchoolYearDto"
+          },
+          "nextYearName": {
+            "type": "string",
+            "description": "The year that will be opened:",
+            "example": "2027–2028"
+          },
+          "classes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClosingClassDto"
+            }
+          }
+        },
+        "required": [
+          "schoolYear",
+          "nextYearName",
+          "classes"
+        ]
+      },
+      "SaveReexamDto": {
+        "type": "object",
+        "properties": {
+          "studentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "grade": {
+            "type": "number",
+            "example": 6,
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "studentId",
+          "subjectId",
+          "grade"
+        ]
+      },
+      "YearOutcome": {
+        "type": "string",
+        "enum": [
+          "PROMOTED",
+          "REPEATING",
+          "GRADUATED"
+        ]
+      },
+      "OutcomeDecisionDto": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/YearOutcome"
+              }
+            ]
+          },
+          "studentId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "outcome",
+          "studentId"
+        ]
+      },
+      "CloseYearDto": {
+        "type": "object",
+        "properties": {
+          "decisions": {
+            "description": "The admin's decision for some students, overriding the suggestion. Every\nstudent still waiting for re-exam results needs one.",
+            "default": [],
+            "maxItems": 5000,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutcomeDecisionDto"
+            }
+          },
+          "createEntryClasses": {
+            "type": "boolean",
+            "description": "Also open empty classes for the new first-grade students (a new 9A for\nthis year's 9A, with the same subjects, teachers to be assigned).",
+            "default": true
+          }
+        },
+        "required": [
+          "decisions",
+          "createEntryClasses"
+        ]
+      },
+      "CloseYearResultDto": {
+        "type": "object",
+        "properties": {
+          "closedYear": {
+            "$ref": "#/components/schemas/SchoolYearDto"
+          },
+          "newYear": {
+            "$ref": "#/components/schemas/SchoolYearDto"
+          },
+          "outcomes": {
+            "$ref": "#/components/schemas/OutcomeCountsDto"
+          },
+          "classesCreated": {
+            "type": "number",
+            "description": "Classes opened in the new year.",
+            "example": 6
+          }
+        },
+        "required": [
+          "closedYear",
+          "newYear",
+          "outcomes",
+          "classesCreated"
+        ]
+      },
       "LoginDto": {
         "type": "object",
         "properties": {
@@ -4823,22 +6047,6 @@
           "ADMIN",
           "TEACHER",
           "STUDENT"
-        ]
-      },
-      "ClassSummaryDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string",
-            "example": "9A"
-          }
-        },
-        "required": [
-          "id",
-          "name"
         ]
       },
       "StudentProfileDto": {
@@ -4969,38 +6177,6 @@
           "user"
         ]
       },
-      "ErrorResponseDto": {
-        "type": "object",
-        "properties": {
-          "statusCode": {
-            "type": "number",
-            "example": 404
-          },
-          "error": {
-            "type": "string"
-          },
-          "message": {
-            "type": "object",
-            "description": "A message, or a list of validation messages.",
-            "example": "Student not found"
-          },
-          "path": {
-            "type": "string",
-            "example": "/api/students/0b39a733-7b2b-45e6-9d19-7938ad3af0b6"
-          },
-          "timestamp": {
-            "type": "string",
-            "example": "2026-10-20T10:00:00.000Z"
-          }
-        },
-        "required": [
-          "statusCode",
-          "error",
-          "message",
-          "path",
-          "timestamp"
-        ]
-      },
       "StudentDto": {
         "type": "object",
         "properties": {
@@ -5033,13 +6209,19 @@
           },
           "class": {
             "nullable": true,
-            "description": "Null when the student is not assigned to a class.",
+            "description": "The class in the school year asked for; null when not enrolled.",
             "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/ClassSummaryDto"
               }
             ]
+          },
+          "graduatedIn": {
+            "type": "string",
+            "nullable": true,
+            "description": "The school year the student graduated in, if they did.",
+            "example": "2025–2026"
           },
           "createdAt": {
             "format": "date-time",
@@ -5055,6 +6237,7 @@
           "lastName",
           "dateOfBirth",
           "class",
+          "graduatedIn",
           "createdAt"
         ]
       },
@@ -5103,6 +6286,124 @@
           "meta"
         ]
       },
+      "SchoolYearRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "2025–2026"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "StudentYearDto": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "nullable": true,
+            "description": "How the year ended; null while it is open.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/YearOutcome"
+              }
+            ]
+          },
+          "schoolYear": {
+            "example": "2025–2026",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SchoolYearRefDto"
+              }
+            ]
+          },
+          "class": {
+            "$ref": "#/components/schemas/ClassSummaryDto"
+          }
+        },
+        "required": [
+          "outcome",
+          "schoolYear",
+          "class"
+        ]
+      },
+      "StudentDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "registrationNumber": {
+            "type": "string",
+            "description": "Number in the school register (număr matricol): year of enrollment and\nnumber in that year, given automatically.",
+            "example": "2026-0042"
+          },
+          "email": {
+            "type": "string",
+            "example": "student@school.test"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Andrei"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Georgescu"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "example": "2011-07-25"
+          },
+          "class": {
+            "nullable": true,
+            "description": "The class in the school year asked for; null when not enrolled.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClassSummaryDto"
+              }
+            ]
+          },
+          "graduatedIn": {
+            "type": "string",
+            "nullable": true,
+            "description": "The school year the student graduated in, if they did.",
+            "example": "2025–2026"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "history": {
+            "description": "The student's classes, year by year, newest first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudentYearDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "registrationNumber",
+          "email",
+          "firstName",
+          "lastName",
+          "dateOfBirth",
+          "class",
+          "graduatedIn",
+          "createdAt",
+          "history"
+        ]
+      },
       "CreateStudentDto": {
         "type": "object",
         "properties": {
@@ -5114,7 +6415,7 @@
           "classId": {
             "type": "string",
             "nullable": true,
-            "description": "Class to enroll the student in. Omit or send null to leave unassigned.",
+            "description": "Class to enroll the student in, in the open school year. Omit or send\nnull to leave unassigned.",
             "format": "uuid"
           },
           "email": {
@@ -5179,7 +6480,7 @@
           "classId": {
             "type": "string",
             "nullable": true,
-            "description": "Class to enroll the student in. Omit or send null to leave unassigned.",
+            "description": "Class to enroll the student in, in the open school year. Omit or send\nnull to leave unassigned.",
             "format": "uuid"
           }
         }
@@ -5235,22 +6536,6 @@
         "required": [
           "data",
           "meta"
-        ]
-      },
-      "SubjectSummaryDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string",
-            "example": "Mathematics"
-          }
-        },
-        "required": [
-          "id",
-          "name"
         ]
       },
       "TeachingAssignmentDto": {
@@ -5386,6 +6671,30 @@
           }
         }
       },
+      "ClassYearDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SchoolYearStatus"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "2026–2027"
+          }
+        },
+        "required": [
+          "status",
+          "id",
+          "name"
+        ]
+      },
       "PersonSummaryDto": {
         "type": "object",
         "properties": {
@@ -5418,6 +6727,20 @@
             "type": "string",
             "example": "9A"
           },
+          "gradeLevel": {
+            "type": "number",
+            "nullable": true,
+            "description": "The grade, from the name (\"9A\" is in grade 9); null if it has none.",
+            "example": 9
+          },
+          "schoolYear": {
+            "description": "Classes belong to one school year. A closed year can only be viewed.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClassYearDto"
+              }
+            ]
+          },
           "homeroomTeacher": {
             "nullable": true,
             "description": "Homeroom teacher (diriginte), or null.",
@@ -5440,6 +6763,8 @@
         "required": [
           "id",
           "name",
+          "gradeLevel",
+          "schoolYear",
           "homeroomTeacher",
           "studentCount",
           "createdAt"
@@ -5504,6 +6829,20 @@
             "type": "string",
             "example": "9A"
           },
+          "gradeLevel": {
+            "type": "number",
+            "nullable": true,
+            "description": "The grade, from the name (\"9A\" is in grade 9); null if it has none.",
+            "example": 9
+          },
+          "schoolYear": {
+            "description": "Classes belong to one school year. A closed year can only be viewed.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClassYearDto"
+              }
+            ]
+          },
           "homeroomTeacher": {
             "nullable": true,
             "description": "Homeroom teacher (diriginte), or null.",
@@ -5533,6 +6872,8 @@
         "required": [
           "id",
           "name",
+          "gradeLevel",
+          "schoolYear",
           "homeroomTeacher",
           "studentCount",
           "createdAt",
@@ -5600,6 +6941,13 @@
       "SubjectDto": {
         "type": "object",
         "properties": {
+          "color": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubjectColor"
+              }
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -5609,6 +6957,7 @@
           }
         },
         "required": [
+          "color",
           "id",
           "name"
         ]
@@ -5616,6 +6965,14 @@
       "CreateSubjectDto": {
         "type": "object",
         "properties": {
+          "color": {
+            "description": "Colour of the subject everywhere it is shown (lists, timetables, charts).\nWhen omitted, the colour used by the fewest subjects is picked.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubjectColor"
+              }
+            ]
+          },
           "name": {
             "type": "string",
             "maxLength": 50
@@ -5628,14 +6985,19 @@
       "UpdateSubjectDto": {
         "type": "object",
         "properties": {
+          "color": {
+            "description": "Colour of the subject everywhere it is shown (lists, timetables, charts).\nWhen omitted, the colour used by the fewest subjects is picked.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubjectColor"
+              }
+            ]
+          },
           "name": {
             "type": "string",
             "maxLength": 50
           }
-        },
-        "required": [
-          "name"
-        ]
+        }
       },
       "CreateClassSubjectDto": {
         "type": "object",
@@ -5977,6 +7339,25 @@
           }
         }
       },
+      "PeriodDto": {
+        "type": "object",
+        "properties": {
+          "semester": {
+            "enum": [
+              1,
+              2
+            ],
+            "type": "number"
+          },
+          "schoolYear": {
+            "$ref": "#/components/schemas/SchoolYearDto"
+          }
+        },
+        "required": [
+          "semester",
+          "schoolYear"
+        ]
+      },
       "GradeEntryDto": {
         "type": "object",
         "properties": {
@@ -6076,8 +7457,17 @@
             "description": "Number in the school register (nr. matricol).",
             "example": "2026-0042"
           },
+          "period": {
+            "description": "The year and semester of the report.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PeriodDto"
+              }
+            ]
+          },
           "class": {
             "nullable": true,
+            "description": "The student's class that year.",
             "type": "object",
             "allOf": [
               {
@@ -6102,14 +7492,125 @@
         "required": [
           "student",
           "registrationNumber",
+          "period",
           "class",
           "subjects",
           "overallAverage"
         ]
       },
+      "SubjectYearDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "semester1": {
+            "type": "number",
+            "nullable": true,
+            "description": "Rounded average of each semester.",
+            "example": 7
+          },
+          "semester2": {
+            "type": "number",
+            "nullable": true,
+            "example": 8
+          },
+          "annual": {
+            "type": "number",
+            "nullable": true,
+            "description": "Mean of the two semester averages.",
+            "example": 7.5
+          },
+          "reexamGrade": {
+            "type": "number",
+            "nullable": true,
+            "description": "Grade of the re-exam (corigență), if the student took one."
+          },
+          "final": {
+            "type": "number",
+            "nullable": true,
+            "description": "The re-exam grade, else the annual average."
+          },
+          "passed": {
+            "type": "boolean",
+            "description": "Final average of at least 5."
+          }
+        },
+        "required": [
+          "subject",
+          "semester1",
+          "semester2",
+          "annual",
+          "reexamGrade",
+          "final",
+          "passed"
+        ]
+      },
+      "StudentYearReportDto": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "nullable": true,
+            "description": "How the year ended (closed years).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/YearOutcome"
+              }
+            ]
+          },
+          "student": {
+            "$ref": "#/components/schemas/PersonSummaryDto"
+          },
+          "registrationNumber": {
+            "type": "string",
+            "example": "2026-0042"
+          },
+          "schoolYear": {
+            "$ref": "#/components/schemas/SchoolYearDto"
+          },
+          "class": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClassSummaryDto"
+              }
+            ]
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectYearDto"
+            }
+          },
+          "generalAverage": {
+            "type": "number",
+            "nullable": true,
+            "description": "Mean of the final subject averages; null while one is missing.",
+            "example": 8.42
+          }
+        },
+        "required": [
+          "outcome",
+          "student",
+          "registrationNumber",
+          "schoolYear",
+          "class",
+          "subjects",
+          "generalAverage"
+        ]
+      },
       "GradeDto": {
         "type": "object",
         "properties": {
+          "semester": {
+            "example": 1,
+            "enum": [
+              1,
+              2
+            ],
+            "type": "number"
+          },
           "id": {
             "type": "string"
           },
@@ -6126,7 +7627,7 @@
           },
           "class": {
             "nullable": true,
-            "description": "The student's current class.",
+            "description": "The student's class in the grade's school year.",
             "type": "object",
             "allOf": [
               {
@@ -6136,6 +7637,9 @@
           },
           "subject": {
             "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "schoolYearId": {
+            "type": "string"
           },
           "teacher": {
             "nullable": true,
@@ -6157,12 +7661,14 @@
           }
         },
         "required": [
+          "semester",
           "id",
           "value",
           "date",
           "student",
           "class",
           "subject",
+          "schoolYearId",
           "teacher",
           "createdAt",
           "updatedAt"
@@ -6189,6 +7695,14 @@
       "CreateGradeDto": {
         "type": "object",
         "properties": {
+          "semester": {
+            "description": "1 or 2. Defaults to the current semester. Only admins can add grades\nto a semester that has ended.",
+            "enum": [
+              1,
+              2
+            ],
+            "type": "number"
+          },
           "studentId": {
             "type": "string",
             "format": "uuid"
@@ -6247,6 +7761,14 @@
       "CreateGradesBatchDto": {
         "type": "object",
         "properties": {
+          "semester": {
+            "description": "1 or 2. Defaults to the current semester. Only admins can add grades\nto a semester that has ended.",
+            "enum": [
+              1,
+              2
+            ],
+            "type": "number"
+          },
           "subjectId": {
             "type": "string",
             "description": "The subject every grade in the batch is for.",
@@ -6456,6 +7978,13 @@
           "class": {
             "$ref": "#/components/schemas/ClassSummaryDto"
           },
+          "period": {
+            "$ref": "#/components/schemas/PeriodDto"
+          },
+          "readOnly": {
+            "type": "boolean",
+            "description": "True when the user can't add or change grades here: a closed year, or\n(for a teacher) a semester that has ended."
+          },
           "subject": {
             "$ref": "#/components/schemas/SubjectSummaryDto"
           },
@@ -6485,6 +8014,8 @@
         },
         "required": [
           "class",
+          "period",
+          "readOnly",
           "subject",
           "teacher",
           "hoursPerWeek",
@@ -7254,6 +8785,234 @@
         },
         "required": [
           "body"
+        ]
+      },
+      "GradeCountDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "example": 8
+          },
+          "count": {
+            "type": "number",
+            "description": "How many grades of this value.",
+            "example": 214
+          }
+        },
+        "required": [
+          "value",
+          "count"
+        ]
+      },
+      "ClassStatsDto": {
+        "type": "object",
+        "properties": {
+          "class": {
+            "$ref": "#/components/schemas/ClassSummaryDto"
+          },
+          "average": {
+            "type": "number",
+            "nullable": true,
+            "description": "Mean of the students' subject averages (two decimals), or null.",
+            "example": 7.84
+          },
+          "studentCount": {
+            "type": "number",
+            "example": 10
+          },
+          "studentsAtRisk": {
+            "type": "number",
+            "description": "Students with at least one subject average under 5.",
+            "example": 1
+          }
+        },
+        "required": [
+          "class",
+          "average",
+          "studentCount",
+          "studentsAtRisk"
+        ]
+      },
+      "SubjectStatsDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "average": {
+            "type": "number",
+            "nullable": true,
+            "description": "Mean of the students' averages in this subject.",
+            "example": 7.9
+          },
+          "gradeCount": {
+            "type": "number",
+            "example": 182
+          }
+        },
+        "required": [
+          "subject",
+          "average",
+          "gradeCount"
+        ]
+      },
+      "WeekActivityDto": {
+        "type": "object",
+        "properties": {
+          "weekStart": {
+            "type": "string",
+            "description": "Monday of the week (YYYY-MM-DD).",
+            "example": "2026-10-19"
+          },
+          "count": {
+            "type": "number",
+            "description": "Grades given that week.",
+            "example": 37
+          }
+        },
+        "required": [
+          "weekStart",
+          "count"
+        ]
+      },
+      "SchoolStatsDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "description": "The school year and semester of the figures.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PeriodDto"
+              }
+            ]
+          },
+          "average": {
+            "type": "number",
+            "nullable": true,
+            "description": "Mean of every student's subject averages.",
+            "example": 7.86
+          },
+          "gradeCount": {
+            "type": "number",
+            "example": 1456
+          },
+          "studentsAtRisk": {
+            "type": "number",
+            "description": "Students with at least one subject average under 5.",
+            "example": 3
+          },
+          "gradeDistribution": {
+            "description": "Grades 1 to 10, each with how many were given.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GradeCountDto"
+            }
+          },
+          "classes": {
+            "description": "Natural class order (9A before 10A).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassStatsDto"
+            }
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectStatsDto"
+            }
+          },
+          "activity": {
+            "description": "Grades given per week, oldest first: the last 8 weeks of the current\nsemester, or the whole of an ended one.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WeekActivityDto"
+            }
+          }
+        },
+        "required": [
+          "period",
+          "average",
+          "gradeCount",
+          "studentsAtRisk",
+          "gradeDistribution",
+          "classes",
+          "subjects",
+          "activity"
+        ]
+      },
+      "TeachingStatsRowDto": {
+        "type": "object",
+        "properties": {
+          "class": {
+            "$ref": "#/components/schemas/ClassSummaryDto"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "average": {
+            "type": "number",
+            "nullable": true,
+            "description": "Mean of the students' averages in the subject.",
+            "example": 7.42
+          },
+          "studentCount": {
+            "type": "number",
+            "example": 10
+          },
+          "studentsAtRisk": {
+            "type": "number",
+            "description": "Students whose average in the subject is under 5.",
+            "example": 1
+          },
+          "studentsMissingGrades": {
+            "type": "number",
+            "description": "Students with fewer grades than the minimum (weekly hours + 1).",
+            "example": 6
+          }
+        },
+        "required": [
+          "class",
+          "subject",
+          "average",
+          "studentCount",
+          "studentsAtRisk",
+          "studentsMissingGrades"
+        ]
+      },
+      "TeachingStatsDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/PeriodDto"
+          },
+          "rows": {
+            "description": "One row per subject the teacher teaches in a class.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeachingStatsRowDto"
+            }
+          },
+          "gradeDistribution": {
+            "description": "Grades in the teacher's subjects and classes, 1 to 10.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GradeCountDto"
+            }
+          },
+          "activity": {
+            "description": "Grades given in the teacher's subjects per week (see SchoolStatsDto.activity).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WeekActivityDto"
+            }
+          }
+        },
+        "required": [
+          "period",
+          "rows",
+          "gradeDistribution",
+          "activity"
         ]
       }
     }

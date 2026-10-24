@@ -56,7 +56,9 @@ describe('LoginPage', () => {
     const login = vi.fn().mockResolvedValue(ADMIN_USER)
     renderWithAuth(routes, { path: '/login', auth: { login } })
 
-    await userEvent.click(screen.getByRole('button', { name: 'Admin' }))
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Log in as Administrator' }),
+    )
 
     await waitFor(() =>
       expect(login).toHaveBeenCalledWith('admin@school.test', 'Password123!'),

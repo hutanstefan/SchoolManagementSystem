@@ -7,6 +7,7 @@ import {
 import { api, unwrap, type Schemas } from '@/api/client'
 import { queryKeys } from '@/api/query-keys'
 import type { operations } from '@/api/schema'
+import { usePeriod } from '@/periods/period-context'
 
 export type SchoolClass = Schemas['ClassDto']
 export type ClassDetail = Schemas['ClassDetailDto']
@@ -15,7 +16,10 @@ export type ClassQuery = NonNullable<
   operations['ClassesController_findAll']['parameters']['query']
 >
 
-export function useClasses(query: ClassQuery = {}) {
+/** Classes of the year picked in the sidebar (unless the query says). */
+export function useClasses(filters: ClassQuery = {}) {
+  const schoolYearId = usePeriod().year?.id
+  const query = { schoolYearId, ...filters }
   return useQuery({
     queryKey: queryKeys.classes.list(query),
     queryFn: () => unwrap(api.GET('/api/classes', { params: { query } })),
@@ -23,9 +27,16 @@ export function useClasses(query: ClassQuery = {}) {
   })
 }
 
-/** Every class the user can see, for select boxes. */
-export function useAllClasses() {
-  return useClasses({ pageSize: 100 })
+/**
+ * Every class the user can see in a year, for select boxes: the picked year,
+ * or `'open'` for the year that can still change (where students are put).
+ */
+export function useAllClasses(year?: 'open') {
+  const { activeYear } = usePeriod()
+  return useClasses({
+    pageSize: 100,
+    ...(year === 'open' && { schoolYearId: activeYear?.id }),
+  })
 }
 
 export function useClass(id: string, options: { enabled?: boolean } = {}) {

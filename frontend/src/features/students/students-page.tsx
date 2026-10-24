@@ -1,8 +1,9 @@
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { GraduationCap, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { DataTable, type Column } from '@/components/data-table'
+import { PersonCell } from '@/components/person-avatar'
 import { PageHeader } from '@/components/page-header'
 import { PaginationBar } from '@/components/pagination-bar'
 import { SearchInput } from '@/components/search-input'
@@ -19,6 +20,7 @@ import {
 import { useAllClasses } from '@/features/classes/api'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { formatDate, fullName } from '@/lib/format'
+import { usePeriod } from '@/periods/period-context'
 import {
   useDeleteStudent,
   useStudents,
@@ -32,6 +34,7 @@ const UNASSIGNED = 'unassigned'
 
 export function StudentsPage() {
   const navigate = useNavigate()
+  const { isArchived, year } = usePeriod()
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   // ?class=unassigned (or a class id) pre-selects the filter, e.g. from the dashboard.
@@ -49,11 +52,14 @@ export function StudentsPage() {
     pageSize: 20,
     sort: 'lastName',
     search: debouncedSearch || undefined,
-    ...(classFilter === UNASSIGNED
+    ...(classFilter === UNASSIGNED && !isArchived
       ? { unassigned: true }
-      : classFilter !== ALL
+      : classFilter !== ALL && classFilter !== UNASSIGNED
         ? { classId: classFilter }
-        : {}),
+        : // A closed year lists the students who were in a class that year.
+          isArchived
+          ? { unassigned: false }
+          : {}),
   }
   const students = useStudents(query)
   const classes = useAllClasses()
@@ -64,7 +70,7 @@ export function StudentsPage() {
     setFormOpen(true)
   }
 
-  const columns: Column<Student>[] = [
+  const allColumns: Column<Student>[] = [
     {
       header: 'Reg. no.',
       cell: (s) => (
@@ -76,18 +82,17 @@ export function StudentsPage() {
     },
     {
       header: 'Name',
-      cell: (s) => <span className="font-medium">{fullName(s)}</span>,
-    },
-    {
-      header: 'Email',
-      cell: (s) => s.email,
-      className: 'hidden md:table-cell',
+      cell: (s) => <PersonCell person={s} secondary={s.email} />,
     },
     {
       header: 'Class',
       cell: (s) =>
         s.class ? (
           <Badge variant="secondary">{s.class.name}</Badge>
+        ) : s.graduatedIn ? (
+          <Badge variant="primary-soft" title={`Graduated in ${s.graduatedIn}`}>
+            <GraduationCap aria-hidden /> Graduated
+          </Badge>
         ) : (
           <span className="text-muted-foreground">Not assigned</span>
         ),
@@ -125,16 +130,24 @@ export function StudentsPage() {
       ),
     },
   ]
+  // A closed year can only be looked at.
+  const columns = isArchived ? allColumns.slice(0, -1) : allColumns
 
   return (
     <>
       <PageHeader
         title="Students"
-        description="Every student account, with the class they belong to."
+        description={
+          isArchived
+            ? `The students of ${year?.name ?? 'that year'}, with the class they were in.`
+            : 'Every student account, with the class they belong to.'
+        }
         actions={
-          <Button onClick={() => openForm(null)}>
-            <Plus aria-hidden /> Add student
-          </Button>
+          !isArchived && (
+            <Button onClick={() => openForm(null)}>
+              <Plus aria-hidden /> Add student
+            </Button>
+          )
         }
       />
 
@@ -160,7 +173,9 @@ export function StudentsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>All classes</SelectItem>
-              <SelectItem value={UNASSIGNED}>Not assigned</SelectItem>
+              {!isArchived && (
+                <SelectItem value={UNASSIGNED}>Not assigned</SelectItem>
+              )}
               {classes.data?.data.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.name}

@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { SubjectColor } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateSubjectDto,
@@ -10,7 +11,7 @@ import {
   UpdateSubjectDto,
 } from './dto/subject.dto';
 
-const subjectSelect = { id: true, name: true } as const;
+const subjectSelect = { id: true, name: true, color: true } as const;
 
 @Injectable()
 export class SubjectsService {
@@ -34,15 +35,18 @@ export class SubjectsService {
 
   async create(dto: CreateSubjectDto): Promise<SubjectDto> {
     await this.assertNameIsFree(dto.name);
-    return this.prisma.subject.create({ data: dto, select: subjectSelect });
+    return this.prisma.subject.create({
+      data: { name: dto.name, color: dto.color ?? (await this.freeColor()) },
+      select: subjectSelect,
+    });
   }
 
   async update(id: string, dto: UpdateSubjectDto): Promise<SubjectDto> {
     await this.findOne(id);
-    await this.assertNameIsFree(dto.name, id);
+    if (dto.name !== undefined) await this.assertNameIsFree(dto.name, id);
     return this.prisma.subject.update({
       where: { id },
-      data: dto,
+      data: { name: dto.name, color: dto.color },
       select: subjectSelect,
     });
   }
@@ -64,6 +68,19 @@ export class SubjectsService {
     }
 
     await this.prisma.subject.delete({ where: { id } });
+  }
+
+  /** The colour fewest subjects have, so new subjects look different. */
+  private async freeColor(): Promise<SubjectColor> {
+    const used = await this.prisma.subject.groupBy({
+      by: ['color'],
+      _count: { _all: true },
+    });
+    const count = (color: SubjectColor) =>
+      used.find((u) => u.color === color)?._count._all ?? 0;
+    return Object.values(SubjectColor).reduce((best, color) =>
+      count(color) < count(best) ? color : best,
+    );
   }
 
   private async assertNameIsFree(name: string, exceptId?: string) {

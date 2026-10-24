@@ -60,9 +60,7 @@ export function startsBlock(previous: Message | undefined, message: Message) {
   )
 }
 
-export function initials(person: { firstName: string; lastName: string }) {
-  return `${person.firstName[0] ?? ''}${person.lastName[0] ?? ''}`.toUpperCase()
-}
+export { initials } from '@/lib/format'
 
 /** "You: See you", "Ana: Thanks", or just the text in a direct conversation. */
 export function previewOf(

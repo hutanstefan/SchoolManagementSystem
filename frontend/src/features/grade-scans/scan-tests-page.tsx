@@ -163,11 +163,12 @@ export function ScanTestsPage() {
       mode: meta?.mode ?? 'ai',
       model: meta?.model ?? null,
       class: { id: classId, name: schoolClass.data?.name ?? '' },
-      subject: {
+      subject: schoolClass.data?.subjects.find(
+        (s) => s.subject.id === subjectId,
+      )?.subject ?? {
         id: subjectId,
-        name:
-          schoolClass.data?.subjects.find((s) => s.subject.id === subjectId)
-            ?.subject.name ?? '',
+        name: '',
+        color: 'INDIGO',
       },
       tests,
     })

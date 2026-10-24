@@ -28,18 +28,22 @@ export function useCreateSubject() {
   })
 }
 
-export function useRenameSubject() {
-  const invalidate = useInvalidateSubjects()
+export function useUpdateSubject() {
+  const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) =>
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string
+      body: Schemas['UpdateSubjectDto']
+    }) =>
       unwrap(
-        api.PATCH('/api/subjects/{id}', {
-          params: { path: { id } },
-          body: { name },
-        }),
+        api.PATCH('/api/subjects/{id}', { params: { path: { id } }, body }),
       ),
-    onSuccess: invalidate,
-    meta: { successMessage: 'Subject renamed' },
+    // The name and colour show up in classes, timetables, grades and charts.
+    onSuccess: () => queryClient.invalidateQueries(),
+    meta: { successMessage: 'Subject updated' },
   })
 }
 

@@ -44,6 +44,7 @@ describe('GradeScansService', () => {
     grades.assertCanGrade.mockResolvedValue({
       className: '9A',
       subjectName: 'Mathematics',
+      subject: { id: 'sub-1', name: 'Mathematics', color: 'AMBER' },
       teacherId: 'teacher-1',
     });
     // Sorted by last name: Georgescu (1), Popescu (2).

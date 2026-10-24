@@ -33,7 +33,7 @@ export function useReviewContext(
     })),
   })
   const isTeacher = user?.role === 'TEACHER'
-  const me = useMyTeacherProfile({ enabled: isTeacher })
+  const me = useMyTeacherProfile({ enabled: isTeacher, year: 'open' })
 
   const byStudent = new Map(
     gradebooks.flatMap((gradebook) =>

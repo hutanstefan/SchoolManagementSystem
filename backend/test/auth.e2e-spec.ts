@@ -1,4 +1,6 @@
+import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
+import { PrismaService } from '../src/prisma/prisma.service';
 import {
   cleanupTestData,
   createTestApp,
@@ -99,6 +101,31 @@ describe('Auth (e2e)', () => {
     await request(app.getHttpServer())
       .get('/api/auth/me')
       .set('Authorization', 'Bearer not.a.real-token')
+      .expect(401);
+  });
+
+  it('accepts only HS256 tokens, even when signed with the right secret', async () => {
+    const jwt = app.get(JwtService);
+    const user = await app.get(PrismaService).user.findUniqueOrThrow({
+      where: { email: 'admin@school.test' },
+    });
+    const payload = { sub: user.id, role: user.role, ver: user.tokenVersion };
+    const hs512 = await jwt.signAsync(payload, { algorithm: 'HS512' });
+    await request(app.getHttpServer())
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${hs512}`)
+      .expect(401);
+
+    // An unsigned token ("alg": "none") is refused too.
+    const encode = (part: object) =>
+      Buffer.from(JSON.stringify(part)).toString('base64url');
+    const unsigned = `${encode({ alg: 'none', typ: 'JWT' })}.${encode({
+      ...payload,
+      exp: Math.floor(Date.now() / 1000) + 600,
+    })}.`;
+    await request(app.getHttpServer())
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${unsigned}`)
       .expect(401);
   });
 

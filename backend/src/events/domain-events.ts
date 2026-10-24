@@ -29,6 +29,9 @@ export interface GradesChangedEvent {
   /** The user who made the change (never notified about it). */
   actorId: string;
   subjectId: string;
+  /** The school year and semester of the grades. */
+  schoolYearId: string;
+  semester: number;
   changes: GradeChange[];
 }
 

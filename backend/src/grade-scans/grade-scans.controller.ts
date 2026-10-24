@@ -51,7 +51,7 @@ export class GradeScansController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @UseInterceptors(
     FilesInterceptor('images', MAX_SCAN_IMAGES, {
-      limits: { fileSize: MAX_SCAN_IMAGE_BYTES },
+      limits: { fileSize: MAX_SCAN_IMAGE_BYTES, fields: 5, fieldSize: 1024 },
     }),
   )
   @ApiConsumes('multipart/form-data')

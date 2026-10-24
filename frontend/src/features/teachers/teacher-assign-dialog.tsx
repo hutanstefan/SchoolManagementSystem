@@ -58,7 +58,7 @@ export function TeacherAssignDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const classes = useAllClasses()
+  const classes = useAllClasses('open')
   const subjects = useSubjects()
   const addSubject = useAddClassSubject()
   const updateSubject = useUpdateClassSubject()

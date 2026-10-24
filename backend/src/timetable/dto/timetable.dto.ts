@@ -18,6 +18,7 @@ import {
 } from '../../common/dto/summaries.dto';
 import { Trim } from '../../common/transformers';
 import { Weekday } from '../../generated/prisma/enums';
+import { OptionalNotNull } from '../../common/validators/optional-not-null';
 
 export const FIRST_PERIOD = 1;
 export const LAST_PERIOD = 8;
@@ -68,12 +69,12 @@ export class CreateTimetableEntryDto {
 /** Move a lesson to another slot and/or room. */
 export class UpdateTimetableEntryDto {
   @ApiProperty({ enum: Weekday, enumName: 'Weekday', required: false })
-  @IsOptional()
+  @OptionalNotNull()
   @IsEnum(Weekday)
   day?: Weekday;
 
   /** @example 6 */
-  @IsOptional()
+  @OptionalNotNull()
   @Type(() => Number)
   @IsInt()
   @Min(FIRST_PERIOD)

@@ -1,9 +1,11 @@
+import { subjectSummarySelect } from '../common/mappers';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Paginated, pageArgs, paginated } from '../common/dto/pagination.dto';
 import { hashPassword } from '../common/password';
 import { Prisma, Role } from '../generated/prisma/client';
-import { compareClassNames } from '../classes/classes.service';
+import { compareClassNames } from '../classes/class-names';
 import { PrismaService } from '../prisma/prisma.service';
+import { SchoolYearsService } from '../school-years/school-years.service';
 import { UsersService } from '../users/users.service';
 import {
   CreateTeacherDto,
@@ -32,6 +34,7 @@ type TeacherRow = Prisma.TeacherGetPayload<{ select: typeof teacherSelect }>;
 export class TeachersService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly years: SchoolYearsService,
     private readonly users: UsersService,
   ) {}
 
@@ -62,30 +65,37 @@ export class TeachersService {
   }
 
   /** The profile of the logged-in teacher, with their classes and subjects. */
-  async findMe(userId: string): Promise<TeacherDetailDto> {
+  async findMe(
+    userId: string,
+    schoolYearId?: string,
+  ): Promise<TeacherDetailDto> {
     const teacher = await this.prisma.teacher.findUnique({
       where: { userId },
       select: { id: true },
     });
     if (!teacher) throw new NotFoundException('Teacher profile not found');
-    return this.findOne(teacher.id);
+    return this.findOne(teacher.id, schoolYearId);
   }
 
-  async findOne(id: string): Promise<TeacherDetailDto> {
+  /** A teacher with their classes and subjects in a school year (the open one by default). */
+  async findOne(id: string, schoolYearId?: string): Promise<TeacherDetailDto> {
+    const year = await this.years.resolveYear(schoolYearId);
     const teacher = await this.prisma.teacher.findUnique({
       where: { id },
       select: {
         ...teacherSelect,
         homeroomClasses: {
+          where: { schoolYearId: year.id },
           select: { id: true, name: true },
           orderBy: { name: 'asc' },
         },
         classSubjects: {
+          where: { class: { schoolYearId: year.id } },
           select: {
             id: true,
             hoursPerWeek: true,
             class: { select: { id: true, name: true } },
-            subject: { select: { id: true, name: true } },
+            subject: { select: subjectSummarySelect },
           },
           orderBy: [{ class: { name: 'asc' } }, { subject: { name: 'asc' } }],
         },
@@ -142,6 +152,7 @@ export class TeachersService {
       },
       select: teacherSelect,
     });
+    if (dto.password) await this.users.endSessions(userId);
     return toTeacherDto(teacher);
   }
 
@@ -152,6 +163,7 @@ export class TeachersService {
   async remove(id: string): Promise<void> {
     const { userId } = await this.getUserId(id);
     await this.prisma.user.delete({ where: { id: userId } });
+    await this.users.endSessions(userId);
   }
 
   private async getUserId(id: string): Promise<{ userId: string }> {

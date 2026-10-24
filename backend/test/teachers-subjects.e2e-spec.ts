@@ -165,6 +165,29 @@ describe('Teachers and subjects (e2e)', () => {
       expect(response.body.message).toMatch(/still taught/);
     });
 
+    it('have a colour the admin can change', async () => {
+      const { body: created } = await as(adminToken)(
+        api()
+          .post('/api/subjects')
+          .send({ name: uniqueName('subject'), color: 'PINK' }),
+      ).expect(201);
+      expect(created.color).toBe('PINK');
+
+      const { body: changed } = await as(adminToken)(
+        api().patch(`/api/subjects/${created.id}`).send({ color: 'LIME' }),
+      ).expect(200);
+      expect(changed).toMatchObject({ name: created.name, color: 'LIME' });
+      await as(adminToken)(
+        api().patch(`/api/subjects/${created.id}`).send({ color: 'PURPLE' }),
+      ).expect(400);
+      await as(adminToken)(
+        api().patch(`/api/subjects/${created.id}`).send({ name: null }),
+      ).expect(400);
+      await as(adminToken)(api().delete(`/api/subjects/${created.id}`)).expect(
+        204,
+      );
+    });
+
     it('rejects a duplicate name regardless of case', async () => {
       await as(adminToken)(
         api().post('/api/subjects').send({ name: 'mathematics' }),

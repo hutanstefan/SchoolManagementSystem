@@ -1,9 +1,14 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types';
-import { compareClassNames } from '../classes/classes.service';
-import { Prisma, Role } from '../generated/prisma/client';
+import { compareClassNames } from '../classes/class-names';
+import { Prisma, Role, SchoolYearStatus } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ChatContactDto } from './dto/chat.dto';
+
+/** Classes of the open school year. */
+const OPEN_YEAR = {
+  schoolYear: { status: SchoolYearStatus.ACTIVE },
+} as const satisfies Prisma.ClassWhereInput;
 
 /** Contacts shown at most (the search narrows them). */
 const MAX_CONTACTS = 300;
@@ -17,7 +22,8 @@ const MAX_CONTACTS = 300;
  * - Students: the teachers of their class (subject and homeroom teachers).
  *   Not each other: students only talk together in groups a teacher made.
  *
- * Groups are created by teachers, with people they may write to.
+ * Groups are created by teachers, with people they may write to. Classes
+ * are those of the open school year.
  */
 @Injectable()
 export class ChatPolicyService {
@@ -29,6 +35,7 @@ export class ChatPolicyService {
 
     if (user.role === Role.TEACHER) {
       const myClass: Prisma.ClassWhereInput = {
+        ...OPEN_YEAR,
         OR: [
           { homeroomTeacher: { userId: user.id } },
           { subjects: { some: { teacher: { userId: user.id } } } },
@@ -36,15 +43,14 @@ export class ChatPolicyService {
       };
       return {
         ...notMe,
-        OR: [{ role: Role.TEACHER }, { student: { class: myClass } }],
+        OR: [
+          { role: Role.TEACHER },
+          { student: { enrollments: { some: { class: myClass } } } },
+        ],
       };
     }
 
-    const student = await this.prisma.student.findUnique({
-      where: { userId: user.id },
-      select: { classId: true },
-    });
-    const classId = student?.classId;
+    const classId = await this.classIdOf(user);
     // A student without a class has no teachers to write to yet.
     if (!classId) return { id: { in: [] } };
     return {
@@ -56,6 +62,15 @@ export class ChatPolicyService {
         ],
       },
     };
+  }
+
+  /** A student's class in the open school year. */
+  private async classIdOf(user: AuthUser): Promise<string | null> {
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: { student: { userId: user.id }, schoolYear: OPEN_YEAR.schoolYear },
+      select: { classId: true },
+    });
+    return enrollment?.classId ?? null;
   }
 
   /** Throws 403, naming the people `user` may not write to. */
@@ -103,11 +118,22 @@ export class ChatPolicyService {
         firstName: true,
         lastName: true,
         role: true,
-        student: { select: { class: { select: { id: true, name: true } } } },
+        student: {
+          select: {
+            enrollments: {
+              where: { schoolYear: OPEN_YEAR.schoolYear },
+              select: { class: { select: { id: true, name: true } } },
+            },
+          },
+        },
         teacher: {
           select: {
-            homeroomClasses: { select: { id: true, name: true } },
+            homeroomClasses: {
+              where: OPEN_YEAR,
+              select: { id: true, name: true },
+            },
             classSubjects: {
+              where: { class: OPEN_YEAR },
               select: { classId: true, subject: { select: { name: true } } },
             },
           },
@@ -118,17 +144,10 @@ export class ChatPolicyService {
     });
 
     const myClassId =
-      user.role === Role.STUDENT
-        ? (
-            await this.prisma.student.findUnique({
-              where: { userId: user.id },
-              select: { classId: true },
-            })
-          )?.classId
-        : null;
+      user.role === Role.STUDENT ? await this.classIdOf(user) : null;
 
     const contacts = users.map((u): ChatContactDto => {
-      const schoolClass = u.student?.class ?? null;
+      const schoolClass = u.student?.enrollments[0]?.class ?? null;
       let detail: string | null = null;
       if (u.role === Role.STUDENT) detail = schoolClass?.name ?? 'No class';
       if (u.role === Role.TEACHER && u.teacher) {

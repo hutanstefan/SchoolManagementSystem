@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { BackLink } from '@/components/back-link'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { ClassTile } from '@/components/class-tile'
 import { PageHeader } from '@/components/page-header'
 import { ErrorState, LoadingBlock } from '@/components/states'
 import { Button } from '@/components/ui/button'
@@ -12,6 +13,7 @@ import { ClassTimetableEditor } from '@/features/timetable/class-timetable-edito
 import { fullName } from '@/lib/format'
 import { useClass, useDeleteClass } from './api'
 import { ClassFormDialog } from './class-form-dialog'
+import { describeClass } from './class-label'
 import { ClassStudentsTab } from './class-students-tab'
 import { ClassSubjectsTab } from './class-subjects-tab'
 
@@ -46,28 +48,40 @@ export function ClassDetailPage() {
   }
 
   const c = schoolClass.data
+  const readOnly = c.schoolYear.status === 'CLOSED'
+  const { section } = describeClass(c)
 
   return (
     <>
       <BackLink to="/admin/classes" label="All classes" />
       <PageHeader
+        leading={<ClassTile name={c.name} />}
         title={`Class ${c.name}`}
         description={
           <>
-            Homeroom teacher:{' '}
+            {c.gradeLevel !== null && (
+              <>
+                Grade {c.gradeLevel}
+                {section && `, section ${section}`} ·{' '}
+              </>
+            )}
+            {c.schoolYear.name}
+            {readOnly && ' (closed)'} · Homeroom teacher:{' '}
             {c.homeroomTeacher ? fullName(c.homeroomTeacher) : 'none'} ·{' '}
             {c.studentCount} {c.studentCount === 1 ? 'student' : 'students'}
           </>
         }
         actions={
-          <>
-            <Button variant="outline" onClick={() => setEditOpen(true)}>
-              <Pencil aria-hidden /> Edit
-            </Button>
-            <Button variant="outline" onClick={() => setDeleteOpen(true)}>
-              <Trash2 aria-hidden /> Delete
-            </Button>
-          </>
+          !readOnly && (
+            <>
+              <Button variant="outline" onClick={() => setEditOpen(true)}>
+                <Pencil aria-hidden /> Edit
+              </Button>
+              <Button variant="outline" onClick={() => setDeleteOpen(true)}>
+                <Trash2 aria-hidden /> Delete
+              </Button>
+            </>
+          )
         }
       />
 
@@ -79,17 +93,18 @@ export function ClassDetailPage() {
           <TabsTrigger value="gradebook">Gradebook</TabsTrigger>
         </TabsList>
         <TabsContent value="students">
-          <ClassStudentsTab classId={c.id} />
+          <ClassStudentsTab classId={c.id} readOnly={readOnly} />
         </TabsContent>
         <TabsContent value="subjects">
-          <ClassSubjectsTab schoolClass={c} />
+          <ClassSubjectsTab schoolClass={c} readOnly={readOnly} />
         </TabsContent>
         <TabsContent value="timetable">
-          <ClassTimetableEditor schoolClass={c} />
+          <ClassTimetableEditor schoolClass={c} readOnly={readOnly} />
         </TabsContent>
         <TabsContent value="gradebook">
           <Gradebook
             classId={c.id}
+            schoolYearId={c.schoolYear.id}
             subjects={c.subjects}
             canAddGrades={() => true}
             canEditGrade={() => true}

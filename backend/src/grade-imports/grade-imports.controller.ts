@@ -88,7 +88,15 @@ export class GradeImportsController {
   @Post()
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(
-    FileInterceptor('file', { limits: { fileSize: MAX_IMPORT_BYTES } }),
+    FileInterceptor('file', {
+      // One file, and only the few small text fields of the form.
+      limits: {
+        fileSize: MAX_IMPORT_BYTES,
+        files: 1,
+        fields: 5,
+        fieldSize: 1024,
+      },
+    }),
   )
   @ApiConsumes('multipart/form-data')
   @ApiBody({

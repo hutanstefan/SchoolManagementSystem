@@ -16,6 +16,8 @@ import { GradesModule } from './grades/grades.module';
 import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { SchoolYearsModule } from './school-years/school-years.module';
+import { StatsModule } from './stats/stats.module';
 import { StudentsModule } from './students/students.module';
 import { SubjectsModule } from './subjects/subjects.module';
 import { TeachersModule } from './teachers/teachers.module';
@@ -33,6 +35,7 @@ import { TimetableModule } from './timetable/timetable.module';
     // Domain events (a grade was given, the timetable changed...), see src/events.
     EventEmitterModule.forRoot(),
     PrismaModule,
+    SchoolYearsModule,
     AuthModule,
     HealthModule,
     StudentsModule,
@@ -46,6 +49,7 @@ import { TimetableModule } from './timetable/timetable.module';
     GradeImportsModule,
     NotificationsModule,
     ChatModule,
+    StatsModule,
   ],
   providers: [
     // Global guards run in this order for every request:

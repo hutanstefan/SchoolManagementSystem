@@ -64,7 +64,7 @@ export class SubjectsController {
 
   @Patch(':id')
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Rename a subject' })
+  @ApiOperation({ summary: 'Rename a subject or change its colour' })
   @ApiOkResponse({ type: SubjectDto })
   @ApiNotFoundResponse({ type: ErrorResponseDto })
   @ApiConflictResponse({ type: ErrorResponseDto, description: 'Name taken' })

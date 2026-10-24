@@ -1,0 +1,32 @@
+meta {
+  name: Teaching stats (as teacher)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/stats/teaching
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("One row per class and subject taught", function () {
+    const rows = res.getBody().rows;
+    expect(rows.length).to.be.above(0);
+    expect(rows[0]).to.have.keys("class", "subject", "average", "studentCount", "studentsAtRisk", "studentsMissingGrades");
+  });
+}
+
+docs {
+  The teacher dashboard: for each subject the teacher teaches in a class, the
+  class average, students under 5 and students with fewer grades than the
+  minimum (weekly hours + 1).
+}

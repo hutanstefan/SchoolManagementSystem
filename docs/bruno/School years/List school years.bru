@@ -1,0 +1,37 @@
+meta {
+  name: List school years
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/school-years
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  const closed = (res.getBody() || []).find((y) => y.status === "CLOSED");
+  if (closed) bru.setVar("closedYearId", closed.id);
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("One open year, newest first", function () {
+    const years = res.getBody();
+    expect(years.filter((y) => y.status === "ACTIVE")).to.have.length(1);
+    for (let i = 1; i < years.length; i++) expect(years[i - 1].startYear).to.be.above(years[i].startYear);
+  });
+  test("A closed year says how it ended", function () {
+    const closed = res.getBody().find((y) => y.status === "CLOSED");
+    expect(closed.outcomes).to.have.keys("promoted", "repeating", "graduated");
+  });
+}
+
+docs {
+  The admin sees every year; a teacher or a student only the years they took
+  part in, plus the open one. Saves the id of a closed year for the next
+  requests.
+}

@@ -6,6 +6,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { Env } from '../config/env.validation';
 import { DomainEvents, type SessionEndedEvent } from '../events/domain-events';
+import { Prisma, SchoolYearStatus } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from './auth.types';
 import { AuthUserDto } from './dto/auth-user.dto';
@@ -26,11 +27,15 @@ const authUserSelect = {
       id: true,
       registrationNumber: true,
       dateOfBirth: true,
-      class: { select: { id: true, name: true } },
+      // The class of the open school year.
+      enrollments: {
+        where: { schoolYear: { status: SchoolYearStatus.ACTIVE } },
+        select: { class: { select: { id: true, name: true } } },
+      },
     },
   },
   teacher: { select: { id: true } },
-} as const;
+} as const satisfies Prisma.UserSelect;
 
 @Injectable()
 export class AuthService {
@@ -118,7 +123,7 @@ export class AuthService {
       id: string;
       registrationNumber: string;
       dateOfBirth: Date;
-      class: { id: string; name: string } | null;
+      enrollments: { class: { id: string; name: string } }[];
     } | null;
     teacher: { id: string } | null;
   }): AuthUserDto {
@@ -133,7 +138,7 @@ export class AuthService {
             id: user.student.id,
             registrationNumber: user.student.registrationNumber,
             dateOfBirth: user.student.dateOfBirth.toISOString().slice(0, 10),
-            class: user.student.class,
+            class: user.student.enrollments[0]?.class ?? null,
           }
         : null,
       teacher: user.teacher,

@@ -40,6 +40,8 @@ export type GradeDialogState =
       mode: 'add'
       student: { id: string; name: string }
       subject: { id: string; name: string }
+      /** The semester the grade goes to; the current one when omitted. */
+      semester?: 1 | 2
     }
   | {
       mode: 'edit'
@@ -81,6 +83,7 @@ export function GradeDialog({
       await create.mutateAsync({
         studentId: state.student.id,
         subjectId: state.subject.id,
+        semester: state.semester,
         ...values,
       })
     }
@@ -93,7 +96,18 @@ export function GradeDialog({
         open={state !== null}
         onOpenChange={(open) => !open && onClose()}
         title={state?.mode === 'edit' ? 'Edit grade' : 'Add grade'}
-        description={state && `${state.student.name} · ${state.subject.name}`}
+        description={
+          state &&
+          [
+            state.student.name,
+            state.subject.name,
+            state.mode === 'add' &&
+              state.semester &&
+              `Semester ${state.semester}`,
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        }
         form={form}
         onSubmit={submit}
         submitLabel={state?.mode === 'edit' ? 'Save changes' : 'Add grade'}

@@ -37,6 +37,7 @@ import {
   TeacherQueryDto,
   UpdateTeacherDto,
 } from './dto/teacher.dto';
+import { YearQueryDto } from '../school-years/dto/school-year.dto';
 import { TeachersService } from './teachers.service';
 
 @ApiTags('Teachers')
@@ -67,19 +68,25 @@ export class TeachersController {
   @ApiOperation({
     summary: 'My profile, classes and subjects (teacher)',
     description:
-      'The logged-in teacher with their homeroom classes and teaching assignments.',
+      'The logged-in teacher with their homeroom classes and teaching assignments in a school year (the open one by default).',
   })
   @ApiOkResponse({ type: TeacherDetailDto })
-  findMe(@CurrentUser() user: AuthUser): Promise<TeacherDetailDto> {
-    return this.teachersService.findMe(user.id);
+  findMe(
+    @CurrentUser() user: AuthUser,
+    @Query() query: YearQueryDto,
+  ): Promise<TeacherDetailDto> {
+    return this.teachersService.findMe(user.id, query.schoolYearId);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a teacher with their classes and subjects' })
   @ApiOkResponse({ type: TeacherDetailDto })
   @ApiNotFoundResponse({ type: ErrorResponseDto })
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<TeacherDetailDto> {
-    return this.teachersService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: YearQueryDto,
+  ): Promise<TeacherDetailDto> {
+    return this.teachersService.findOne(id, query.schoolYearId);
   }
 
   @Post()

@@ -5,6 +5,9 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { formatAverage } from '@/lib/format'
+import { SUBJECT_COLORS } from '@/features/subjects/subject-colors'
+import { SubjectDot } from '@/features/subjects/subject-icon'
+import { cn } from '@/lib/utils'
 
 type SubjectGrades = Schemas['SubjectGradesDto']
 
@@ -34,7 +37,10 @@ export function SubjectAverages({ subjects }: { subjects: SubjectGrades[] }) {
           key={row.subject.id}
           className="grid grid-cols-[minmax(0,9rem)_1fr_3rem] items-center gap-3 text-sm"
         >
-          <span className="truncate">{row.subject.name}</span>
+          <span className="flex min-w-0 items-center gap-2">
+            <SubjectDot color={row.subject.color} />
+            <span className="truncate">{row.subject.name}</span>
+          </span>
           <Tooltip>
             <TooltipTrigger asChild>
               {/* Taller than the bar, so it is easy to hover. */}
@@ -45,7 +51,10 @@ export function SubjectAverages({ subjects }: { subjects: SubjectGrades[] }) {
               >
                 <div className="bg-muted h-2.5 w-full rounded-full">
                   <div
-                    className="bg-primary h-full rounded-full"
+                    className={cn(
+                      'h-full rounded-full',
+                      SUBJECT_COLORS[row.subject.color].solid,
+                    )}
                     style={{ width: `${(row.average / 10) * 100}%` }}
                   />
                 </div>

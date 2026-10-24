@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 
-/** "Are you sure?" dialog for destructive actions. Stays open on error. */
+/** "Are you sure?" dialog for destructive or final actions. Stays open on error. */
 export function ConfirmDialog({
   open,
   onOpenChange,
@@ -20,6 +20,7 @@ export function ConfirmDialog({
   confirmLabel = 'Delete',
   onConfirm,
   pending,
+  confirmVariant = 'destructive',
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -28,6 +29,8 @@ export function ConfirmDialog({
   confirmLabel?: string
   onConfirm: () => void
   pending?: boolean
+  /** "default" for a step that is not destructive, only final. */
+  confirmVariant?: 'destructive' | 'default'
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -38,7 +41,11 @@ export function ConfirmDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
-          <Button variant="destructive" onClick={onConfirm} disabled={pending}>
+          <Button
+            variant={confirmVariant}
+            onClick={onConfirm}
+            disabled={pending}
+          >
             {pending && <LoaderCircle className="animate-spin" aria-hidden />}
             {confirmLabel}
           </Button>

@@ -1,4 +1,12 @@
-import { Link2, Pencil, Trash2, UserMinus } from 'lucide-react'
+import {
+  Clock,
+  Home,
+  Link2,
+  Pencil,
+  School,
+  Trash2,
+  UserMinus,
+} from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import type { Schemas } from '@/api/client'
@@ -6,6 +14,7 @@ import { BackLink } from '@/components/back-link'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { DataTable, type Column } from '@/components/data-table'
 import { PageHeader } from '@/components/page-header'
+import { PersonAvatar } from '@/components/person-avatar'
 import { SectionHeader } from '@/components/section-header'
 import { StatCard } from '@/components/stat-card'
 import { ErrorState, LoadingBlock } from '@/components/states'
@@ -15,6 +24,8 @@ import { useUpdateClassSubject } from '@/features/classes/api'
 import { useTeacherTimetable } from '@/features/timetable/api'
 import { TimetableGrid } from '@/features/timetable/timetable-grid'
 import { fullName } from '@/lib/format'
+import { SubjectDot } from '@/features/subjects/subject-icon'
+import { usePeriod } from '@/periods/period-context'
 import { useDeleteTeacher, useTeacher } from './api'
 import { TeacherAssignDialog } from './teacher-assign-dialog'
 import { TeacherFormDialog } from './teacher-form-dialog'
@@ -22,9 +33,9 @@ import { TeacherFormDialog } from './teacher-form-dialog'
 type Assignment = Schemas['TeachingAssignmentDto']
 
 function assignmentColumns(
-  onUnassign: (assignment: Assignment) => void,
+  onUnassign: ((assignment: Assignment) => void) | null,
 ): Column<Assignment>[] {
-  return [
+  const columns: Column<Assignment>[] = [
     {
       header: 'Class',
       cell: (a) => (
@@ -36,7 +47,15 @@ function assignmentColumns(
         </Link>
       ),
     },
-    { header: 'Subject', cell: (a) => a.subject.name },
+    {
+      header: 'Subject',
+      cell: (a) => (
+        <span className="flex items-center gap-2">
+          <SubjectDot color={a.subject.color} />
+          {a.subject.name}
+        </span>
+      ),
+    },
     {
       header: 'Hours / week',
       cell: (a) => a.hoursPerWeek,
@@ -50,18 +69,21 @@ function assignmentColumns(
           variant="ghost"
           size="icon"
           aria-label={`Stop teaching ${a.subject.name} in ${a.class.name}`}
-          onClick={() => onUnassign(a)}
+          onClick={() => onUnassign?.(a)}
         >
           <UserMinus />
         </Button>
       ),
     },
   ]
+  // In a closed year the assignments are history.
+  return onUnassign ? columns : columns.slice(0, -1)
 }
 
 export function TeacherDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const { isArchived, year } = usePeriod()
   const teacher = useTeacher(id)
   const timetable = useTeacherTimetable(id)
   const remove = useDeleteTeacher()
@@ -89,13 +111,18 @@ export function TeacherDetailPage() {
     <>
       <BackLink to="/admin/teachers" label="All teachers" />
       <PageHeader
+        leading={
+          <PersonAvatar person={t} className="size-14 rounded-2xl text-lg" />
+        }
         title={fullName(t)}
         description={t.email}
         actions={
           <>
-            <Button onClick={() => setAssignOpen(true)}>
-              <Link2 aria-hidden /> Assign to class
-            </Button>
+            {!isArchived && (
+              <Button onClick={() => setAssignOpen(true)}>
+                <Link2 aria-hidden /> Assign to class
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setEditOpen(true)}>
               <Pencil aria-hidden /> Edit
             </Button>
@@ -109,6 +136,8 @@ export function TeacherDetailPage() {
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Homeroom teacher of"
+          icon={Home}
+          tone="amber"
           value={
             t.homeroomClasses.length === 0
               ? '—'
@@ -125,15 +154,28 @@ export function TeacherDetailPage() {
                 ))
           }
         />
-        <StatCard label="Classes taught" value={classCount} />
-        <StatCard label="Hours per week" value={hours} />
+        <StatCard
+          label="Classes taught"
+          value={classCount}
+          icon={School}
+          tone="indigo"
+        />
+        <StatCard
+          label="Hours per week"
+          value={hours}
+          icon={Clock}
+          tone="violet"
+        />
       </div>
 
       <div className="grid gap-6">
         <Card className="gap-0 py-0">
-          <SectionHeader title="Teaching assignments" />
+          <SectionHeader
+            title="Teaching assignments"
+            description={year?.name}
+          />
           <DataTable
-            columns={assignmentColumns(setUnassigning)}
+            columns={assignmentColumns(isArchived ? null : setUnassigning)}
             rows={t.teaching}
             rowKey={(a) => a.classSubjectId}
             emptyTitle="Not teaching any class yet"

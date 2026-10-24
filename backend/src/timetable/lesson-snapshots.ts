@@ -1,3 +1,4 @@
+import { subjectSummarySelect } from '../common/mappers';
 import type { LessonSnapshot } from '../events/domain-events';
 import type { Prisma } from '../generated/prisma/client';
 
@@ -22,7 +23,7 @@ export async function snapshotLessons(
       classSubject: {
         select: {
           class: { select: { name: true } },
-          subject: { select: { id: true, name: true } },
+          subject: { select: subjectSummarySelect },
           teacher: {
             select: {
               userId: true,

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, api, unwrap, type Schemas } from '@/api/client'
 import { queryKeys } from '@/api/query-keys'
+import { usePeriod } from '@/periods/period-context'
 
 export type Timetable = Schemas['TimetableDto']
 export type Lesson = Schemas['TimetableLessonDto']
@@ -56,21 +57,27 @@ export function useClassTimetable(classId: string) {
 }
 
 export function useTeacherTimetable(teacherId: string) {
+  const schoolYearId = usePeriod().year?.id
   return useQuery({
-    queryKey: queryKeys.timetable.teacher(teacherId),
+    queryKey: queryKeys.timetable.teacher(teacherId, schoolYearId),
     queryFn: () =>
       unwrap(
         api.GET('/api/teachers/{id}/timetable', {
-          params: { path: { id: teacherId } },
+          params: { path: { id: teacherId }, query: { schoolYearId } },
         }),
       ),
   })
 }
 
+/** The user's lessons in the picked year. */
 export function useMyTimetable() {
+  const schoolYearId = usePeriod().year?.id
   return useQuery({
-    queryKey: queryKeys.timetable.me,
-    queryFn: () => unwrap(api.GET('/api/timetable/me')),
+    queryKey: queryKeys.timetable.me(schoolYearId),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/timetable/me', { params: { query: { schoolYearId } } }),
+      ),
   })
 }
 

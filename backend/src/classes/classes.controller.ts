@@ -54,10 +54,11 @@ export class ClassesController {
   constructor(private readonly classesService: ClassesService) {}
 
   @Get()
+  @Roles(Role.ADMIN, Role.TEACHER, Role.STUDENT)
   @ApiOperation({
-    summary: 'List classes',
+    summary: 'List the classes of a school year',
     description:
-      'Admins get every class. Teachers get only the classes they teach or are homeroom teacher of.',
+      'The open year by default (`schoolYearId` for another). Admins get every class; teachers the classes they teach or are homeroom teacher of; students their own class.',
   })
   @ApiOkResponse({ type: PaginatedClassesDto })
   findAll(

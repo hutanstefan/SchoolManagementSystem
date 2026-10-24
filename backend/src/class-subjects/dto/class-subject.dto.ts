@@ -8,6 +8,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { OptionalNotNull } from '../../common/validators/optional-not-null';
 
 export class CreateClassSubjectDto {
   @IsUUID()
@@ -39,7 +40,7 @@ export class UpdateClassSubjectDto {
    * Lessons per week (1-10). Can't go below the lessons already in the timetable.
    * @example 3
    */
-  @IsOptional()
+  @OptionalNotNull()
   @Type(() => Number)
   @IsInt()
   @Min(1)

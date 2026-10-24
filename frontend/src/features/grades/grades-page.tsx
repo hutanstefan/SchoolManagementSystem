@@ -1,6 +1,7 @@
 import { FileSpreadsheet, History, Pencil } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
+import { PersonCell } from '@/components/person-avatar'
 import { DataTable, type Column } from '@/components/data-table'
 import { PageHeader } from '@/components/page-header'
 import { PaginationBar } from '@/components/pagination-bar'
@@ -20,6 +21,8 @@ import { useSubjects } from '@/features/subjects/api'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { formatDate, fullName } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { SubjectDot } from '@/features/subjects/subject-icon'
+import { usePeriod } from '@/periods/period-context'
 import { useGrades, type Grade } from './api'
 import { gradeTone } from './grade-tone'
 import { GradeDialog, type GradeDialogState } from './grade-dialog'
@@ -29,6 +32,7 @@ const ALL = 'all'
 
 /** Every grade in the school, newest first, with filters and the audit trail. */
 export function GradesPage() {
+  const { isArchived, year, semester } = usePeriod()
   const [search, setSearch] = useState('')
   const [classId, setClassId] = useState(ALL)
   const [subjectId, setSubjectId] = useState(ALL)
@@ -58,12 +62,14 @@ export function GradesPage() {
     {
       header: 'Student',
       cell: (g) => (
-        <Link
-          to={`/admin/students/${g.student.id}`}
-          className="font-medium hover:underline"
-        >
-          {fullName(g.student)}
-        </Link>
+        <PersonCell person={g.student}>
+          <Link
+            to={`/admin/students/${g.student.id}`}
+            className="hover:underline"
+          >
+            {fullName(g.student)}
+          </Link>
+        </PersonCell>
       ),
     },
     {
@@ -72,7 +78,15 @@ export function GradesPage() {
         g.class ? <Badge variant="secondary">{g.class.name}</Badge> : '—',
       className: 'hidden sm:table-cell',
     },
-    { header: 'Subject', cell: (g) => g.subject.name },
+    {
+      header: 'Subject',
+      cell: (g) => (
+        <span className="flex items-center gap-2">
+          <SubjectDot color={g.subject.color} />
+          {g.subject.name}
+        </span>
+      ),
+    },
     {
       header: 'Grade',
       cell: (g) => (
@@ -104,21 +118,24 @@ export function GradesPage() {
           >
             <History />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Edit grade"
-            onClick={() =>
-              setEditing({
-                mode: 'edit',
-                grade: g,
-                student: { id: g.student.id, name: fullName(g.student) },
-                subject: g.subject,
-              })
-            }
-          >
-            <Pencil />
-          </Button>
+          {/* A closed year's grades can't change any more. */}
+          {!isArchived && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Edit grade"
+              onClick={() =>
+                setEditing({
+                  mode: 'edit',
+                  grade: g,
+                  student: { id: g.student.id, name: fullName(g.student) },
+                  subject: g.subject,
+                })
+              }
+            >
+              <Pencil />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -128,13 +145,22 @@ export function GradesPage() {
     <>
       <PageHeader
         title="Grades"
-        description="All grades in the school. Add new grades from a class gradebook, or import them from Excel."
+        description={
+          <>
+            Grades of {year ? `${year.name}, semester ${semester}` : 'the term'}
+            .
+            {!isArchived &&
+              ' Add new grades from a class gradebook, or import them from Excel.'}
+          </>
+        }
         actions={
-          <Button asChild variant="outline">
-            <Link to="/admin/grades/import">
-              <FileSpreadsheet aria-hidden /> Import from Excel
-            </Link>
-          </Button>
+          !isArchived && (
+            <Button asChild variant="outline">
+              <Link to="/admin/grades/import">
+                <FileSpreadsheet aria-hidden /> Import from Excel
+              </Link>
+            </Button>
+          )
         }
       />
       <Card className="gap-0 py-0">
@@ -180,6 +206,7 @@ export function GradesPage() {
               <SelectItem value={ALL}>All subjects</SelectItem>
               {subjects.data?.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
+                  <SubjectDot color={s.color} />
                   {s.name}
                 </SelectItem>
               ))}

@@ -4,6 +4,140 @@
  */
 
 export interface paths {
+    "/api/school-years": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * School years I can look at, newest first
+         * @description Admins get every year. Teachers and students get the years they had classes in, and the open one. Closed years are a read-only archive.
+         */
+        get: operations["SchoolYearsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/school-years/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The open school year and its current semester */
+        get: operations["SchoolYearsController_current"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/school-years/current/end-semester": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End the first semester
+         * @description New grades go to the second semester. Teachers can no longer change the grades of the first one; admins still can.
+         */
+        post: operations["SchoolYearsController_endSemester"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/school-years/current/closing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview the end of the school year
+         * @description Every student with their annual general average, the subjects they failed (annual average under 5, or none) and what the Romanian rules suggest: PROMOTED, GRADUATED (final grade), REEXAM (one or two subjects failed: re-exam results needed) or REPEATING (three or more, or a failed re-exam). Only in the second semester.
+         */
+        get: operations["SchoolYearsController_closingPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/school-years/current/reexams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Record the grade of a re-exam (examen de corigență)
+         * @description Only for a subject the student failed this year. The grade replaces the annual average of the subject.
+         */
+        put: operations["SchoolYearsController_saveReexam"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/school-years/current/reexams/{studentId}/{subjectId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove the grade of a re-exam */
+        delete: operations["SchoolYearsController_removeReexam"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/school-years/current/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close the school year and open the next one
+         * @description Records every outcome (the suggestion, or the decision sent for a student), archives the year (read-only) and opens the next: each class continues a grade higher ("9A" becomes "10A") with its homeroom teacher, subjects and teachers and its promoted students; students repeating the year join the class of their grade; graduates leave. Optionally opens empty first-grade classes. The timetable is not copied.
+         */
+        post: operations["SchoolYearsController_close"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -100,7 +234,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a student */
+        /**
+         * Get a student
+         * @description With their class in the school year asked for (the open one by default) and their classes year by year.
+         */
         get: operations["StudentsController_findOne"];
         put?: never;
         post?: never;
@@ -139,7 +276,7 @@ export interface paths {
         };
         /**
          * My profile, classes and subjects (teacher)
-         * @description The logged-in teacher with their homeroom classes and teaching assignments.
+         * @description The logged-in teacher with their homeroom classes and teaching assignments in a school year (the open one by default).
          */
         get: operations["TeachersController_findMe"];
         put?: never;
@@ -177,8 +314,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List classes
-         * @description Admins get every class. Teachers get only the classes they teach or are homeroom teacher of.
+         * List the classes of a school year
+         * @description The open year by default (`schoolYearId` for another). Admins get every class; teachers the classes they teach or are homeroom teacher of; students their own class.
          */
         get: operations["ClassesController_findAll"];
         put?: never;
@@ -289,7 +426,7 @@ export interface paths {
         delete: operations["SubjectsController_remove"];
         options?: never;
         head?: never;
-        /** Rename a subject */
+        /** Rename a subject or change its colour */
         patch: operations["SubjectsController_update"];
         trace?: never;
     };
@@ -456,6 +593,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/grades/me/year": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My whole school year
+         * @description Both semester averages of every subject, the annual averages, re-exams, the annual general average and, for a closed year, how it ended.
+         */
+        get: operations["GradesController_myYear"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/grades": {
         parameters: {
             query?: never;
@@ -576,6 +733,26 @@ export interface paths {
          * @description Admins, and teachers of the student's class.
          */
         get: operations["GradesController_studentReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/students/{id}/grades/year": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A student's whole school year
+         * @description Semester and annual averages per subject, re-exams, the annual general average and the outcome of a closed year. Teachers: students of their classes that year.
+         */
+        get: operations["GradesController_studentYear"];
         put?: never;
         post?: never;
         delete?: never;
@@ -959,10 +1136,228 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats/school": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The whole school at a glance (admin dashboard)
+         * @description Of a school year and semester (the current ones by default): average, grade distribution, averages per class and subject, students at risk and grades given per week.
+         */
+        get: operations["StatsController_school"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stats/teaching": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My classes at a glance (teacher dashboard)
+         * @description For each subject the teacher teaches in a class: the class average, students at risk and students missing grades.
+         */
+        get: operations["StatsController_teaching"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ErrorResponseDto: {
+            /** @example 404 */
+            statusCode: number;
+            error: string;
+            /**
+             * @description A message, or a list of validation messages.
+             * @example Student not found
+             */
+            message: Record<string, never>;
+            /** @example /api/students/0b39a733-7b2b-45e6-9d19-7938ad3af0b6 */
+            path: string;
+            /** @example 2026-10-20T10:00:00.000Z */
+            timestamp: string;
+        };
+        /** @enum {string} */
+        SchoolYearStatus: "ACTIVE" | "CLOSED";
+        OutcomeCountsDto: {
+            /** @example 47 */
+            promoted: number;
+            /** @example 2 */
+            repeating: number;
+            /** @example 10 */
+            graduated: number;
+        };
+        SchoolYearSummaryDto: {
+            status: components["schemas"]["SchoolYearStatus"];
+            /**
+             * @description 1 or 2: new grades go to this semester.
+             * @example 1
+             * @enum {number}
+             */
+            currentSemester: 1 | 2;
+            /** @example 6 */
+            classCount: number;
+            /**
+             * @description Students enrolled in a class that year.
+             * @example 60
+             */
+            studentCount: number;
+            /** @description For a closed year: how it ended for its students. */
+            outcomes: components["schemas"]["OutcomeCountsDto"] | null;
+            id: string;
+            /** @example 2026 */
+            startYear: number;
+            /** @example 2026–2027 */
+            name: string;
+            /** Format: date-time */
+            semester1EndedAt: string | null;
+            /** Format: date-time */
+            closedAt: string | null;
+        };
+        SchoolYearDto: {
+            status: components["schemas"]["SchoolYearStatus"];
+            /**
+             * @description 1 or 2: new grades go to this semester.
+             * @example 1
+             * @enum {number}
+             */
+            currentSemester: 1 | 2;
+            id: string;
+            /** @example 2026 */
+            startYear: number;
+            /** @example 2026–2027 */
+            name: string;
+            /** Format: date-time */
+            semester1EndedAt: string | null;
+            /** Format: date-time */
+            closedAt: string | null;
+        };
+        ClassSummaryDto: {
+            id: string;
+            /** @example 9A */
+            name: string;
+        };
+        /**
+         * @description Its colour in the app, chosen by the admin.
+         * @enum {string}
+         */
+        SubjectColor: "INDIGO" | "VIOLET" | "PINK" | "ROSE" | "ORANGE" | "AMBER" | "LIME" | "EMERALD" | "TEAL" | "SKY";
+        SubjectSummaryDto: {
+            /** @description Its colour in the app, chosen by the admin. */
+            color: components["schemas"]["SubjectColor"];
+            id: string;
+            /** @example Mathematics */
+            name: string;
+        };
+        SubjectYearResultDto: {
+            subject: components["schemas"]["SubjectSummaryDto"];
+            /**
+             * @description Rounded semester averages.
+             * @example 7
+             */
+            semester1: number | null;
+            /** @example 8 */
+            semester2: number | null;
+            /**
+             * @description Mean of the semester averages.
+             * @example 7.5
+             */
+            annual: number | null;
+            /** @description Grade of the re-exam, when there was one. */
+            reexamGrade: number | null;
+            /** @description The re-exam grade if any, else the annual average. */
+            final: number | null;
+            passed: boolean;
+        };
+        ClosingStudentDto: {
+            /** @enum {string} */
+            suggestedOutcome: "PROMOTED" | "GRADUATED" | "REPEATING" | "REEXAM";
+            id: string;
+            /** @example Andrei */
+            firstName: string;
+            /** @example Georgescu */
+            lastName: string;
+            /** @example 2026-0001 */
+            registrationNumber: string;
+            /**
+             * @description Annual general average; null while a subject has none.
+             * @example 8.42
+             */
+            generalAverage: number | null;
+            /** @description Subjects with an annual average under 5 (or none), with re-exams. */
+            failedSubjects: components["schemas"]["SubjectYearResultDto"][];
+        };
+        ClosingClassDto: {
+            class: components["schemas"]["ClassSummaryDto"];
+            /** @description Where its students go next year; null for the final grade (they graduate). */
+            nextClassName: string | null;
+            students: components["schemas"]["ClosingStudentDto"][];
+        };
+        ClosingPreviewDto: {
+            schoolYear: components["schemas"]["SchoolYearDto"];
+            /**
+             * @description The year that will be opened:
+             * @example 2027–2028
+             */
+            nextYearName: string;
+            classes: components["schemas"]["ClosingClassDto"][];
+        };
+        SaveReexamDto: {
+            /** Format: uuid */
+            studentId: string;
+            /** Format: uuid */
+            subjectId: string;
+            /** @example 6 */
+            grade: number;
+        };
+        /** @enum {string} */
+        YearOutcome: "PROMOTED" | "REPEATING" | "GRADUATED";
+        OutcomeDecisionDto: {
+            outcome: components["schemas"]["YearOutcome"];
+            /** Format: uuid */
+            studentId: string;
+        };
+        CloseYearDto: {
+            /**
+             * @description The admin's decision for some students, overriding the suggestion. Every
+             *     student still waiting for re-exam results needs one.
+             * @default []
+             */
+            decisions: components["schemas"]["OutcomeDecisionDto"][];
+            /**
+             * @description Also open empty classes for the new first-grade students (a new 9A for
+             *     this year's 9A, with the same subjects, teachers to be assigned).
+             * @default true
+             */
+            createEntryClasses: boolean;
+        };
+        CloseYearResultDto: {
+            closedYear: components["schemas"]["SchoolYearDto"];
+            newYear: components["schemas"]["SchoolYearDto"];
+            outcomes: components["schemas"]["OutcomeCountsDto"];
+            /**
+             * @description Classes opened in the new year.
+             * @example 6
+             */
+            classesCreated: number;
+        };
         LoginDto: {
             /**
              * Format: email
@@ -975,11 +1370,6 @@ export interface components {
         };
         /** @enum {string} */
         Role: "ADMIN" | "TEACHER" | "STUDENT";
-        ClassSummaryDto: {
-            id: string;
-            /** @example 9A */
-            name: string;
-        };
         StudentProfileDto: {
             id: string;
             /**
@@ -1022,20 +1412,6 @@ export interface components {
             expiresIn: number;
             user: components["schemas"]["AuthUserDto"];
         };
-        ErrorResponseDto: {
-            /** @example 404 */
-            statusCode: number;
-            error: string;
-            /**
-             * @description A message, or a list of validation messages.
-             * @example Student not found
-             */
-            message: Record<string, never>;
-            /** @example /api/students/0b39a733-7b2b-45e6-9d19-7938ad3af0b6 */
-            path: string;
-            /** @example 2026-10-20T10:00:00.000Z */
-            timestamp: string;
-        };
         StudentDto: {
             id: string;
             userId: string;
@@ -1053,8 +1429,13 @@ export interface components {
             lastName: string;
             /** @example 2011-07-25 */
             dateOfBirth: string;
-            /** @description Null when the student is not assigned to a class. */
+            /** @description The class in the school year asked for; null when not enrolled. */
             class: components["schemas"]["ClassSummaryDto"] | null;
+            /**
+             * @description The school year the student graduated in, if they did.
+             * @example 2025–2026
+             */
+            graduatedIn: string | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -1072,6 +1453,47 @@ export interface components {
             data: components["schemas"]["StudentDto"][];
             meta: components["schemas"]["PaginationMetaDto"];
         };
+        SchoolYearRefDto: {
+            id: string;
+            /** @example 2025–2026 */
+            name: string;
+        };
+        StudentYearDto: {
+            /** @description How the year ended; null while it is open. */
+            outcome: components["schemas"]["YearOutcome"] | null;
+            /** @example 2025–2026 */
+            schoolYear: components["schemas"]["SchoolYearRefDto"];
+            class: components["schemas"]["ClassSummaryDto"];
+        };
+        StudentDetailDto: {
+            id: string;
+            userId: string;
+            /**
+             * @description Number in the school register (număr matricol): year of enrollment and
+             *     number in that year, given automatically.
+             * @example 2026-0042
+             */
+            registrationNumber: string;
+            /** @example student@school.test */
+            email: string;
+            /** @example Andrei */
+            firstName: string;
+            /** @example Georgescu */
+            lastName: string;
+            /** @example 2011-07-25 */
+            dateOfBirth: string;
+            /** @description The class in the school year asked for; null when not enrolled. */
+            class: components["schemas"]["ClassSummaryDto"] | null;
+            /**
+             * @description The school year the student graduated in, if they did.
+             * @example 2025–2026
+             */
+            graduatedIn: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description The student's classes, year by year, newest first. */
+            history: components["schemas"]["StudentYearDto"][];
+        };
         CreateStudentDto: {
             /**
              * @description Format YYYY-MM-DD.
@@ -1080,7 +1502,8 @@ export interface components {
             dateOfBirth: string;
             /**
              * Format: uuid
-             * @description Class to enroll the student in. Omit or send null to leave unassigned.
+             * @description Class to enroll the student in, in the open school year. Omit or send
+             *     null to leave unassigned.
              */
             classId?: string | null;
             /**
@@ -1120,7 +1543,8 @@ export interface components {
             dateOfBirth?: string;
             /**
              * Format: uuid
-             * @description Class to enroll the student in. Omit or send null to leave unassigned.
+             * @description Class to enroll the student in, in the open school year. Omit or send
+             *     null to leave unassigned.
              */
             classId?: string | null;
         };
@@ -1139,11 +1563,6 @@ export interface components {
         PaginatedTeachersDto: {
             data: components["schemas"]["TeacherDto"][];
             meta: components["schemas"]["PaginationMetaDto"];
-        };
-        SubjectSummaryDto: {
-            id: string;
-            /** @example Mathematics */
-            name: string;
         };
         TeachingAssignmentDto: {
             classSubjectId: string;
@@ -1200,6 +1619,12 @@ export interface components {
             /** @example Marin */
             lastName?: string;
         };
+        ClassYearDto: {
+            status: components["schemas"]["SchoolYearStatus"];
+            id: string;
+            /** @example 2026–2027 */
+            name: string;
+        };
         PersonSummaryDto: {
             /** @description Teacher or student id (not the user id). */
             id: string;
@@ -1212,6 +1637,13 @@ export interface components {
             id: string;
             /** @example 9A */
             name: string;
+            /**
+             * @description The grade, from the name ("9A" is in grade 9); null if it has none.
+             * @example 9
+             */
+            gradeLevel: number | null;
+            /** @description Classes belong to one school year. A closed year can only be viewed. */
+            schoolYear: components["schemas"]["ClassYearDto"];
             /** @description Homeroom teacher (diriginte), or null. */
             homeroomTeacher: components["schemas"]["PersonSummaryDto"] | null;
             /** @example 10 */
@@ -1235,6 +1667,13 @@ export interface components {
             id: string;
             /** @example 9A */
             name: string;
+            /**
+             * @description The grade, from the name ("9A" is in grade 9); null if it has none.
+             * @example 9
+             */
+            gradeLevel: number | null;
+            /** @description Classes belong to one school year. A closed year can only be viewed. */
+            schoolYear: components["schemas"]["ClassYearDto"];
             /** @description Homeroom teacher (diriginte), or null. */
             homeroomTeacher: components["schemas"]["PersonSummaryDto"] | null;
             /** @example 10 */
@@ -1273,15 +1712,26 @@ export interface components {
             studentIds: string[];
         };
         SubjectDto: {
+            color: components["schemas"]["SubjectColor"];
             id: string;
             /** @example Mathematics */
             name: string;
         };
         CreateSubjectDto: {
+            /**
+             * @description Colour of the subject everywhere it is shown (lists, timetables, charts).
+             *     When omitted, the colour used by the fewest subjects is picked.
+             */
+            color?: components["schemas"]["SubjectColor"];
             name: string;
         };
         UpdateSubjectDto: {
-            name: string;
+            /**
+             * @description Colour of the subject everywhere it is shown (lists, timetables, charts).
+             *     When omitted, the colour used by the fewest subjects is picked.
+             */
+            color?: components["schemas"]["SubjectColor"];
+            name?: string;
         };
         CreateClassSubjectDto: {
             /** Format: uuid */
@@ -1428,6 +1878,11 @@ export interface components {
              */
             replaceLessonId?: string;
         };
+        PeriodDto: {
+            /** @enum {number} */
+            semester: 1 | 2;
+            schoolYear: components["schemas"]["SchoolYearDto"];
+        };
         GradeEntryDto: {
             id: string;
             /** @example 9 */
@@ -1467,6 +1922,9 @@ export interface components {
              * @example 2026-0042
              */
             registrationNumber: string;
+            /** @description The year and semester of the report. */
+            period: components["schemas"]["PeriodDto"];
+            /** @description The student's class that year. */
             class: components["schemas"]["ClassSummaryDto"] | null;
             /** @description Every subject of the class (and any other subject the student has grades in). */
             subjects: components["schemas"]["SubjectGradesDto"][];
@@ -1477,16 +1935,58 @@ export interface components {
              */
             overallAverage: number | null;
         };
+        SubjectYearDto: {
+            subject: components["schemas"]["SubjectSummaryDto"];
+            /**
+             * @description Rounded average of each semester.
+             * @example 7
+             */
+            semester1: number | null;
+            /** @example 8 */
+            semester2: number | null;
+            /**
+             * @description Mean of the two semester averages.
+             * @example 7.5
+             */
+            annual: number | null;
+            /** @description Grade of the re-exam (corigență), if the student took one. */
+            reexamGrade: number | null;
+            /** @description The re-exam grade, else the annual average. */
+            final: number | null;
+            /** @description Final average of at least 5. */
+            passed: boolean;
+        };
+        StudentYearReportDto: {
+            /** @description How the year ended (closed years). */
+            outcome: components["schemas"]["YearOutcome"] | null;
+            student: components["schemas"]["PersonSummaryDto"];
+            /** @example 2026-0042 */
+            registrationNumber: string;
+            schoolYear: components["schemas"]["SchoolYearDto"];
+            class: components["schemas"]["ClassSummaryDto"] | null;
+            subjects: components["schemas"]["SubjectYearDto"][];
+            /**
+             * @description Mean of the final subject averages; null while one is missing.
+             * @example 8.42
+             */
+            generalAverage: number | null;
+        };
         GradeDto: {
+            /**
+             * @example 1
+             * @enum {number}
+             */
+            semester: 1 | 2;
             id: string;
             /** @example 9 */
             value: number;
             /** @example 2026-10-20 */
             date: string;
             student: components["schemas"]["PersonSummaryDto"];
-            /** @description The student's current class. */
+            /** @description The student's class in the grade's school year. */
             class: components["schemas"]["ClassSummaryDto"] | null;
             subject: components["schemas"]["SubjectSummaryDto"];
+            schoolYearId: string;
             /** @description Who gave the grade. Null if that teacher was deleted. */
             teacher: components["schemas"]["PersonSummaryDto"] | null;
             /** Format: date-time */
@@ -1499,6 +1999,12 @@ export interface components {
             meta: components["schemas"]["PaginationMetaDto"];
         };
         CreateGradeDto: {
+            /**
+             * @description 1 or 2. Defaults to the current semester. Only admins can add grades
+             *     to a semester that has ended.
+             * @enum {number}
+             */
+            semester?: 1 | 2;
             /** Format: uuid */
             studentId: string;
             /** Format: uuid */
@@ -1533,6 +2039,12 @@ export interface components {
             replaceGradeId?: string;
         };
         CreateGradesBatchDto: {
+            /**
+             * @description 1 or 2. Defaults to the current semester. Only admins can add grades
+             *     to a semester that has ended.
+             * @enum {number}
+             */
+            semester?: 1 | 2;
             /**
              * Format: uuid
              * @description The subject every grade in the batch is for.
@@ -1606,6 +2118,12 @@ export interface components {
         };
         GradebookDto: {
             class: components["schemas"]["ClassSummaryDto"];
+            period: components["schemas"]["PeriodDto"];
+            /**
+             * @description True when the user can't add or change grades here: a closed year, or
+             *     (for a teacher) a semester that has ended.
+             */
+            readOnly: boolean;
             subject: components["schemas"]["SubjectSummaryDto"];
             teacher: components["schemas"]["PersonSummaryDto"] | null;
             /** @example 4 */
@@ -1874,6 +2392,108 @@ export interface components {
         SendMessageDto: {
             body: string;
         };
+        GradeCountDto: {
+            /** @example 8 */
+            value: number;
+            /**
+             * @description How many grades of this value.
+             * @example 214
+             */
+            count: number;
+        };
+        ClassStatsDto: {
+            class: components["schemas"]["ClassSummaryDto"];
+            /**
+             * @description Mean of the students' subject averages (two decimals), or null.
+             * @example 7.84
+             */
+            average: number | null;
+            /** @example 10 */
+            studentCount: number;
+            /**
+             * @description Students with at least one subject average under 5.
+             * @example 1
+             */
+            studentsAtRisk: number;
+        };
+        SubjectStatsDto: {
+            subject: components["schemas"]["SubjectSummaryDto"];
+            /**
+             * @description Mean of the students' averages in this subject.
+             * @example 7.9
+             */
+            average: number | null;
+            /** @example 182 */
+            gradeCount: number;
+        };
+        WeekActivityDto: {
+            /**
+             * @description Monday of the week (YYYY-MM-DD).
+             * @example 2026-10-19
+             */
+            weekStart: string;
+            /**
+             * @description Grades given that week.
+             * @example 37
+             */
+            count: number;
+        };
+        SchoolStatsDto: {
+            /** @description The school year and semester of the figures. */
+            period: components["schemas"]["PeriodDto"];
+            /**
+             * @description Mean of every student's subject averages.
+             * @example 7.86
+             */
+            average: number | null;
+            /** @example 1456 */
+            gradeCount: number;
+            /**
+             * @description Students with at least one subject average under 5.
+             * @example 3
+             */
+            studentsAtRisk: number;
+            /** @description Grades 1 to 10, each with how many were given. */
+            gradeDistribution: components["schemas"]["GradeCountDto"][];
+            /** @description Natural class order (9A before 10A). */
+            classes: components["schemas"]["ClassStatsDto"][];
+            subjects: components["schemas"]["SubjectStatsDto"][];
+            /**
+             * @description Grades given per week, oldest first: the last 8 weeks of the current
+             *     semester, or the whole of an ended one.
+             */
+            activity: components["schemas"]["WeekActivityDto"][];
+        };
+        TeachingStatsRowDto: {
+            class: components["schemas"]["ClassSummaryDto"];
+            subject: components["schemas"]["SubjectSummaryDto"];
+            /**
+             * @description Mean of the students' averages in the subject.
+             * @example 7.42
+             */
+            average: number | null;
+            /** @example 10 */
+            studentCount: number;
+            /**
+             * @description Students whose average in the subject is under 5.
+             * @example 1
+             */
+            studentsAtRisk: number;
+            /**
+             * @description Students with fewer grades than the minimum (weekly hours + 1).
+             * @example 6
+             */
+            studentsMissingGrades: number;
+        };
+        TeachingStatsDto: {
+            period: components["schemas"]["PeriodDto"];
+            /** @description One row per subject the teacher teaches in a class. */
+            rows: components["schemas"]["TeachingStatsRowDto"][];
+            /** @description Grades in the teacher's subjects and classes, 1 to 10. */
+            gradeDistribution: components["schemas"]["GradeCountDto"][];
+            /** @description Grades given in the teacher's subjects per week (see SchoolStatsDto.activity). */
+            activity: components["schemas"]["WeekActivityDto"][];
+        };
     };
     responses: never;
     parameters: never;
@@ -1883,6 +2503,237 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    SchoolYearsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolYearSummaryDto"][];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    SchoolYearsController_current: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolYearDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    SchoolYearsController_endSemester: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolYearDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description The second semester has already started */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    SchoolYearsController_closingPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClosingPreviewDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Still in the first semester */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    SchoolYearsController_saveReexam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveReexamDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    SchoolYearsController_removeReexam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                studentId: string;
+                subjectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    SchoolYearsController_close: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseYearDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CloseYearResultDto"];
+                };
+            };
+            /** @description Re-exam results or decisions are missing */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
     AuthController_login: {
         parameters: {
             query?: never;
@@ -2000,9 +2851,11 @@ export interface operations {
                 order?: "asc" | "desc";
                 /** @description Field to sort by. */
                 sort?: "lastName" | "firstName" | "email" | "dateOfBirth" | "registrationNumber" | "createdAt";
+                /** @description The school year whose classes are shown; the open one when omitted. */
+                schoolYearId?: string;
                 /** @description Only students of this class. */
                 classId?: string;
-                /** @description Only students without a class. */
+                /** @description Only students without a class that year (graduates excluded). */
                 unassigned?: true | false;
                 /** @description Case-insensitive text search. */
                 search?: string;
@@ -2102,7 +2955,9 @@ export interface operations {
     };
     StudentsController_findOne: {
         parameters: {
-            query?: never;
+            query?: {
+                schoolYearId?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -2116,7 +2971,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StudentDto"];
+                    "application/json": components["schemas"]["StudentDetailDto"];
                 };
             };
             /** @description Validation failed */
@@ -2353,7 +3208,9 @@ export interface operations {
     };
     TeachersController_findMe: {
         parameters: {
-            query?: never;
+            query?: {
+                schoolYearId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2390,7 +3247,9 @@ export interface operations {
     };
     TeachersController_findOne: {
         parameters: {
-            query?: never;
+            query?: {
+                schoolYearId?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -2551,6 +3410,8 @@ export interface operations {
                 order?: "asc" | "desc";
                 /** @description Field to sort by. */
                 sort?: "name" | "createdAt";
+                /** @description Classes of this school year; the open one when omitted. */
+                schoolYearId?: string;
                 /** @description Case-insensitive text search. */
                 search?: string;
             };
@@ -3308,7 +4169,9 @@ export interface operations {
     };
     TimetableController_forCurrentUser: {
         parameters: {
-            query?: never;
+            query?: {
+                schoolYearId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3449,7 +4312,9 @@ export interface operations {
     };
     TimetableController_forTeacher: {
         parameters: {
-            query?: never;
+            query?: {
+                schoolYearId?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -3647,7 +4512,11 @@ export interface operations {
     };
     GradesController_myReport: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 1 or 2. Defaults to the year's current semester (2 for a closed year). */
+                semester?: 1 | 2;
+                schoolYearId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3681,6 +4550,44 @@ export interface operations {
             };
         };
     };
+    GradesController_myYear: {
+        parameters: {
+            query?: {
+                schoolYearId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentYearReportDto"];
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
     GradesController_findAll: {
         parameters: {
             query?: {
@@ -3690,8 +4597,12 @@ export interface operations {
                 pageSize?: number;
                 /** @description Sort direction (newest first by default). */
                 order?: "asc" | "desc";
+                /** @description 1 or 2; the year's current semester when omitted. */
+                semester?: 1 | 2;
                 /** @description Field to sort by (newest first by default). */
                 sort?: "date" | "value" | "createdAt";
+                /** @description The school year; the open one when omitted. */
+                schoolYearId?: string;
                 classId?: string;
                 subjectId?: string;
                 studentId?: string;
@@ -4019,7 +4930,11 @@ export interface operations {
     };
     GradesController_studentReport: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 1 or 2. Defaults to the year's current semester (2 for a closed year). */
+                semester?: 1 | 2;
+                schoolYearId?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -4063,9 +4978,59 @@ export interface operations {
             };
         };
     };
+    GradesController_studentYear: {
+        parameters: {
+            query?: {
+                schoolYearId?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentYearReportDto"];
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
     GradesController_gradebook: {
         parameters: {
             query: {
+                /** @description 1 or 2; the class's current semester when omitted. */
+                semester?: 1 | 2;
                 subjectId: string;
             };
             header?: never;
@@ -5056,6 +6021,68 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    StatsController_school: {
+        parameters: {
+            query?: {
+                /** @description 1 or 2. Defaults to the year's current semester (2 for a closed year). */
+                semester?: 1 | 2;
+                schoolYearId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolStatsDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    StatsController_teaching: {
+        parameters: {
+            query?: {
+                /** @description 1 or 2. Defaults to the year's current semester (2 for a closed year). */
+                semester?: 1 | 2;
+                schoolYearId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeachingStatsDto"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Check, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { DataTable, type Column } from '@/components/data-table'
@@ -10,17 +10,43 @@ import { TextField } from '@/components/form-fields'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import { cn } from '@/lib/utils'
 import { nameField } from '@/lib/validation'
 import {
   useCreateSubject,
   useDeleteSubject,
-  useRenameSubject,
   useSubjects,
+  useUpdateSubject,
   type Subject,
 } from './api'
+import {
+  SUBJECT_COLOR_KEYS,
+  SUBJECT_COLORS,
+  type SubjectColor,
+} from './subject-colors'
+import { SubjectIcon } from './subject-icon'
 
-const schema = z.object({ name: nameField })
+const schema = z.object({
+  name: nameField,
+  color: z.enum(SUBJECT_COLOR_KEYS as [SubjectColor, ...SubjectColor[]]),
+})
 type Values = z.infer<typeof schema>
+
+/** The colour fewest subjects have: a good start for a new one. */
+function leastUsedColor(subjects: Subject[]): SubjectColor {
+  const count = (color: SubjectColor) =>
+    subjects.filter((s) => s.color === color).length
+  return SUBJECT_COLOR_KEYS.reduce((best, color) =>
+    count(color) < count(best) ? color : best,
+  )
+}
 
 export function SubjectsPage() {
   const subjects = useSubjects()
@@ -29,15 +55,35 @@ export function SubjectsPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [deleting, setDeleting] = useState<Subject | null>(null)
 
+  const [newColor, setNewColor] = useState<SubjectColor>('INDIGO')
+
   const openForm = (subject: Subject | null) => {
     setEditing(subject)
+    setNewColor(subject?.color ?? leastUsedColor(subjects.data ?? []))
     setFormOpen(true)
   }
 
   const columns: Column<Subject>[] = [
     {
       header: 'Name',
-      cell: (s) => <span className="font-medium">{s.name}</span>,
+      cell: (s) => (
+        <div className="flex items-center gap-3">
+          <SubjectIcon subject={s} />
+          <span className="font-medium">{s.name}</span>
+        </div>
+      ),
+    },
+    {
+      header: 'Colour',
+      cell: (s) => (
+        <span className="text-muted-foreground inline-flex items-center gap-2 text-sm">
+          <span
+            aria-hidden
+            className={cn('size-3 rounded-full', SUBJECT_COLORS[s.color].solid)}
+          />
+          {SUBJECT_COLORS[s.color].label}
+        </span>
+      ),
     },
     {
       header: <span className="sr-only">Actions</span>,
@@ -47,7 +93,7 @@ export function SubjectsPage() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label={`Rename ${s.name}`}
+            aria-label={`Edit ${s.name}`}
             onClick={() => openForm(s)}
           >
             <Pencil />
@@ -69,7 +115,7 @@ export function SubjectsPage() {
     <>
       <PageHeader
         title="Subjects"
-        description="The subjects taught in the school. Add them to classes from a class page."
+        description="The subjects taught in the school. Each has a colour and icon, used in timetables, gradebooks and report cards."
         actions={
           <Button onClick={() => openForm(null)}>
             <Plus aria-hidden /> Add subject
@@ -92,6 +138,7 @@ export function SubjectsPage() {
         open={formOpen}
         onOpenChange={setFormOpen}
         subject={editing}
+        initialColor={newColor}
       />
       <ConfirmDialog
         open={deleting !== null}
@@ -112,37 +159,43 @@ function SubjectFormDialog({
   open,
   onOpenChange,
   subject,
+  initialColor,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   subject: Subject | null
+  initialColor: SubjectColor
 }) {
   const create = useCreateSubject()
-  const rename = useRenameSubject()
+  const update = useUpdateSubject()
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { name: '' },
+    defaultValues: { name: '', color: 'INDIGO' },
   })
 
   useEffect(() => {
-    if (open) form.reset({ name: subject?.name ?? '' })
-  }, [open, subject, form])
+    if (open) form.reset({ name: subject?.name ?? '', color: initialColor })
+  }, [open, subject, initialColor, form])
 
-  const submit = async ({ name }: Values) => {
-    if (subject) await rename.mutateAsync({ id: subject.id, name })
-    else await create.mutateAsync({ name })
+  const submit = async (body: Values) => {
+    if (subject) await update.mutateAsync({ id: subject.id, body })
+    else await create.mutateAsync(body)
     onOpenChange(false)
   }
+  const [name, color] = useWatch({
+    control: form.control,
+    name: ['name', 'color'],
+  })
 
   return (
     <FormDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={subject ? 'Rename subject' : 'Add subject'}
+      title={subject ? 'Edit subject' : 'Add subject'}
       form={form}
       onSubmit={submit}
-      submitLabel={subject ? 'Rename' : 'Add subject'}
-      pending={create.isPending || rename.isPending}
+      submitLabel={subject ? 'Save changes' : 'Add subject'}
+      pending={create.isPending || update.isPending}
     >
       <TextField
         control={form.control}
@@ -151,6 +204,56 @@ function SubjectFormDialog({
         placeholder="e.g. Mathematics"
         autoFocus
       />
+      <FormField
+        control={form.control}
+        name="color"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Colour</FormLabel>
+            <FormControl>
+              <div
+                role="radiogroup"
+                aria-label="Colour"
+                className="flex flex-wrap gap-2"
+              >
+                {SUBJECT_COLOR_KEYS.map((key) => {
+                  const checked = field.value === key
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="radio"
+                      aria-checked={checked}
+                      aria-label={SUBJECT_COLORS[key].label}
+                      title={SUBJECT_COLORS[key].label}
+                      onClick={() => field.onChange(key)}
+                      className={cn(
+                        'ring-offset-background focus-visible:ring-ring flex size-8 items-center justify-center rounded-full text-white transition outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+                        SUBJECT_COLORS[key].solid,
+                        checked
+                          ? 'ring-foreground/70 scale-110 ring-2 ring-offset-2'
+                          : 'hover:scale-105',
+                      )}
+                    >
+                      {checked && <Check className="size-4" aria-hidden />}
+                    </button>
+                  )
+                })}
+              </div>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <div className="bg-muted/40 flex items-center gap-3 rounded-lg border p-3">
+        <SubjectIcon subject={{ name: name || 'Subject', color }} />
+        <div className="min-w-0 text-sm">
+          <p className="truncate font-medium">{name || 'New subject'}</p>
+          <p className="text-muted-foreground text-xs">
+            How it looks in timetables, gradebooks and report cards
+          </p>
+        </div>
+      </div>
     </FormDialog>
   )
 }

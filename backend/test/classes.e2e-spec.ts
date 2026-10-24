@@ -157,8 +157,11 @@ describe('Classes (e2e)', () => {
   });
 
   describe('student', () => {
-    it('cannot list classes or their students', async () => {
-      await as(studentToken)(api().get('/api/classes')).expect(403);
+    it('sees only their own class, and not its student list', async () => {
+      const { body } = await as(studentToken)(api().get('/api/classes')).expect(
+        200,
+      );
+      expect(body.data.map((c: { name: string }) => c.name)).toEqual(['9A']);
       await as(studentToken)(
         api().get(`/api/classes/${classIds['9A']}/students`),
       ).expect(403);

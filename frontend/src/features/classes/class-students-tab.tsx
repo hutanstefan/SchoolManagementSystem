@@ -2,6 +2,7 @@ import { UserMinus, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { PersonCell } from '@/components/person-avatar'
 import { DataTable, type Column } from '@/components/data-table'
 import { SearchInput } from '@/components/search-input'
 import { EmptyState, LoadingBlock } from '@/components/states'
@@ -21,19 +22,27 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useStudents, type Student } from '@/features/students/api'
 import { formatDate, fullName } from '@/lib/format'
+import { usePeriod } from '@/periods/period-context'
 import {
   useAssignStudents,
   useClassStudents,
   useRemoveStudentFromClass,
 } from './api'
 
-export function ClassStudentsTab({ classId }: { classId: string }) {
+export function ClassStudentsTab({
+  classId,
+  readOnly = false,
+}: {
+  classId: string
+  /** A class of a closed year: its students can't change any more. */
+  readOnly?: boolean
+}) {
   const students = useClassStudents(classId)
   const removeStudent = useRemoveStudentFromClass()
   const [addOpen, setAddOpen] = useState(false)
   const [removing, setRemoving] = useState<Student | null>(null)
 
-  const columns: Column<Student>[] = [
+  const allColumns: Column<Student>[] = [
     {
       header: 'Reg. no.',
       cell: (s) => (
@@ -46,18 +55,12 @@ export function ClassStudentsTab({ classId }: { classId: string }) {
     {
       header: 'Name',
       cell: (s) => (
-        <Link
-          to={`/admin/students/${s.id}`}
-          className="font-medium hover:underline"
-        >
-          {fullName(s)}
-        </Link>
+        <PersonCell person={s} secondary={s.email}>
+          <Link to={`/admin/students/${s.id}`} className="hover:underline">
+            {fullName(s)}
+          </Link>
+        </PersonCell>
       ),
-    },
-    {
-      header: 'Email',
-      cell: (s) => s.email,
-      className: 'hidden md:table-cell',
     },
     {
       header: 'Date of birth',
@@ -79,16 +82,21 @@ export function ClassStudentsTab({ classId }: { classId: string }) {
       ),
     },
   ]
+  const columns = readOnly ? allColumns.slice(0, -1) : allColumns
 
   return (
     <Card className="gap-0 py-0">
       <div className="flex items-center justify-between gap-4 border-b p-4">
         <p className="text-muted-foreground text-sm">
-          Students enrolled in this class.
+          {readOnly
+            ? 'Students who were in this class that year.'
+            : 'Students enrolled in this class.'}
         </p>
-        <Button size="sm" onClick={() => setAddOpen(true)}>
-          <UserPlus aria-hidden /> Add students
-        </Button>
+        {!readOnly && (
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <UserPlus aria-hidden /> Add students
+          </Button>
+        )}
       </div>
       <DataTable
         columns={columns}
@@ -135,7 +143,10 @@ function AddStudentsDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
+  // Only the open year's classes take students.
+  const { activeYear } = usePeriod()
   const unassigned = useStudents({
+    schoolYearId: activeYear?.id,
     unassigned: true,
     pageSize: 100,
     sort: 'lastName',

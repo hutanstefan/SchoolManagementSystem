@@ -7,13 +7,19 @@ import {
 import { api, unwrap, type Schemas } from '@/api/client'
 import { queryKeys } from '@/api/query-keys'
 import type { operations } from '@/api/schema'
+import { usePeriod } from '@/periods/period-context'
 
 export type Student = Schemas['StudentDto']
+export type StudentDetail = Schemas['StudentDetailDto']
+export type StudentYear = Schemas['StudentYearDto']
 export type StudentQuery = NonNullable<
   operations['StudentsController_findAll']['parameters']['query']
 >
 
-export function useStudents(query: StudentQuery) {
+/** Students of the year picked in the sidebar, with their class that year. */
+export function useStudents(filters: StudentQuery) {
+  const schoolYearId = usePeriod().year?.id
+  const query = { schoolYearId, ...filters }
   return useQuery({
     queryKey: queryKeys.students.list(query),
     queryFn: () => unwrap(api.GET('/api/students', { params: { query } })),
@@ -22,10 +28,16 @@ export function useStudents(query: StudentQuery) {
 }
 
 export function useStudent(id: string) {
+  const schoolYearId = usePeriod().year?.id
   return useQuery({
-    queryKey: queryKeys.students.detail(id),
+    queryKey: queryKeys.students.detail(id, schoolYearId),
     queryFn: () =>
-      unwrap(api.GET('/api/students/{id}', { params: { path: { id } } })),
+      unwrap(
+        api.GET('/api/students/{id}', {
+          params: { path: { id }, query: { schoolYearId } },
+        }),
+      ),
+    placeholderData: keepPreviousData,
   })
 }
 

@@ -1,0 +1,25 @@
+meta {
+  name: School stats as a teacher (403)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/stats/school
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+tests {
+  test("Status is 403", function () {
+    expect(res.getStatus()).to.equal(403);
+  });
+}
+
+docs {
+  School-wide figures are for administrators only.
+}

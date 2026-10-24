@@ -1,18 +1,25 @@
-import { School } from 'lucide-react'
+import { BookOpen, Home, School, Users } from 'lucide-react'
 import { DataTable, type Column } from '@/components/data-table'
+import { ClassTile } from '@/components/class-tile'
 import { PageHeader } from '@/components/page-header'
 import { SectionHeader } from '@/components/section-header'
 import { StatCard } from '@/components/stat-card'
 import { EmptyState, ErrorState, LoadingBlock } from '@/components/states'
 import { Card } from '@/components/ui/card'
 import type { ClassSubject } from '@/features/classes/api'
+import { SubjectIcon } from '@/features/subjects/subject-icon'
 import { fullName } from '@/lib/format'
 import { useMyClass } from './use-my-class'
 
 const subjectColumns: Column<ClassSubject>[] = [
   {
     header: 'Subject',
-    cell: (s) => <span className="font-medium">{s.subject.name}</span>,
+    cell: (s) => (
+      <div className="flex items-center gap-3">
+        <SubjectIcon subject={s.subject} />
+        <span className="font-medium">{s.subject.name}</span>
+      </div>
+    ),
   },
   {
     header: 'Teacher',
@@ -31,8 +38,9 @@ const subjectColumns: Column<ClassSubject>[] = [
 ]
 
 export function StudentClassPage() {
-  const { classId, schoolClass } = useMyClass()
+  const { classId, isPending, schoolClass } = useMyClass()
 
+  if (isPending) return <LoadingBlock />
   if (!classId) {
     return (
       <>
@@ -63,18 +71,28 @@ export function StudentClassPage() {
   return (
     <>
       <PageHeader
+        leading={<ClassTile name={c.name} />}
         title={`Class ${c.name}`}
-        description="Your class, its subjects and teachers."
+        description={`Your class in ${c.schoolYear.name}, its subjects and teachers.`}
       />
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Homeroom teacher"
           value={c.homeroomTeacher ? fullName(c.homeroomTeacher) : '—'}
+          icon={Home}
+          tone="amber"
         />
-        <StatCard label="Students" value={c.studentCount} />
+        <StatCard
+          label="Students"
+          value={c.studentCount}
+          icon={Users}
+          tone="violet"
+        />
         <StatCard
           label="Subjects"
           value={c.subjects.length}
+          icon={BookOpen}
+          tone="sky"
           hint={`${hours} hours a week`}
         />
       </div>

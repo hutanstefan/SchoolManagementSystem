@@ -38,9 +38,15 @@ import {
   GradeQueryDto,
   GradesBatchResultDto,
   PaginatedGradesDto,
+  GradebookQueryDto,
   StudentGradesReportDto,
+  StudentYearReportDto,
   UpdateGradeDto,
 } from './dto/grade.dto';
+import {
+  PeriodQueryDto,
+  YearQueryDto,
+} from '../school-years/dto/school-year.dto';
 import { GradesService } from './grades.service';
 
 @ApiTags('Grades')
@@ -63,8 +69,26 @@ export class GradesController {
       'Grades per subject with the subject average (two decimals and rounded to a whole grade, as in Romanian schools) and the overall average.',
   })
   @ApiOkResponse({ type: StudentGradesReportDto })
-  myReport(@CurrentUser() user: AuthUser): Promise<StudentGradesReportDto> {
-    return this.gradesService.myReport(user);
+  myReport(
+    @CurrentUser() user: AuthUser,
+    @Query() query: PeriodQueryDto,
+  ): Promise<StudentGradesReportDto> {
+    return this.gradesService.myReport(user, query);
+  }
+
+  @Get('grades/me/year')
+  @Roles(Role.STUDENT)
+  @ApiOperation({
+    summary: 'My whole school year',
+    description:
+      'Both semester averages of every subject, the annual averages, re-exams, the annual general average and, for a closed year, how it ended.',
+  })
+  @ApiOkResponse({ type: StudentYearReportDto })
+  myYear(
+    @CurrentUser() user: AuthUser,
+    @Query() query: YearQueryDto,
+  ): Promise<StudentYearReportDto> {
+    return this.gradesService.myYear(user, query.schoolYearId);
   }
 
   @Get('grades')
@@ -190,8 +214,26 @@ export class GradesController {
   studentReport(
     @CurrentUser() user: AuthUser,
     @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: PeriodQueryDto,
   ): Promise<StudentGradesReportDto> {
-    return this.gradesService.studentReport(user, id);
+    return this.gradesService.studentReport(user, id, query);
+  }
+
+  @Get('students/:id/grades/year')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiOperation({
+    summary: "A student's whole school year",
+    description:
+      'Semester and annual averages per subject, re-exams, the annual general average and the outcome of a closed year. Teachers: students of their classes that year.',
+  })
+  @ApiOkResponse({ type: StudentYearReportDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto })
+  studentYear(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: YearQueryDto,
+  ): Promise<StudentYearReportDto> {
+    return this.gradesService.studentYear(user, id, query.schoolYearId);
   }
 
   @Get('classes/:id/gradebook')
@@ -207,8 +249,13 @@ export class GradesController {
   gradebook(
     @CurrentUser() user: AuthUser,
     @Param('id', ParseUUIDPipe) classId: string,
-    @Query('subjectId', ParseUUIDPipe) subjectId: string,
+    @Query() query: GradebookQueryDto,
   ): Promise<GradebookDto> {
-    return this.gradesService.gradebook(user, classId, subjectId);
+    return this.gradesService.gradebook(
+      user,
+      classId,
+      query.subjectId,
+      query.semester,
+    );
   }
 }

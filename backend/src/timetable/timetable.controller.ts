@@ -39,6 +39,7 @@ import {
   TimetableLessonDto,
   UpdateTimetableEntryDto,
 } from './dto/timetable.dto';
+import { YearQueryDto } from '../school-years/dto/school-year.dto';
 import { TimetableService } from './timetable.service';
 
 @ApiTags('Timetable')
@@ -60,8 +61,11 @@ export class TimetableController {
       "Teachers get the lessons they teach. Students get their class's timetable (empty if they have no class).",
   })
   @ApiOkResponse({ type: TimetableDto })
-  forCurrentUser(@CurrentUser() user: AuthUser): Promise<TimetableDto> {
-    return this.timetableService.forCurrentUser(user);
+  forCurrentUser(
+    @CurrentUser() user: AuthUser,
+    @Query() query: YearQueryDto,
+  ): Promise<TimetableDto> {
+    return this.timetableService.forCurrentUser(user, query.schoolYearId);
   }
 
   @Get('classes/:id/timetable')
@@ -86,8 +90,9 @@ export class TimetableController {
   @ApiNotFoundResponse({ type: ErrorResponseDto })
   forTeacher(
     @Param('id', ParseUUIDPipe) teacherId: string,
+    @Query() query: YearQueryDto,
   ): Promise<TimetableDto> {
-    return this.timetableService.forTeacher(teacherId);
+    return this.timetableService.forTeacher(teacherId, query.schoolYearId);
   }
 
   @Get('class-subjects/:id/free-slots')

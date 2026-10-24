@@ -6,8 +6,8 @@ import { groupTeaching } from './teaching'
 const c9A = { id: 'c-9a', name: '9A' }
 const c10A = { id: 'c-10a', name: '10A' }
 const c11B = { id: 'c-11b', name: '11B' }
-const maths = { id: 's-maths', name: 'Mathematics' }
-const physics = { id: 's-physics', name: 'Physics' }
+const maths = { id: 's-maths', name: 'Mathematics', color: 'INDIGO' as const }
+const physics = { id: 's-physics', name: 'Physics', color: 'VIOLET' as const }
 
 const profile = {
   id: 't-1',
@@ -48,7 +48,14 @@ describe('groupTeaching', () => {
 
   it('adds student counts from the class list when available', () => {
     const classes = [
-      { ...c9A, studentCount: 28, homeroomTeacher: null, createdAt: '' },
+      {
+        ...c9A,
+        gradeLevel: 9,
+        schoolYear: { id: 'y', name: '2026–2027', status: 'ACTIVE' as const },
+        studentCount: 28,
+        homeroomTeacher: null,
+        createdAt: '',
+      },
     ] satisfies SchoolClass[]
 
     const result = groupTeaching(profile, classes)

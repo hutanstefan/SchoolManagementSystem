@@ -1,4 +1,8 @@
-import { personSelect, toPerson } from '../common/mappers';
+import {
+  personSelect,
+  toPerson,
+  subjectSummarySelect,
+} from '../common/mappers';
 import type { Prisma } from '../generated/prisma/client';
 import type { TimetableLessonDto } from './dto/timetable.dto';
 
@@ -12,7 +16,7 @@ export const lessonSelect = {
     select: {
       id: true,
       class: { select: { id: true, name: true } },
-      subject: { select: { id: true, name: true } },
+      subject: { select: subjectSummarySelect },
       teacher: { select: personSelect },
     },
   },

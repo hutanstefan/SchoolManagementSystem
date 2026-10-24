@@ -1,0 +1,32 @@
+meta {
+  name: Closing preview
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/school-years/current/closing
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("200 in semester 2, 409 before", function () {
+    expect([200, 409]).to.include(res.getStatus());
+  });
+  test("In semester 2: every student with a suggested outcome", function () {
+    if (res.getStatus() !== 200) return;
+    for (const c of res.getBody().classes) {
+      for (const s of c.students) {
+        expect(["PROMOTED", "GRADUATED", "REPEATING", "REEXAM"]).to.include(s.suggestedOutcome);
+      }
+    }
+  });
+}
+
+docs {
+  What closing the year would do, by Romanian rules: the annual average of a
+  subject is the mean of the two semester averages; under 5 in one or two
+  subjects means a re-exam, in three or more repeating the year. Only during
+  semester 2 (the seeded year is in semester 1, so this answers 409).
+}

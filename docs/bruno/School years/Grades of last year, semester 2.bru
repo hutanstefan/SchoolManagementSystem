@@ -1,0 +1,23 @@
+meta {
+  name: Grades of last year, semester 2
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/grades?schoolYearId={{closedYearId}}&semester=2&pageSize=5&sort=date&order=desc
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Only grades of that year and semester", function () {
+    for (const g of res.getBody().data) {
+      expect(g.schoolYearId).to.equal(bru.getVar("closedYearId"));
+      expect(g.semester).to.equal(2);
+    }
+  });
+}

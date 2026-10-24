@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { createTestApp, loginAs, TestApp } from './utils';
+import { createTestApp, loginAs, OPEN_YEAR, TestApp } from './utils';
 
 /** The smallest valid PNG (1x1 pixel): enough for the demo reader. */
 const PNG = Buffer.from(
@@ -31,7 +31,7 @@ describe('Batch grades and test scanning (e2e)', () => {
       loginAs(app, 'student'),
     ]);
     const classes = await prisma.class.findMany({
-      where: { name: { in: ['9A', '10B'] } },
+      where: { name: { in: ['9A', '10B'] }, ...OPEN_YEAR },
     });
     class9A = classes.find((c) => c.name === '9A')!.id;
     class10B = classes.find((c) => c.name === '10B')!.id;
@@ -41,13 +41,13 @@ describe('Batch grades and test scanning (e2e)', () => {
     maths = subjects.find((s) => s.name === 'Mathematics')!.id;
     physics = subjects.find((s) => s.name === 'Physics')!.id;
     students9A = await prisma.student.findMany({
-      where: { classId: class9A },
+      where: { enrollments: { some: { classId: class9A } } },
       select: { id: true },
       take: 3,
     });
     student10B = (
       await prisma.student.findFirstOrThrow({
-        where: { classId: class10B },
+        where: { enrollments: { some: { classId: class10B } } },
       })
     ).id;
   });
@@ -183,7 +183,7 @@ describe('Batch grades and test scanning (e2e)', () => {
       expect(body.subject.name).toBe('Mathematics');
       expect(body.tests).toHaveLength(2);
       const enrolled = await prisma.student.findMany({
-        where: { classId: class9A },
+        where: { enrollments: { some: { classId: class9A } } },
         select: { id: true },
       });
       for (const test of body.tests) {

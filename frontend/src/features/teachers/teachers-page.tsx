@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { DataTable, type Column } from '@/components/data-table'
+import { PersonCell } from '@/components/person-avatar'
 import { PageHeader } from '@/components/page-header'
 import { PaginationBar } from '@/components/pagination-bar'
 import { SearchInput } from '@/components/search-input'
@@ -38,9 +39,8 @@ export function TeachersPage() {
   const columns: Column<Teacher>[] = [
     {
       header: 'Name',
-      cell: (t) => <span className="font-medium">{fullName(t)}</span>,
+      cell: (t) => <PersonCell person={t} secondary={t.email} />,
     },
-    { header: 'Email', cell: (t) => t.email },
     {
       header: 'Added',
       cell: (t) => formatDate(t.createdAt),

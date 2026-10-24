@@ -11,7 +11,7 @@ const lesson: Lesson = {
   room: 'Lab 2',
   classSubjectId: 'cs-1',
   class: { id: 'c-1', name: '9A' },
-  subject: { id: 's-1', name: 'Physics' },
+  subject: { id: 's-1', name: 'Physics', color: 'VIOLET' },
   teacher: { id: 't-1', firstName: 'Aristita', lastName: 'David' },
 }
 

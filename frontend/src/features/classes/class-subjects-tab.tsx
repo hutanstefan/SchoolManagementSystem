@@ -26,12 +26,16 @@ import {
   AssignmentConflictDialog,
   type AssignmentConflictState,
 } from './assignment-conflict-dialog'
+import { SubjectIcon } from '@/features/subjects/subject-icon'
 
 /** Subjects taught in the class, who teaches them and how many hours. */
 export function ClassSubjectsTab({
   schoolClass,
+  readOnly = false,
 }: {
   schoolClass: ClassDetail
+  /** A class of a closed year: shown as it was. */
+  readOnly?: boolean
 }) {
   const timetable = useClassTimetable(schoolClass.id)
   const remove = useRemoveClassSubject()
@@ -58,10 +62,15 @@ export function ClassSubjectsTab({
     setFormOpen(true)
   }
 
-  const columns: Column<ClassSubject>[] = [
+  const allColumns: Column<ClassSubject>[] = [
     {
       header: 'Subject',
-      cell: (a) => <span className="font-medium">{a.subject.name}</span>,
+      cell: (a) => (
+        <div className="flex items-center gap-3">
+          <SubjectIcon subject={a.subject} />
+          <span className="font-medium">{a.subject.name}</span>
+        </div>
+      ),
     },
     {
       header: 'Teacher',
@@ -114,6 +123,7 @@ export function ClassSubjectsTab({
       ),
     },
   ]
+  const columns = readOnly ? allColumns.slice(0, -1) : allColumns
 
   return (
     <Card className="gap-0 py-0">
@@ -121,9 +131,11 @@ export function ClassSubjectsTab({
         <p className="text-muted-foreground text-sm">
           The minimum number of grades per term is hours per week + 1.
         </p>
-        <Button size="sm" onClick={() => openForm(null)}>
-          <Plus aria-hidden /> Add subject
-        </Button>
+        {!readOnly && (
+          <Button size="sm" onClick={() => openForm(null)}>
+            <Plus aria-hidden /> Add subject
+          </Button>
+        )}
       </div>
       <DataTable
         columns={columns}

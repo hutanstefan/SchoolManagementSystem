@@ -22,7 +22,10 @@ function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
   return (
     <thead
       data-slot="table-header"
-      className={cn('[&_tr]:border-b', className)}
+      className={cn(
+        'bg-muted/40 [&_tr]:border-b [&_tr]:hover:bg-transparent',
+        className,
+      )}
       {...props}
     />
   )
@@ -56,7 +59,7 @@ function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
     <tr
       data-slot="table-row"
       className={cn(
-        'hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors',
+        'hover:bg-accent/40 has-aria-expanded:bg-accent/40 data-[state=selected]:bg-accent border-b transition-colors',
         className,
       )}
       {...props}
@@ -69,7 +72,7 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
     <th
       data-slot="table-head"
       className={cn(
-        'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+        'text-muted-foreground h-10 px-2 text-left align-middle text-xs font-medium tracking-wide whitespace-nowrap uppercase [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
         className,
       )}
       {...props}
@@ -83,6 +86,8 @@ function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
       data-slot="table-cell"
       className={cn(
         'p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+        // Row actions (icon buttons) stay quiet until hovered.
+        '[&_[data-slot=button][data-variant=ghost][data-size=icon]]:text-muted-foreground [&_[data-slot=button][data-variant=ghost][data-size=icon]:hover]:text-foreground',
         className,
       )}
       {...props}

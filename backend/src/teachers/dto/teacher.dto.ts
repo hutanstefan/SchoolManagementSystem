@@ -13,7 +13,10 @@ import { CreateAccountDto } from '../../users/dto/create-account.dto';
 export class CreateTeacherDto extends CreateAccountDto {}
 
 /** Every field is optional; sending `password` resets it. */
-export class UpdateTeacherDto extends PartialType(CreateTeacherDto) {}
+export class UpdateTeacherDto extends PartialType(CreateTeacherDto, {
+  // A field that is sent must be valid: null is not \"leave as is\".
+  skipNullProperties: false,
+}) {}
 
 export const TEACHER_SORT_FIELDS = [
   'lastName',

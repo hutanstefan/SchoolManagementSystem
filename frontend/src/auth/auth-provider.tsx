@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -23,6 +24,7 @@ import type { AuthUser } from './roles'
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const [user, setUser] = useState<AuthUser | null>(null)
+  const loggingOut = useRef(false)
   const [status, setStatus] = useState<AuthStatus>(() =>
     tokenStorage.get() ? 'loading' : 'anonymous',
   )
@@ -55,6 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // The token expired or was revoked (logout on another device, password reset).
   useEffect(() => {
     const onExpired = () => {
+      // Our own logout also ends the session (and closes the live connection).
+      if (loggingOut.current) return
       endSession()
       toast.error('Your session has ended. Please log in again.')
     }
@@ -73,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
+    loggingOut.current = true
     try {
       // Revokes the token on the server too, not just in this browser.
       await unwrap(api.POST('/api/auth/logout'))
@@ -80,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Already invalid or the server is down: still log out locally.
     } finally {
       endSession()
+      loggingOut.current = false
     }
   }, [endSession])
 

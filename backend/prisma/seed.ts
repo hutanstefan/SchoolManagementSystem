@@ -6,17 +6,26 @@
  * Docker on every start, so restarting the containers keeps your changes).
  */
 import 'dotenv/config';
-import { fakerRO as faker } from '@faker-js/faker';
+import { base, en, Faker, fakerRO as faker, ro } from '@faker-js/faker';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
 import {
   GradeAction,
   PrismaClient,
   Role,
+  SchoolYearStatus,
+  SubjectColor,
   Weekday,
+  YearOutcome,
   type ClassSubject,
 } from '../src/generated/prisma/client';
-import { gradeMessage } from '../src/notifications/messages';
+import { yearResult } from '../src/school-years/promotion';
+import {
+  assignmentMessage,
+  gradeMessage,
+  lowGradeAlert,
+  PASSING_GRADE,
+} from '../src/notifications/messages';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -29,14 +38,39 @@ const EMAIL_DOMAIN = 'school.test';
 
 /** Subjects and how many hours per week every class studies them (20 hours in total). */
 const SUBJECTS = [
-  { name: 'Mathematics', hoursPerWeek: 4, room: null },
-  { name: 'Romanian Language', hoursPerWeek: 4, room: null },
-  { name: 'English', hoursPerWeek: 2, room: null },
-  { name: 'Physics', hoursPerWeek: 2, room: 'Physics lab' },
-  { name: 'Chemistry', hoursPerWeek: 2, room: 'Chemistry lab' },
-  { name: 'Biology', hoursPerWeek: 2, room: 'Biology lab' },
-  { name: 'History', hoursPerWeek: 2, room: null },
-  { name: 'Geography', hoursPerWeek: 2, room: null },
+  {
+    name: 'Mathematics',
+    hoursPerWeek: 4,
+    room: null,
+    color: SubjectColor.INDIGO,
+  },
+  {
+    name: 'Romanian Language',
+    hoursPerWeek: 4,
+    room: null,
+    color: SubjectColor.ROSE,
+  },
+  { name: 'English', hoursPerWeek: 2, room: null, color: SubjectColor.SKY },
+  {
+    name: 'Physics',
+    hoursPerWeek: 2,
+    room: 'Physics lab',
+    color: SubjectColor.VIOLET,
+  },
+  {
+    name: 'Chemistry',
+    hoursPerWeek: 2,
+    room: 'Chemistry lab',
+    color: SubjectColor.TEAL,
+  },
+  {
+    name: 'Biology',
+    hoursPerWeek: 2,
+    room: 'Biology lab',
+    color: SubjectColor.EMERALD,
+  },
+  { name: 'History', hoursPerWeek: 2, room: null, color: SubjectColor.AMBER },
+  { name: 'Geography', hoursPerWeek: 2, room: null, color: SubjectColor.LIME },
 ] as const;
 
 type SubjectName = (typeof SUBJECTS)[number]['name'];
@@ -102,9 +136,19 @@ function makeEmail(
   return email;
 }
 
+/**
+ * A second generator for how well students do. `faker` keeps making exactly
+ * the draws it always made, so the seeded names, emails and birth dates stay
+ * the same on every run (the photos in docs/sample-tests show some of them).
+ */
+const levels = new Faker({ locale: base });
+
+/** Everything about last school year (names included) has its own generator too. */
+const past = new Faker({ locale: [ro, en, base] });
+
 /** Grades skew towards 7-10, like in a real class. */
-function randomGradeValue(): number {
-  return faker.helpers.weightedArrayElement([
+function randomGradeValue(generator: Faker = faker): number {
+  return generator.helpers.weightedArrayElement([
     { value: 4, weight: 1 },
     { value: 5, weight: 3 },
     { value: 6, weight: 5 },
@@ -113,6 +157,23 @@ function randomGradeValue(): number {
     { value: 9, weight: 9 },
     { value: 10, weight: 7 },
   ]);
+}
+
+/**
+ * How far a student's grades sit from the typical ones: some students are
+ * strong, most are average and a few struggle (their averages can fall
+ * under 5, which the dashboards flag).
+ */
+function studentShift(): number {
+  return levels.helpers.weightedArrayElement([
+    { value: levels.number.float({ min: 0.3, max: 0.9 }), weight: 3 },
+    { value: levels.number.float({ min: -0.6, max: 0.6 }), weight: 6 },
+    { value: levels.number.float({ min: -3.2, max: -2.2 }), weight: 1 },
+  ]);
+}
+
+function shifted(value: number, shift: number): number {
+  return Math.min(10, Math.max(1, Math.round(value + shift)));
 }
 
 /**
@@ -150,6 +211,7 @@ type TimetableSlot = {
 function buildTimetable(
   classSubjects: (ClassSubject & { room: string })[],
   classIds: string[],
+  generator: Faker = faker,
 ): TimetableSlot[] {
   const teacherBusy = new Set<string>(); // "teacherId|day|period"
   const entries: TimetableSlot[] = [];
@@ -161,7 +223,7 @@ function buildTimetable(
 
     let placed: TimetableSlot[] | null = null;
     for (let attempt = 0; attempt < 500 && !placed; attempt++) {
-      placed = tryPlace(faker.helpers.shuffle(lessons), classId);
+      placed = tryPlace(generator.helpers.shuffle(lessons), classId);
     }
     if (!placed) {
       throw new Error(`Could not build a timetable for class ${classId}`);
@@ -229,13 +291,19 @@ async function clearDatabase(): Promise<void> {
   // Order matters because of foreign keys.
   await prisma.gradeHistory.deleteMany();
   await prisma.grade.deleteMany();
+  await prisma.reexam.deleteMany();
+  await prisma.enrollment.deleteMany();
   await prisma.timetableEntry.deleteMany();
   await prisma.classSubject.deleteMany();
   await prisma.student.deleteMany();
+  // Next year's classes point to last year's: those go first.
+  await prisma.class.deleteMany({ where: { previousClassId: { not: null } } });
   await prisma.class.deleteMany();
+  await prisma.schoolYear.deleteMany();
   await prisma.teacher.deleteMany();
   await prisma.subject.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.registrationCounter.deleteMany();
 }
 
 async function main(): Promise<void> {
@@ -245,6 +313,8 @@ async function main(): Promise<void> {
   }
 
   faker.seed(2026);
+  levels.seed(7);
+  past.seed(2025);
   const usedEmails = new Set<string>([
     `admin@${EMAIL_DOMAIN}`,
     `teacher@${EMAIL_DOMAIN}`,
@@ -269,7 +339,7 @@ async function main(): Promise<void> {
   const subjects = new Map<SubjectName, string>();
   for (const subject of SUBJECTS) {
     const created = await prisma.subject.create({
-      data: { name: subject.name },
+      data: { name: subject.name, color: subject.color },
     });
     subjects.set(subject.name, created.id);
   }
@@ -303,6 +373,25 @@ async function main(): Promise<void> {
     console.log(`  ${email} teaches ${staff.subject}`);
   }
 
+  console.log('Creating the school years...');
+  const today = new Date();
+  const yearStart = schoolYearStart(today);
+  const startYear = yearStart.getUTCFullYear();
+  // Last year is closed (its classes are created at the end); this one is in
+  // its first semester.
+  const lastYear = await prisma.schoolYear.create({
+    data: {
+      startYear: startYear - 1,
+      status: SchoolYearStatus.CLOSED,
+      currentSemester: 2,
+      semester1EndedAt: new Date(Date.UTC(startYear, 0, 30, 15)),
+      closedAt: new Date(Date.UTC(startYear, 7, 31, 12)),
+    },
+  });
+  const thisYear = await prisma.schoolYear.create({
+    data: { startYear, currentSemester: 1 },
+  });
+
   console.log('Creating classes and teaching assignments...');
   const classIds: string[] = [];
   const gradeLevelByClassId = new Map<string, number>(); // "10A" -> 10
@@ -311,6 +400,7 @@ async function main(): Promise<void> {
     const schoolClass = await prisma.class.create({
       data: {
         name,
+        schoolYearId: thisYear.id,
         homeroomTeacherId: teacherIds[HOMEROOM_TEACHERS[classIndex]],
       },
     });
@@ -342,12 +432,12 @@ async function main(): Promise<void> {
   await prisma.timetableEntry.createMany({ data: timetable });
 
   console.log('Creating students and grades...');
-  const today = new Date();
-  const yearStart = schoolYearStart(today);
   const grades: {
     studentId: string;
     subjectId: string;
     teacherId: string | null;
+    schoolYearId: string;
+    semester: number;
     value: number;
     date: Date;
   }[] = [];
@@ -369,6 +459,10 @@ async function main(): Promise<void> {
     return `${year}-${String(number).padStart(4, '0')}`;
   };
 
+  const classShift = new Map(
+    classIds.map((id) => [id, levels.number.float({ min: -0.5, max: 0.5 })]),
+  );
+
   const userIdByStudentId = new Map<string, string>();
   for (const [index, classId] of studentSlots.entries()) {
     const isMainStudent = index === 0;
@@ -385,7 +479,9 @@ async function main(): Promise<void> {
       data: {
         registrationNumber: nextRegistrationNumber(gradeLevel),
         dateOfBirth: birthDateForGrade(gradeLevel, yearStart),
-        class: classId ? { connect: { id: classId } } : undefined,
+        enrollments: classId
+          ? { create: { classId, schoolYearId: thisYear.id } }
+          : undefined,
         user: {
           create: {
             email,
@@ -401,22 +497,54 @@ async function main(): Promise<void> {
     userIdByStudentId.set(student.id, student.userId);
     if (!classId) continue; // unassigned students have no grades yet
 
+    // Classes differ a little, and every student has stronger and weaker subjects.
+    const shift =
+      (isMainStudent ? 0.6 : studentShift()) + classShift.get(classId)!;
+
     // Each grade is given by the teacher who teaches that subject in the student's class.
     for (const classSubject of classSubjects.filter(
       (cs) => cs.classId === classId,
     )) {
+      const subjectShift = shift + levels.number.float({ min: -0.7, max: 0.7 });
       const count = faker.number.int({ min: 2, max: 4 });
       for (let i = 0; i < count; i++) {
         grades.push({
           studentId: student.id,
           subjectId: classSubject.subjectId,
           teacherId: classSubject.teacherId,
-          value: randomGradeValue(),
+          schoolYearId: thisYear.id,
+          semester: 1,
+          value: shifted(randomGradeValue(), subjectShift),
           date: faker.date.between({ from: yearStart, to: today }),
+        });
+      }
+      // Subjects with more hours have a higher minimum (hours + 1): mid-semester
+      // some students already have it, others not yet.
+      const extra = levels.number.int({
+        min: 0,
+        max: Math.max(0, classSubject.hoursPerWeek - 2),
+      });
+      for (let i = 0; i < extra; i++) {
+        grades.push({
+          studentId: student.id,
+          subjectId: classSubject.subjectId,
+          teacherId: classSubject.teacherId,
+          schoolYearId: thisYear.id,
+          semester: 1,
+          value: shifted(randomGradeValue(levels), subjectShift),
+          date: levels.date.between({ from: yearStart, to: today }),
         });
       }
     }
   }
+
+  // New students created in the app continue from these numbers.
+  await prisma.registrationCounter.createMany({
+    data: [...enrolledInYear].map(([year, lastNumber]) => ({
+      year,
+      lastNumber,
+    })),
+  });
 
   const createdGrades = await prisma.grade.createManyAndReturn({
     data: grades,
@@ -476,17 +604,502 @@ async function main(): Promise<void> {
     })),
   });
 
+  const teacherNotifications = await seedTeacherNotifications(
+    yearStart,
+    thisYear.id,
+  );
   const conversations = await seedChat(today);
+
+  // Last year comes last, with its own generator: everything above makes the
+  // same random draws as before it existed, so the names stay the same.
+  console.log('Creating last school year...');
+  const archived = await seedLastYear({
+    lastYearId: lastYear.id,
+    lastYearStart: new Date(Date.UTC(startYear - 1, 8, 15)),
+    thisYearClasses: classIds,
+    teacherIds,
+    userIdByTeacherId,
+    usedEmails,
+    rooms: new Map(classSubjects.map((cs) => [cs.id, cs.room])),
+  });
 
   console.log(
     `Done: 1 admin, ${teacherIds.length} teachers, ${classIds.length} classes, ` +
       `${subjects.size} subjects, ${classSubjects.length} teaching assignments, ` +
       `${timetable.length} timetable lessons, ${studentSlots.length} students, ${grades.length} grades, ` +
-      `${notifications.count} notifications, ${conversations} conversations.`,
+      `${notifications.count + teacherNotifications} notifications, ${conversations} conversations.`,
+  );
+  console.log(
+    `Last year (${startYear - 1}–${startYear}, closed): ${archived.classes} classes, ` +
+      `${archived.grades} grades, ${archived.graduates} graduates, ${archived.repeating} repeating, ${archived.reexams} re-exams.`,
   );
   console.log(
     `Login with admin@${EMAIL_DOMAIN}, teacher@${EMAIL_DOMAIN} or student@${EMAIL_DOMAIN} / ${DEFAULT_PASSWORD}`,
   );
+}
+
+/**
+ * Teachers' notifications, as the app would have sent them: their teaching
+ * assignments at the start of the year (already read) and an alert to the
+ * homeroom teacher for each failing grade in their class.
+ */
+async function seedTeacherNotifications(
+  yearStart: Date,
+  schoolYearId: string,
+): Promise<number> {
+  const [assignments, homerooms, failingGrades] = await Promise.all([
+    prisma.classSubject.findMany({
+      where: { teacherId: { not: null }, class: { schoolYearId } },
+      select: {
+        hoursPerWeek: true,
+        class: { select: { id: true, name: true } },
+        subject: { select: { name: true } },
+        teacher: { select: { userId: true } },
+      },
+    }),
+    prisma.class.findMany({
+      where: { homeroomTeacherId: { not: null }, schoolYearId },
+      select: {
+        id: true,
+        name: true,
+        homeroomTeacher: { select: { userId: true } },
+      },
+    }),
+    prisma.grade.findMany({
+      where: { value: { lt: PASSING_GRADE }, schoolYearId },
+      select: {
+        value: true,
+        date: true,
+        subject: { select: { name: true } },
+        student: {
+          select: {
+            user: { select: { firstName: true, lastName: true } },
+            enrollments: {
+              where: { schoolYearId },
+              select: {
+                class: {
+                  select: { homeroomTeacher: { select: { userId: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+  ]);
+  const settledIn = new Date(yearStart.getTime() + 9 * 60 * 60 * 1000);
+
+  const { count } = await prisma.notification.createMany({
+    data: [
+      ...assignments.map((a) => ({
+        userId: a.teacher!.userId,
+        ...assignmentMessage({
+          kind: 'assigned',
+          teacherUserId: a.teacher!.userId,
+          classId: a.class.id,
+          className: a.class.name,
+          subjectName: a.subject.name,
+          hoursPerWeek: a.hoursPerWeek,
+        }),
+        link: '/teacher/classes',
+        createdAt: settledIn,
+        readAt: settledIn,
+      })),
+      ...homerooms.map((c) => ({
+        userId: c.homeroomTeacher!.userId,
+        ...assignmentMessage({
+          kind: 'homeroom-assigned',
+          teacherUserId: c.homeroomTeacher!.userId,
+          classId: c.id,
+          className: c.name,
+        }),
+        link: '/teacher/classes',
+        createdAt: settledIn,
+        readAt: settledIn,
+      })),
+      ...failingGrades
+        .filter((g) => g.student.enrollments[0]?.class.homeroomTeacher)
+        .map((g) => ({
+          userId: g.student.enrollments[0].class.homeroomTeacher!.userId,
+          ...lowGradeAlert(
+            `${g.student.user.firstName} ${g.student.user.lastName}`,
+            g.subject.name,
+            g.value,
+            null,
+          ),
+          link: '/teacher/classes',
+          createdAt: new Date(g.date.getTime() + 15 * 60 * 60 * 1000),
+        })),
+    ],
+  });
+  return count;
+}
+
+/**
+ * Last school year, closed: the classes this year's students were in a grade
+ * lower (10A was 9A), plus last year's 12A, who graduated. Grades in both
+ * semesters, each student's outcome, a student who passed after a re-exam
+ * and one who repeats the year. Uses its own random generator (`past`).
+ */
+async function seedLastYear(options: {
+  lastYearId: string;
+  lastYearStart: Date;
+  thisYearClasses: string[];
+  teacherIds: string[];
+  userIdByTeacherId: Map<string, string>;
+  usedEmails: Set<string>;
+  rooms: Map<string, string>;
+}): Promise<{
+  classes: number;
+  grades: number;
+  graduates: number;
+  repeating: number;
+  reexams: number;
+}> {
+  const { lastYearId, lastYearStart } = options;
+  const y = lastYearStart.getUTCFullYear();
+  const semesters = [
+    { semester: 1, from: lastYearStart, to: new Date(Date.UTC(y + 1, 0, 30)) },
+    {
+      semester: 2,
+      from: new Date(Date.UTC(y + 1, 1, 9)),
+      to: new Date(Date.UTC(y + 1, 5, 19)),
+    },
+  ];
+  const thisYear = await prisma.class.findMany({
+    where: { id: { in: options.thisYearClasses } },
+    select: {
+      id: true,
+      name: true,
+      homeroomTeacherId: true,
+      subjects: {
+        select: {
+          id: true,
+          subjectId: true,
+          teacherId: true,
+          hoursPerWeek: true,
+        },
+      },
+      enrollments: { select: { studentId: true } },
+    },
+  });
+  const level = (name: string) => Number.parseInt(name, 10);
+  const entryLevel = Math.min(...thisYear.map((c) => level(c.name)));
+
+  type LastYearClass = {
+    id: string;
+    name: string;
+    subjects: (ClassSubject & { room: string })[];
+    students: { studentId: string; outcome: YearOutcome }[];
+  };
+  const lastYearClasses: LastYearClass[] = [];
+  const copyClass = async (
+    name: string,
+    source: (typeof thisYear)[number],
+    homeroomTeacherId: string | null,
+  ) => {
+    const created = await prisma.class.create({
+      data: { name, schoolYearId: lastYearId, homeroomTeacherId },
+    });
+    const subjects: (ClassSubject & { room: string })[] = [];
+    for (const cs of source.subjects) {
+      const row = await prisma.classSubject.create({
+        data: {
+          classId: created.id,
+          subjectId: cs.subjectId,
+          teacherId: cs.teacherId,
+          hoursPerWeek: cs.hoursPerWeek,
+        },
+      });
+      subjects.push({ ...row, room: options.rooms.get(cs.id) ?? 'Room 101' });
+    }
+    const entry: LastYearClass = {
+      id: created.id,
+      name,
+      subjects,
+      students: [],
+    };
+    lastYearClasses.push(entry);
+    return entry;
+  };
+
+  // This year's classes, a grade lower: same homeroom teacher and teachers.
+  for (const current of thisYear) {
+    if (level(current.name) === entryLevel) continue; // new this year
+    const previous = await copyClass(
+      `${level(current.name) - 1}${current.name.replace(/^\d+/, '')}`,
+      current,
+      current.homeroomTeacherId,
+    );
+    previous.students = current.enrollments.map((e) => ({
+      studentId: e.studentId,
+      outcome: YearOutcome.PROMOTED,
+    }));
+    await prisma.class.update({
+      where: { id: current.id },
+      data: { previousClassId: previous.id },
+    });
+  }
+
+  // Last year's final grade: they graduated (new students, not in this year).
+  const finalSource = thisYear.reduce((a, b) =>
+    level(a.name) >= level(b.name) ? a : b,
+  );
+  const graduating = await copyClass(
+    finalSource.name,
+    finalSource,
+    options.teacherIds[6] ?? null,
+  );
+  const studentAccount = async (
+    registrationNumber: string,
+    birthYear: number,
+  ) => {
+    const firstName = past.person.firstName();
+    const lastName = past.person.lastName();
+    return prisma.student.create({
+      data: {
+        registrationNumber,
+        dateOfBirth: past.date.between({
+          from: new Date(Date.UTC(birthYear, 0, 1)),
+          to: new Date(Date.UTC(birthYear, 11, 31)),
+        }),
+        user: {
+          create: {
+            email: makeEmail(firstName, lastName, options.usedEmails),
+            passwordHash: await hashPassword(),
+            role: Role.STUDENT,
+            firstName,
+            lastName,
+          },
+        },
+      },
+      select: { id: true },
+    });
+  };
+  const finalLevel = level(graduating.name);
+  const graduatesStarted = y - (finalLevel - 9); // year they entered grade 9
+  for (let n = 1; n <= STUDENTS_PER_CLASS; n++) {
+    const student = await studentAccount(
+      `${graduatesStarted}-${String(n).padStart(4, '0')}`,
+      y - finalLevel - 6,
+    );
+    graduating.students.push({
+      studentId: student.id,
+      outcome: YearOutcome.GRADUATED,
+    });
+  }
+
+  // A student of last year's 11th grade who failed three subjects and repeats
+  // the year: they are in this year's 11th grade again.
+  const repeatClass = lastYearClasses.find((c) => level(c.name) === 11);
+  const repeatTarget = thisYear.find((c) => level(c.name) === 11);
+  let repeaterId: string | null = null;
+  if (repeatClass && repeatTarget) {
+    const started = y - 2;
+    const counter = await prisma.registrationCounter.findUnique({
+      where: { year: started },
+    });
+    const number = (counter?.lastNumber ?? 0) + 1;
+    const repeater = await studentAccount(
+      `${started}-${String(number).padStart(4, '0')}`,
+      y - 11 - 6,
+    );
+    repeaterId = repeater.id;
+    repeatClass.students.push({
+      studentId: repeater.id,
+      outcome: YearOutcome.REPEATING,
+    });
+    const { schoolYearId: thisYearId } = await prisma.class.findUniqueOrThrow({
+      where: { id: repeatTarget.id },
+      select: { schoolYearId: true },
+    });
+    await prisma.enrollment.create({
+      data: {
+        studentId: repeater.id,
+        classId: repeatTarget.id,
+        schoolYearId: thisYearId,
+      },
+    });
+    // Second time around they do better: this semester's grades so far.
+    const thisYearStart = new Date(Date.UTC(y + 1, 8, 15));
+    const today = new Date();
+    await prisma.grade.createMany({
+      data: repeatTarget.subjects.flatMap((cs) =>
+        Array.from(
+          { length: cs.hoursPerWeek + 1 + past.number.int({ min: 0, max: 1 }) },
+          () => ({
+            studentId: repeater.id,
+            subjectId: cs.subjectId,
+            teacherId: cs.teacherId,
+            schoolYearId: thisYearId,
+            semester: 1,
+            value: shifted(randomGradeValue(past), 0.4),
+            date: past.date.between({ from: thisYearStart, to: today }),
+          }),
+        ),
+      ),
+    });
+  }
+  // Registration numbers continue after the graduates and the repeater.
+  await prisma.registrationCounter.upsert({
+    where: { year: graduatesStarted },
+    create: { year: graduatesStarted, lastNumber: STUDENTS_PER_CLASS },
+    update: { lastNumber: STUDENTS_PER_CLASS },
+  });
+  if (repeaterId) {
+    await prisma.registrationCounter.update({
+      where: { year: y - 2 },
+      data: { lastNumber: { increment: 1 } },
+    });
+  }
+
+  // The student who passed Chemistry only at the re-exam: the first of last
+  // year's entry-level class.
+  const firstClass = lastYearClasses.find((c) => level(c.name) === entryLevel);
+  const reexamStudentId = firstClass?.students[0]?.studentId ?? null;
+  const chemistry = await prisma.subject.findUnique({
+    where: { name: 'Chemistry' },
+    select: { id: true },
+  });
+  const weakSubjects = await prisma.subject.findMany({
+    where: { name: { in: ['Mathematics', 'Physics', 'Chemistry'] } },
+    select: { id: true },
+  });
+
+  console.log('  timetable, enrollments and grades...');
+  const timetable = buildTimetable(
+    lastYearClasses.flatMap((c) => c.subjects),
+    lastYearClasses.map((c) => c.id),
+    past,
+  );
+  await prisma.timetableEntry.createMany({ data: timetable });
+
+  const grades: {
+    studentId: string;
+    subjectId: string;
+    teacherId: string | null;
+    schoolYearId: string;
+    semester: number;
+    value: number;
+    date: Date;
+  }[] = [];
+  const reexams: { studentId: string; subjectId: string; grade: number }[] = [];
+
+  for (const schoolClass of lastYearClasses) {
+    await prisma.enrollment.createMany({
+      data: schoolClass.students.map((s) => ({
+        studentId: s.studentId,
+        classId: schoolClass.id,
+        schoolYearId: lastYearId,
+        outcome: s.outcome,
+      })),
+    });
+
+    for (const { studentId, outcome } of schoolClass.students) {
+      let shift = past.number.float({ min: -0.8, max: 1 });
+      // Draw the year, then check it ends as recorded; raise the grades of a
+      // student who should have passed but drew too many failures.
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const own: typeof grades = [];
+        for (const cs of schoolClass.subjects) {
+          const weak =
+            (studentId === repeaterId &&
+              weakSubjects.some((w) => w.id === cs.subjectId)) ||
+            (studentId === reexamStudentId && cs.subjectId === chemistry?.id);
+          const subjectShift = weak
+            ? -4
+            : shift + past.number.float({ min: -0.6, max: 0.6 });
+          for (const { semester, from, to } of semesters) {
+            const count =
+              cs.hoursPerWeek + 1 + past.number.int({ min: 0, max: 2 });
+            for (let i = 0; i < count; i++) {
+              own.push({
+                studentId,
+                subjectId: cs.subjectId,
+                teacherId: cs.teacherId,
+                schoolYearId: lastYearId,
+                semester,
+                value: shifted(randomGradeValue(past), subjectShift),
+                date: past.date.between({ from, to }),
+              });
+            }
+          }
+        }
+        const result = yearResult(
+          schoolClass.subjects.map((cs) => ({
+            subjectId: cs.subjectId,
+            semester1: own
+              .filter((g) => g.subjectId === cs.subjectId && g.semester === 1)
+              .map((g) => g.value),
+            semester2: own
+              .filter((g) => g.subjectId === cs.subjectId && g.semester === 2)
+              .map((g) => g.value),
+            reexamGrade: null,
+          })),
+          false,
+        );
+        const failed = result.failedSubjects;
+        const fits =
+          outcome === YearOutcome.REPEATING
+            ? failed.length >= 3
+            : studentId === reexamStudentId
+              ? failed.length === 1
+              : failed.length === 0;
+        if (fits || attempt === 5) {
+          grades.push(...own);
+          if (outcome !== YearOutcome.REPEATING) {
+            // Passed the re-exam(s), as their promotion says.
+            for (const f of failed) {
+              reexams.push({
+                studentId,
+                subjectId: f.subjectId,
+                grade: past.number.int({ min: 5, max: 7 }),
+              });
+            }
+          }
+          break;
+        }
+        shift += 1;
+      }
+    }
+  }
+
+  const created = await prisma.grade.createManyAndReturn({
+    data: grades,
+    select: {
+      id: true,
+      studentId: true,
+      subjectId: true,
+      teacherId: true,
+      value: true,
+      date: true,
+    },
+  });
+  await prisma.gradeHistory.createMany({
+    data: created.map((grade) => ({
+      gradeId: grade.id,
+      studentId: grade.studentId,
+      subjectId: grade.subjectId,
+      action: GradeAction.CREATED,
+      newValue: grade.value,
+      newDate: grade.date,
+      changedById: grade.teacherId
+        ? options.userIdByTeacherId.get(grade.teacherId)
+        : null,
+      changedAt: new Date(grade.date.getTime() + 13 * 60 * 60 * 1000),
+    })),
+  });
+  await prisma.reexam.createMany({
+    data: reexams.map((r) => ({ ...r, schoolYearId: lastYearId })),
+  });
+
+  return {
+    classes: lastYearClasses.length,
+    grades: created.length,
+    graduates: graduating.students.length,
+    repeating: repeaterId ? 1 : 0,
+    reexams: reexams.length,
+  };
 }
 
 /**
@@ -508,7 +1121,16 @@ async function seedChat(today: Date): Promise<number> {
     select: { id: true, firstName: true, lastName: true },
   });
   const class9A = await prisma.student.findMany({
-    where: { class: { name: '9A' } },
+    where: {
+      enrollments: {
+        some: {
+          class: {
+            name: '9A',
+            schoolYear: { status: SchoolYearStatus.ACTIVE },
+          },
+        },
+      },
+    },
     select: { userId: true, user: { select: { firstName: true } } },
     orderBy: { user: { lastName: 'asc' } },
   });
@@ -529,8 +1151,8 @@ async function seedChat(today: Date): Promise<number> {
     system?: string;
   }) => {
     const all = [options.owner, ...options.members];
-    const last = options.lines[options.lines.length - 1]!;
-    const first = options.lines[0]!;
+    const last = options.lines[options.lines.length - 1];
+    const first = options.lines[0];
     await prisma.conversation.create({
       data: {
         type: options.type,
@@ -614,13 +1236,13 @@ async function seedChat(today: Date): Promise<number> {
         'Test on Friday: chapter 3, linear equations. Exercises 1-12 on page 54 for practice.',
         299,
       ],
-      [first!.userId, 'Will we have the formulas sheet during the test?', 240],
+      [first.userId, 'Will we have the formulas sheet during the test?', 240],
       [
         mihai.id,
         'No formulas sheet this time, but the test only covers what we did in class.',
         230,
       ],
-      [second!.userId, 'Thank you!', 228],
+      [second.userId, 'Thank you!', 228],
     ],
   });
 

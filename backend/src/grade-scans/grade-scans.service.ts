@@ -57,11 +57,8 @@ export class GradeScansService {
     subjectId: string,
     images: UploadedImage[],
   ): Promise<GradeScanResultDto> {
-    const { className, subjectName } = await this.grades.assertCanGrade(
-      user,
-      classId,
-      subjectId,
-    );
+    const { className, subjectName, subject } =
+      await this.grades.assertCanGrade(user, classId, subjectId);
 
     if (images.length === 0) {
       throw new BadRequestException('Upload at least one photo of a test');
@@ -85,7 +82,7 @@ export class GradeScansService {
     }
 
     const students = await this.prisma.student.findMany({
-      where: { classId },
+      where: { enrollments: { some: { classId } } },
       select: {
         id: true,
         user: { select: { firstName: true, lastName: true } },
@@ -129,7 +126,7 @@ export class GradeScansService {
       mode: this.reader.mode,
       model: this.reader.model,
       class: { id: classId, name: className },
-      subject: { id: subjectId, name: subjectName },
+      subject,
       tests,
     };
   }

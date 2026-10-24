@@ -10,6 +10,9 @@ import {
   loginAs,
   TestApp,
   uniqueName,
+  currentClass,
+  OPEN_YEAR,
+  studentsOf,
 } from './utils';
 
 interface Conversation {
@@ -55,8 +58,10 @@ describe('Chat (e2e)', () => {
   let mihai: string; // user ids
   let andrei: string; // student@school.test, 9A
   let classmate: string; // another 9A student
+  let classmateEmail: string;
   let otherClassStudent: string; // 12A, not taught by Mihai
   let notMyTeacher: string; // teaches no lesson in 9A
+  let notMyTeacherEmail: string;
   let newStudent: { id: string; token: string };
   const startedAt = new Date();
   const sockets: Socket[] = [];
@@ -98,18 +103,37 @@ describe('Chat (e2e)', () => {
       loginAs(app, 'admin'),
       loginAs(app, 'teacher'),
     ]);
-    [mihai, andrei, classmate, otherClassStudent, notMyTeacher] =
-      await Promise.all([
-        userId('teacher@school.test'),
-        userId('student@school.test'),
-        userId('geanina.sava@school.test'),
-        userId('zina.tataru@school.test'),
-        userId('frusina.manolache@school.test'),
-      ]);
-
-    const class9A = await prisma.class.findUniqueOrThrow({
-      where: { name: '9A' },
+    [mihai, andrei] = await Promise.all([
+      userId('teacher@school.test'),
+      userId('student@school.test'),
+    ]);
+    // Looked up rather than named, so the test doesn't depend on seeded names.
+    const seededStudent = (className: string) =>
+      prisma.user.findFirstOrThrow({
+        where: {
+          email: { not: 'student@school.test' },
+          NOT: { email: { startsWith: 'e2e-' } },
+          student: studentsOf(className),
+        },
+        orderBy: { email: 'asc' },
+        select: { id: true, email: true },
+      });
+    const mate = await seededStudent('9A');
+    classmate = mate.id;
+    classmateEmail = mate.email;
+    otherClassStudent = (await seededStudent('12A')).id;
+    const outsider = await prisma.teacher.findFirstOrThrow({
+      where: {
+        user: { email: { not: 'teacher@school.test' } },
+        classSubjects: { none: { class: { name: '9A', ...OPEN_YEAR } } },
+        homeroomClasses: { none: { name: '9A', ...OPEN_YEAR } },
+      },
+      select: { user: { select: { id: true, email: true } } },
     });
+    notMyTeacher = outsider.user.id;
+    notMyTeacherEmail = outsider.user.email;
+
+    const class9A = await currentClass(app, '9A');
     const { body } = await as(adminToken)(
       api()
         .post('/api/students')
@@ -359,7 +383,7 @@ describe('Chat (e2e)', () => {
     });
 
     it("hides other people's conversations", async () => {
-      const otherTeacher = await tokenOf('frusina.manolache@school.test');
+      const otherTeacher = await tokenOf(notMyTeacherEmail);
       await as(otherTeacher)(
         api().get(`/api/chat/conversations/${conversationId}/messages`),
       ).expect(404);
@@ -408,7 +432,7 @@ describe('Chat (e2e)', () => {
       });
       expect(group.members).toHaveLength(3);
 
-      const classmateToken = await tokenOf('geanina.sava@school.test');
+      const classmateToken = await tokenOf(classmateEmail);
       const classmateSocket = connect(classmateToken);
       await next(classmateSocket, 'connect');
       const pushed = next<{ message: Message }>(

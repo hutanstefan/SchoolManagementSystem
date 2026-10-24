@@ -1,4 +1,5 @@
-import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { YearOutcome } from '../../generated/prisma/enums';
 import { IsDateString, IsIn, IsOptional, IsUUID } from 'class-validator';
 import {
   PaginationMetaDto,
@@ -18,14 +19,20 @@ export class CreateStudentDto extends CreateAccountDto {
   @IsPastDate()
   dateOfBirth!: string;
 
-  /** Class to enroll the student in. Omit or send null to leave unassigned. */
+  /**
+   * Class to enroll the student in, in the open school year. Omit or send
+   * null to leave unassigned.
+   */
   @IsOptional()
   @IsUUID()
   classId?: string | null;
 }
 
 /** Every field is optional. `password` resets it, `classId: null` unassigns the student. */
-export class UpdateStudentDto extends PartialType(CreateStudentDto) {}
+export class UpdateStudentDto extends PartialType(CreateStudentDto, {
+  // A field that is sent must be valid: null is not \"leave as is\".
+  skipNullProperties: false,
+}) {}
 
 export const STUDENT_SORT_FIELDS = [
   'lastName',
@@ -43,12 +50,17 @@ export class StudentQueryDto extends PaginationQueryDto {
   @IsIn(STUDENT_SORT_FIELDS)
   sort: (typeof STUDENT_SORT_FIELDS)[number] = 'lastName';
 
+  /** The school year whose classes are shown; the open one when omitted. */
+  @IsOptional()
+  @IsUUID()
+  schoolYearId?: string;
+
   /** Only students of this class. */
   @IsOptional()
   @IsUUID()
   classId?: string;
 
-  /** Only students without a class. */
+  /** Only students without a class that year (graduates excluded). */
   @IsOptional()
   @ToBoolean()
   @IsIn([true, false])
@@ -71,9 +83,31 @@ export class StudentDto {
   lastName!: string;
   /** @example 2011-07-25 */
   dateOfBirth!: string;
-  /** Null when the student is not assigned to a class. */
+  /** The class in the school year asked for; null when not enrolled. */
   class!: ClassSummaryDto | null;
+  /** The school year the student graduated in, if they did. @example 2025–2026 */
+  graduatedIn!: string | null;
   createdAt!: Date;
+}
+
+export class SchoolYearRefDto {
+  id!: string;
+  /** @example 2025–2026 */
+  name!: string;
+}
+
+export class StudentYearDto {
+  /** @example 2025–2026 */
+  schoolYear!: SchoolYearRefDto;
+  class!: ClassSummaryDto;
+  /** How the year ended; null while it is open. */
+  @ApiProperty({ enum: YearOutcome, enumName: 'YearOutcome', nullable: true })
+  outcome!: YearOutcome | null;
+}
+
+export class StudentDetailDto extends StudentDto {
+  /** The student's classes, year by year, newest first. */
+  history!: StudentYearDto[];
 }
 
 export class PaginatedStudentsDto {

@@ -1,7 +1,14 @@
 import ExcelJS from 'exceljs';
+import JSZip from 'jszip';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { createTestApp, loginAs, TestApp } from './utils';
+import {
+  createTestApp,
+  currentClass,
+  loginAs,
+  studentsOf,
+  TestApp,
+} from './utils';
 
 /** Reads a binary response body into a Buffer. */
 const binary = (
@@ -20,6 +27,7 @@ describe('Excel import and replacing grades (e2e)', () => {
   let prisma: PrismaService;
   let teacherToken: string;
   let class9A: string;
+  let openYearId: string;
   let maths: string;
   let physics: string;
   const createdGradeIds: string[] = [];
@@ -28,8 +36,9 @@ describe('Excel import and replacing grades (e2e)', () => {
     app = await createTestApp();
     prisma = app.get(PrismaService);
     teacherToken = await loginAs(app, 'teacher');
-    class9A = (await prisma.class.findFirstOrThrow({ where: { name: '9A' } }))
-      .id;
+    const current = await currentClass(app, '9A');
+    class9A = current.id;
+    openYearId = current.schoolYearId;
     maths = (
       await prisma.subject.findFirstOrThrow({ where: { name: 'Mathematics' } })
     ).id;
@@ -76,7 +85,7 @@ describe('Excel import and replacing grades (e2e)', () => {
     ).expect(200);
     expect(body).toEqual([
       {
-        subject: { id: maths, name: 'Mathematics' },
+        subject: expect.objectContaining({ id: maths, name: 'Mathematics' }),
         classes: [
           expect.objectContaining({ name: '9A' }),
           expect.objectContaining({ name: '9B' }),
@@ -95,7 +104,7 @@ describe('Excel import and replacing grades (e2e)', () => {
     );
     const { sheet } = await readSheet(res.body);
     const students = await prisma.student.findMany({
-      where: { classId: class9A },
+      where: { enrollments: { some: { classId: class9A } } },
       select: { registrationNumber: true },
     });
     expect(sheet.rowCount).toBe(students.length + 1);
@@ -166,7 +175,7 @@ describe('Excel import and replacing grades (e2e)', () => {
 
   it('reads a CSV made by hand: by reg. no., else by class and name', async () => {
     const [a, b, c] = await prisma.student.findMany({
-      where: { classId: class9A },
+      where: { enrollments: { some: { classId: class9A } } },
       include: { user: true },
       orderBy: { registrationNumber: 'asc' },
       take: 3,
@@ -194,6 +203,15 @@ describe('Excel import and replacing grades (e2e)', () => {
 
   it('rejects other files and subjects the teacher does not teach', async () => {
     await upload(Buffer.from('%PDF-1.7'), 'grades.pdf', class9A).expect(400);
+    // A "zip bomb": a small .xlsx that would unpack to 100 MB in memory.
+    const bomb = new JSZip();
+    bomb.file('xl/worksheets/sheet1.xml', Buffer.alloc(100 * 1024 * 1024));
+    const bombed = await upload(
+      await bomb.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }),
+      'grades.xlsx',
+      class9A,
+    ).expect(400);
+    expect(bombed.body.message).toContain('too large once unpacked');
     await teacher(
       api().get(
         `/api/grade-imports/template?subjectId=${physics}&classId=${class9A}`,
@@ -207,7 +225,7 @@ describe('Excel import and replacing grades (e2e)', () => {
   it('saves grades of several classes at once, all or none', async () => {
     const [in9A, in10A, in12A] = await Promise.all(
       ['9A', '10A', '12A'].map((name) =>
-        prisma.student.findFirstOrThrow({ where: { class: { name } } }),
+        prisma.student.findFirstOrThrow({ where: studentsOf(name) }),
       ),
     );
     const save = (studentIds: string[]) =>
@@ -241,7 +259,7 @@ describe('Excel import and replacing grades (e2e)', () => {
 
   it('replaces an existing grade instead of adding one, keeping the history', async () => {
     const student = await prisma.student.findFirstOrThrow({
-      where: { classId: class9A },
+      where: { enrollments: { some: { classId: class9A } } },
     });
     const { body: added } = await teacher(
       api()
@@ -280,7 +298,7 @@ describe('Excel import and replacing grades (e2e)', () => {
 
   it("won't replace a grade of another student or given by another teacher", async () => {
     const [a, b] = await prisma.student.findMany({
-      where: { classId: class9A },
+      where: { enrollments: { some: { classId: class9A } } },
       take: 2,
     });
     const otherTeacher = await prisma.teacher.findFirstOrThrow({
@@ -291,6 +309,8 @@ describe('Excel import and replacing grades (e2e)', () => {
         studentId: a.id,
         subjectId: maths,
         teacherId: otherTeacher.id,
+        schoolYearId: openYearId,
+        semester: 1,
         value: 6,
         date: new Date('2026-10-03'),
       },

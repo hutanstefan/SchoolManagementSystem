@@ -1,7 +1,8 @@
-import { Plus } from 'lucide-react'
+import { Lock, Plus } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { DataTable, type Column } from '@/components/data-table'
+import { Segmented } from '@/components/segmented'
 import { EmptyState } from '@/components/states'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { ClassSubject } from '@/features/classes/api'
+import type { Semester } from '@/features/school-years/api'
+import { SubjectDot } from '@/features/subjects/subject-icon'
+import { usePeriod } from '@/periods/period-context'
+import { startedSemesters } from '@/periods/resolve'
 import { formatAverage, fullName } from '@/lib/format'
 import {
   useGradebook,
@@ -39,8 +44,11 @@ export function Gradebook({
   studentLink,
   initialSubjectId,
   actions,
+  schoolYearId,
 }: {
   classId: string
+  /** The class's school year: its semester follows the one picked in the sidebar. */
+  schoolYearId?: string
   /** Subjects to choose from (a teacher only sees their own). */
   subjects: ClassSubject[]
   canAddGrades: (gradebook: GradebookData) => boolean
@@ -57,7 +65,14 @@ export function Gradebook({
       : null,
   )
   const subjectId = chosenSubjectId ?? subjects[0]?.subject.id ?? null
-  const gradebook = useGradebook(classId, subjectId)
+  const period = usePeriod()
+  const [chosenSemester, setChosenSemester] = useState<Semester | undefined>()
+  const semester =
+    chosenSemester ??
+    (schoolYearId && schoolYearId === period.year?.id
+      ? period.semester
+      : undefined)
+  const gradebook = useGradebook(classId, subjectId, semester)
   const [dialog, setDialog] = useState<GradeDialogState | null>(null)
 
   if (subjects.length === 0) {
@@ -72,7 +87,11 @@ export function Gradebook({
   }
 
   const data = gradebook.data
-  const canAdd = data ? canAddGrades(data) : false
+  const readOnly = data?.readOnly ?? false
+  const canAdd = data && !readOnly ? canAddGrades(data) : false
+  const canEdit = (grade: GradeEntry) => !readOnly && canEditGrade(grade)
+  const shownSemester = data?.period.semester ?? semester ?? 1
+  const started = data ? startedSemesters(data.period.schoolYear) : [1]
   const subjectRef = data && { id: data.subject.id, name: data.subject.name }
 
   // Class average: mean of the students' rounded averages, like the school report.
@@ -118,7 +137,7 @@ export function Gradebook({
               key={grade.id}
               grade={grade}
               onClick={
-                canEditGrade(grade) && subjectRef
+                canEdit(grade) && subjectRef
                   ? () =>
                       setDialog({
                         mode: 'edit',
@@ -144,6 +163,7 @@ export function Gradebook({
                   mode: 'add',
                   student: { id: row.student.id, name: fullName(row.student) },
                   subject: subjectRef,
+                  semester: data?.period.semester,
                 })
               }
             >
@@ -178,7 +198,7 @@ export function Gradebook({
 
   return (
     <Card className="gap-0 py-0">
-      <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Select
             value={subjectId ?? undefined}
@@ -190,12 +210,28 @@ export function Gradebook({
             <SelectContent>
               {subjects.map((a) => (
                 <SelectItem key={a.subject.id} value={a.subject.id}>
+                  <SubjectDot color={a.subject.color} />
                   {a.subject.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          <Segmented
+            label="Semester"
+            value={shownSemester}
+            onChange={setChosenSemester}
+            options={([1, 2] as const).map((s) => ({
+              value: s,
+              label: `Sem. ${s}`,
+              disabled: !started.includes(s),
+            }))}
+          />
           {canAdd && subjectId && actions?.(subjectId)}
+          {readOnly && (
+            <Badge variant="warning-soft" className="gap-1">
+              <Lock aria-hidden /> Read-only
+            </Badge>
+          )}
         </div>
         {data && (
           <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">

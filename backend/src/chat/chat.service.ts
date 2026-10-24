@@ -11,6 +11,7 @@ import {
   MessageKind,
   Prisma,
   Role,
+  SchoolYearStatus,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway, ServerEvents } from '../realtime/realtime.gateway';
@@ -19,6 +20,7 @@ import {
   ConversationDto,
   CreateGroupDto,
   MessageDto,
+  MAX_GROUP_MEMBERS,
   MessagePageDto,
   MessagesQueryDto,
 } from './dto/chat.dto';
@@ -29,7 +31,15 @@ const userSelect = {
   firstName: true,
   lastName: true,
   role: true,
-  student: { select: { class: { select: { id: true, name: true } } } },
+  // A student's class in the open school year.
+  student: {
+    select: {
+      enrollments: {
+        where: { schoolYear: { status: SchoolYearStatus.ACTIVE } },
+        select: { class: { select: { id: true, name: true } } },
+      },
+    },
+  },
 } as const satisfies Prisma.UserSelect;
 
 const messageSelect = {
@@ -261,6 +271,12 @@ export class ChatService {
     );
     if (added.length === 0) {
       throw new BadRequestException('They are already in the group');
+    }
+    // The creator plus at most MAX_GROUP_MEMBERS others, as when it's created.
+    if (current.size + added.length > MAX_GROUP_MEMBERS + 1) {
+      throw new BadRequestException(
+        `A group can have at most ${MAX_GROUP_MEMBERS} members besides its creator`,
+      );
     }
     await this.policy.assertCanReach(user, added);
 
@@ -629,7 +645,7 @@ function toConversation(
       firstName: m.user.firstName,
       lastName: m.user.lastName,
       role: m.user.role,
-      class: m.user.student?.class ?? null,
+      class: m.user.student?.enrollments[0]?.class ?? null,
     },
     role: m.role,
     lastReadAt: m.lastReadAt,

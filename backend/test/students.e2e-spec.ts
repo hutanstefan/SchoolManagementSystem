@@ -180,6 +180,18 @@ describe('Students (e2e)', () => {
       }
     });
 
+    it("never gives a deleted student's number to someone else", async () => {
+      const { body: first } = await asAdmin(
+        api().post('/api/students').send(newStudent()),
+      ).expect(201);
+      await asAdmin(api().delete(`/api/students/${first.id}`)).expect(204);
+      const { body: next } = await asAdmin(
+        api().post('/api/students').send(newStudent()),
+      ).expect(201);
+
+      expect(next.registrationNumber > first.registrationNumber).toBe(true);
+    });
+
     it('rejects a duplicate email with 409', async () => {
       const response = await asAdmin(
         api()
@@ -211,6 +223,28 @@ describe('Students (e2e)', () => {
           'password must contain a digit',
         ]),
       );
+    });
+
+    it('refuses null for a field that must have a value, but allows it for the class', async () => {
+      const { body: created } = await asAdmin(
+        api().post('/api/students').send(newStudent()),
+      ).expect(201);
+
+      const refused = await asAdmin(
+        api()
+          .patch(`/api/students/${created.id}`)
+          .send({ firstName: null, email: null }),
+      ).expect(400);
+      expect(refused.body.message).toEqual(
+        expect.arrayContaining([
+          'firstName must be a string',
+          'email must be an email',
+        ]),
+      );
+      // null is how a student is taken out of their class.
+      await asAdmin(
+        api().patch(`/api/students/${created.id}`).send({ classId: null }),
+      ).expect(200);
     });
 
     it('returns 404 for an unknown class', async () => {

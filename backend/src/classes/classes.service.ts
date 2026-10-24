@@ -7,7 +7,11 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { AuthUser } from '../auth/auth.types';
 import { Paginated, pageArgs, paginated } from '../common/dto/pagination.dto';
-import { personSelect, toPerson } from '../common/mappers';
+import {
+  personSelect,
+  toPerson,
+  subjectSummarySelect,
+} from '../common/mappers';
 import { Prisma, Role } from '../generated/prisma/client';
 import {
   DomainEvents,
@@ -15,6 +19,9 @@ import {
   type AssignmentsChangedEvent,
 } from '../events/domain-events';
 import { PrismaService } from '../prisma/prisma.service';
+import { gradeLevel, yearName } from '../school-years/school-year';
+import { SchoolYearsService } from '../school-years/school-years.service';
+import { compareClassNames } from './class-names';
 import { StudentDto } from '../students/dto/student.dto';
 import { studentSelect, toStudentDto } from '../students/student.mapper';
 import {
@@ -29,8 +36,9 @@ const classSelect = {
   id: true,
   name: true,
   createdAt: true,
+  schoolYear: { select: { id: true, startYear: true, status: true } },
   homeroomTeacher: { select: personSelect },
-  _count: { select: { students: true } },
+  _count: { select: { enrollments: true } },
 } as const satisfies Prisma.ClassSelect;
 
 type ClassRow = Prisma.ClassGetPayload<{ select: typeof classSelect }>;
@@ -40,14 +48,20 @@ export class ClassesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventEmitter2,
+    private readonly years: SchoolYearsService,
   ) {}
 
-  /** Admins see every class, teachers only the classes they are assigned to. */
+  /**
+   * The classes of a school year (the open one by default). Admins see every
+   * class, teachers the classes they are assigned to, students their own.
+   */
   async findAll(
     user: AuthUser,
     query: ClassQueryDto,
   ): Promise<Paginated<ClassDto>> {
+    const year = await this.years.resolveYear(query.schoolYearId);
     const where: Prisma.ClassWhereInput = {
+      schoolYearId: year.id,
       ...this.visibleTo(user),
       ...(query.search && {
         name: { contains: query.search, mode: 'insensitive' },
@@ -95,7 +109,7 @@ export class ClassesService {
           select: {
             id: true,
             hoursPerWeek: true,
-            subject: { select: { id: true, name: true } },
+            subject: { select: subjectSummarySelect },
             teacher: { select: personSelect },
           },
           orderBy: { subject: { name: 'asc' } },
@@ -116,23 +130,36 @@ export class ClassesService {
 
   async findStudents(user: AuthUser, id: string): Promise<StudentDto[]> {
     await this.assertCanView(user, id);
-
-    const students = await this.prisma.student.findMany({
-      where: { classId: id },
-      select: studentSelect,
-      orderBy: [{ user: { lastName: 'asc' } }, { user: { firstName: 'asc' } }],
-    });
-    return students.map(toStudentDto);
+    return this.studentsOf(id);
   }
 
+  private async studentsOf(id: string): Promise<StudentDto[]> {
+    const { schoolYearId } = await this.prisma.class.findUniqueOrThrow({
+      where: { id },
+      select: { schoolYearId: true },
+    });
+    const students = await this.prisma.student.findMany({
+      where: { enrollments: { some: { classId: id } } },
+      select: studentSelect(schoolYearId),
+      orderBy: [{ user: { lastName: 'asc' } }, { user: { firstName: 'asc' } }],
+    });
+    return students.map((student) => toStudentDto(student, schoolYearId));
+  }
+
+  /** A new class of the open school year. */
   async create(dto: CreateClassDto): Promise<ClassDto> {
-    await this.assertNameIsFree(dto.name);
+    const year = await this.years.active();
+    await this.assertNameIsFree(year.id, dto.name);
     if (dto.homeroomTeacherId) {
       await this.assertTeacherExists(dto.homeroomTeacherId);
     }
 
     const schoolClass = await this.prisma.class.create({
-      data: { name: dto.name, homeroomTeacherId: dto.homeroomTeacherId },
+      data: {
+        name: dto.name,
+        schoolYearId: year.id,
+        homeroomTeacherId: dto.homeroomTeacherId,
+      },
       select: classSelect,
     });
     await this.publishHomeroomChange(
@@ -144,8 +171,8 @@ export class ClassesService {
   }
 
   async update(id: string, dto: UpdateClassDto): Promise<ClassDto> {
-    await this.assertExists(id);
-    if (dto.name) await this.assertNameIsFree(dto.name, id);
+    const year = await this.years.assertClassOpen(id);
+    if (dto.name) await this.assertNameIsFree(year.id, dto.name, id);
     if (dto.homeroomTeacherId) {
       await this.assertTeacherExists(dto.homeroomTeacherId);
     }
@@ -212,16 +239,19 @@ export class ClassesService {
    * Its students become unassigned; their grades are kept.
    */
   async remove(id: string): Promise<void> {
-    await this.assertExists(id);
+    await this.years.assertClassOpen(id);
     await this.prisma.class.delete({ where: { id } });
   }
 
-  /** Moves the given students into the class (out of their current class, if any). */
+  /**
+   * Moves the given students into the class (out of their class of that
+   * year, if any). Only in the open year.
+   */
   async assignStudents(
     id: string,
     studentIds: string[],
   ): Promise<StudentDto[]> {
-    await this.assertExists(id);
+    const year = await this.years.assertClassOpen(id);
 
     const found = await this.prisma.student.findMany({
       where: { id: { in: studentIds } },
@@ -233,23 +263,25 @@ export class ClassesService {
       throw new NotFoundException(`Students not found: ${missing.join(', ')}`);
     }
 
-    await this.prisma.student.updateMany({
-      where: { id: { in: studentIds } },
-      data: { classId: id },
-    });
-
-    const students = await this.prisma.student.findMany({
-      where: { classId: id },
-      select: studentSelect,
-      orderBy: [{ user: { lastName: 'asc' } }, { user: { firstName: 'asc' } }],
-    });
-    return students.map(toStudentDto);
+    await this.prisma.$transaction([
+      this.prisma.enrollment.deleteMany({
+        where: { studentId: { in: studentIds }, schoolYearId: year.id },
+      }),
+      this.prisma.enrollment.createMany({
+        data: studentIds.map((studentId) => ({
+          studentId,
+          classId: id,
+          schoolYearId: year.id,
+        })),
+      }),
+    ]);
+    return this.studentsOf(id);
   }
 
   async unassignStudent(id: string, studentId: string): Promise<void> {
-    const { count } = await this.prisma.student.updateMany({
-      where: { id: studentId, classId: id },
-      data: { classId: null },
+    await this.years.assertClassOpen(id);
+    const { count } = await this.prisma.enrollment.deleteMany({
+      where: { studentId, classId: id },
     });
     if (count === 0) {
       throw new NotFoundException('Student is not enrolled in this class');
@@ -272,7 +304,7 @@ export class ClassesService {
           ],
         };
       case Role.STUDENT:
-        return { students: { some: { userId: user.id } } };
+        return { enrollments: { some: { student: { userId: user.id } } } };
     }
   }
 
@@ -309,36 +341,39 @@ export class ClassesService {
     if (!exists) throw new NotFoundException('Teacher not found');
   }
 
-  private async assertNameIsFree(name: string, exceptId?: string) {
+  private async assertNameIsFree(
+    schoolYearId: string,
+    name: string,
+    exceptId?: string,
+  ) {
     const existing = await this.prisma.class.findFirst({
       where: {
+        schoolYearId,
         name: { equals: name, mode: 'insensitive' },
         ...(exceptId && { id: { not: exceptId } }),
       },
       select: { id: true },
     });
     if (existing) {
-      throw new ConflictException('A class with this name already exists');
+      throw new ConflictException(
+        'A class with this name already exists this school year',
+      );
     }
   }
-}
-
-/** Natural order: "9A" < "9B" < "10A" < "12A". */
-export function compareClassNames(
-  a: string,
-  b: string,
-  order: 'asc' | 'desc' = 'asc',
-): number {
-  const result = a.localeCompare(b, 'en', { numeric: true });
-  return order === 'asc' ? result : -result;
 }
 
 function toClassDto(schoolClass: ClassRow): ClassDto {
   return {
     id: schoolClass.id,
     name: schoolClass.name,
+    gradeLevel: gradeLevel(schoolClass.name),
+    schoolYear: {
+      id: schoolClass.schoolYear.id,
+      name: yearName(schoolClass.schoolYear.startYear),
+      status: schoolClass.schoolYear.status,
+    },
     homeroomTeacher: toPerson(schoolClass.homeroomTeacher),
-    studentCount: schoolClass._count.students,
+    studentCount: schoolClass._count.enrollments,
     createdAt: schoolClass.createdAt,
   };
 }

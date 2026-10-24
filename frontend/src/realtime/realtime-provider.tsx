@@ -1,5 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from 'react'
 import { io } from 'socket.io-client'
+import { api } from '@/api/client'
 import { useAuth } from '@/auth/auth-context'
 import { tokenStorage } from '@/lib/storage'
 import { RealtimeContext } from './realtime-context'
@@ -30,8 +31,16 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!socket) return
+    // The server closes the connection when the token expires or the session
+    // ends (password reset, account deleted). Asking the API who we are then
+    // gets a 401, which logs the tab out with an explanation.
+    const onDisconnect = (reason: string) => {
+      if (reason === 'io server disconnect') void api.GET('/api/auth/me')
+    }
+    socket.on('disconnect', onDisconnect)
     socket.connect()
     return () => {
+      socket.off('disconnect', onDisconnect)
       socket.disconnect()
     }
   }, [socket])

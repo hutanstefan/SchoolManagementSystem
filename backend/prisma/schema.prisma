@@ -55,6 +55,36 @@ enum MessageKind {
   SYSTEM
 }
 
+/// An open school year (one at a time) or a finished one, kept as an archive.
+enum SchoolYearStatus {
+  ACTIVE
+  CLOSED
+}
+
+/// What happened to a student at the end of a school year.
+enum YearOutcome {
+  /// Passed every subject (maybe after a re-exam): moves up a grade.
+  PROMOTED
+  /// Repeats the grade (repetent).
+  REPEATING
+  /// Passed the last grade (12th): leaves the school.
+  GRADUATED
+}
+
+/// Colour of a subject in the app (timetable, gradebook, charts), chosen by the admin.
+enum SubjectColor {
+  INDIGO
+  VIOLET
+  PINK
+  ROSE
+  ORANGE
+  AMBER
+  LIME
+  EMERALD
+  TEAL
+  SKY
+}
+
 enum Weekday {
   MONDAY
   TUESDAY
@@ -96,16 +126,25 @@ model Student {
   /// number among that year's enrollments, e.g. "2026-0042". Never changes.
   registrationNumber String   @unique @map("registration_number")
   dateOfBirth        DateTime @map("date_of_birth") @db.Date
-  classId            String?  @map("class_id") @db.Uuid
 
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  /// Deleting a class keeps its students, they just become unassigned.
-  class        Class?         @relation(fields: [classId], references: [id], onDelete: SetNull)
+  /// The class the student was in, in each school year.
+  enrollments  Enrollment[]
   grades       Grade[]
   gradeHistory GradeHistory[]
+  reexams      Reexam[]
 
-  @@index([classId])
   @@map("students")
+}
+
+/// The last registration number given in each year. Numbers are never given
+/// twice, not even after the student who had one is deleted (like a paper
+/// school register).
+model RegistrationCounter {
+  year       Int @id
+  lastNumber Int @map("last_number")
+
+  @@map("registration_counters")
 }
 
 model Teacher {
@@ -122,28 +161,105 @@ model Teacher {
   @@map("teachers")
 }
 
-/// A class has one homeroom teacher (diriginte) and many students (a student belongs to one class).
+/// A class in one school year: "9A" in 2026–2027 is a different row from "9A"
+/// in 2025–2026. At the end of a year its students move up to the next
+/// class ("10A"), which points back to this one. A class has one homeroom
+/// teacher (diriginte) and its students (enrollments).
 model Class {
   id                String   @id @default(uuid()) @db.Uuid
-  name              String   @unique
+  schoolYearId      String   @map("school_year_id") @db.Uuid
+  /// Unique within the school year, e.g. "9A". The number is the grade level.
+  name              String
   homeroomTeacherId String?  @map("homeroom_teacher_id") @db.Uuid
+  /// The class these students were in the year before (9A for this 10A).
+  previousClassId   String?  @map("previous_class_id") @db.Uuid
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
+  schoolYear      SchoolYear     @relation(fields: [schoolYearId], references: [id], onDelete: Restrict)
   /// Deleting a teacher leaves the class without a homeroom teacher.
   homeroomTeacher Teacher?       @relation(fields: [homeroomTeacherId], references: [id], onDelete: SetNull)
-  students        Student[]
+  previousClass   Class?         @relation("ClassContinuation", fields: [previousClassId], references: [id], onDelete: SetNull)
+  nextClasses     Class[]        @relation("ClassContinuation")
+  /// Deleting a class unenrolls its students (they stay in the school).
+  enrollments     Enrollment[]
   subjects        ClassSubject[]
 
+  @@unique([schoolYearId, name])
+  /// Target of the composite foreign key from enrollments (same school year).
+  @@unique([id, schoolYearId])
   @@index([homeroomTeacherId])
   @@map("classes")
+}
+
+/// A school year, e.g. 2026–2027, with two semesters. Grades belong to a
+/// year and a semester; classes belong to a year.
+model SchoolYear {
+  id               String           @id @default(uuid()) @db.Uuid
+  /// 2026 for 2026–2027.
+  startYear        Int              @unique @map("start_year")
+  status           SchoolYearStatus @default(ACTIVE)
+  /// 1 or 2. New grades go to this semester; teachers can't change the grades
+  /// of an earlier one (admins can).
+  currentSemester  Int              @default(1) @map("current_semester") @db.SmallInt
+  semester1EndedAt DateTime?        @map("semester1_ended_at")
+  closedAt         DateTime?        @map("closed_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+
+  classes     Class[]
+  enrollments Enrollment[]
+  grades      Grade[]
+  reexams     Reexam[]
+
+  @@map("school_years")
+}
+
+/// A student in a class for one school year: at most one class per year.
+model Enrollment {
+  id           String       @id @default(uuid()) @db.Uuid
+  studentId    String       @map("student_id") @db.Uuid
+  classId      String       @map("class_id") @db.Uuid
+  /// Copy of the class's year, kept consistent by the composite foreign key,
+  /// so the database enforces "one class per student per year".
+  schoolYearId String       @map("school_year_id") @db.Uuid
+  /// Set when the school year is closed.
+  outcome      YearOutcome?
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class      Class      @relation(fields: [classId, schoolYearId], references: [id, schoolYearId], onDelete: Cascade)
+  schoolYear SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, schoolYearId])
+  @@index([classId])
+  @@map("enrollments")
+}
+
+/// A re-exam (examen de corigență) at the end of a year, for a subject whose
+/// annual average was under 5. Its grade replaces that average.
+model Reexam {
+  id           String   @id @default(uuid()) @db.Uuid
+  studentId    String   @map("student_id") @db.Uuid
+  schoolYearId String   @map("school_year_id") @db.Uuid
+  subjectId    String   @map("subject_id") @db.Uuid
+  grade        Int      @db.SmallInt
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  schoolYear SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+  subject    Subject    @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, schoolYearId, subjectId])
+  @@map("reexams")
 }
 
 model Subject {
   id            String         @id @default(uuid()) @db.Uuid
   name          String         @unique
+  color         SubjectColor   @default(INDIGO)
   classSubjects ClassSubject[]
   grades        Grade[]
+  reexams       Reexam[]
 
   gradeHistory GradeHistory[]
 
@@ -194,22 +310,27 @@ model TimetableEntry {
 
 /// A single grade (1-10). The value range is also enforced by a CHECK constraint in the migration.
 model Grade {
-  id        String   @id @default(uuid()) @db.Uuid
-  studentId String   @map("student_id") @db.Uuid
-  subjectId String   @map("subject_id") @db.Uuid
+  id           String   @id @default(uuid()) @db.Uuid
+  studentId    String   @map("student_id") @db.Uuid
+  subjectId    String   @map("subject_id") @db.Uuid
   /// The teacher who gave the grade. Null if that teacher was deleted (the grade stays in history).
-  teacherId String?  @map("teacher_id") @db.Uuid
-  value     Int      @db.SmallInt
-  date      DateTime @db.Date
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  teacherId    String?  @map("teacher_id") @db.Uuid
+  /// The school year and semester (1 or 2) the grade counts for.
+  schoolYearId String   @map("school_year_id") @db.Uuid
+  semester     Int      @db.SmallInt
+  value        Int      @db.SmallInt
+  date         DateTime @db.Date
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  student Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  schoolYear SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Restrict)
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
   /// A subject that still has grades cannot be deleted.
-  subject Subject  @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  teacher Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  subject    Subject    @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teacher    Teacher?   @relation(fields: [teacherId], references: [id], onDelete: SetNull)
 
   @@index([studentId, subjectId])
+  @@index([schoolYearId, semester])
   @@index([teacherId])
   @@map("grades")
 }

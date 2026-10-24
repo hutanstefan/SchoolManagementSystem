@@ -39,7 +39,7 @@ describe('AuthService', () => {
       id: 'student-1',
       registrationNumber: '2026-0001',
       dateOfBirth: new Date('2011-07-25T00:00:00.000Z'),
-      class: { id: 'class-1', name: '9A' },
+      enrollments: [{ class: { id: 'class-1', name: '9A' } }],
     },
     teacher: null,
   };

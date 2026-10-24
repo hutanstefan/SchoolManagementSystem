@@ -1,0 +1,32 @@
+meta {
+  name: School stats (as admin)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/stats/school
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Grades 1 to 10, adding up to the total", function () {
+    const body = res.getBody();
+    expect(body.gradeDistribution.map((d) => d.value)).to.eql([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    const total = body.gradeDistribution.reduce((sum, d) => sum + d.count, 0);
+    expect(total).to.equal(body.gradeCount);
+  });
+  test("An average per class", function () {
+    expect(res.getBody().classes.length).to.be.above(0);
+  });
+}
+
+docs {
+  Figures for the admin dashboard: school average, students at risk (an
+  average under 5 in a subject), grade distribution, grades given per week,
+  and averages per class and per subject.
+}

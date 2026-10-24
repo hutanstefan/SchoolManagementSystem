@@ -5,7 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { personSelect, toPerson } from '../common/mappers';
+import {
+  personSelect,
+  toPerson,
+  subjectSummarySelect,
+} from '../common/mappers';
 import { ClassSubjectSummaryDto } from '../classes/dto/class.dto';
 import {
   DomainEvents,
@@ -15,6 +19,7 @@ import {
 } from '../events/domain-events';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { SchoolYearsService } from '../school-years/school-years.service';
 import { serializableTransaction } from '../prisma/serializable-transaction';
 import { snapshotLessons } from '../timetable/lesson-snapshots';
 import { lessonSelect, toLesson } from '../timetable/lessons';
@@ -28,7 +33,7 @@ import {
 const classSubjectSelect = {
   id: true,
   hoursPerWeek: true,
-  subject: { select: { id: true, name: true } },
+  subject: { select: subjectSummarySelect },
   teacher: { select: { ...personSelect, userId: true } },
 } as const satisfies Prisma.ClassSubjectSelect;
 
@@ -42,12 +47,15 @@ export class ClassSubjectsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventEmitter2,
+    private readonly years: SchoolYearsService,
   ) {}
 
+  /** Only classes of the open year can change (a closed year is an archive). */
   async create(
     classId: string,
     dto: CreateClassSubjectDto,
   ): Promise<ClassSubjectSummaryDto> {
+    await this.years.assertClassOpen(classId);
     const [schoolClass, subject] = await Promise.all([
       this.prisma.class.findUnique({
         where: { id: classId },
@@ -115,6 +123,7 @@ export class ClassSubjectsService {
       select: { classId: true },
     });
     if (!existing) throw new NotFoundException('Class subject not found');
+    const year = await this.years.assertClassOpen(existing.classId);
     const classIds = [existing.classId];
 
     const { summary, before, after, changes } = await serializableTransaction(
@@ -175,6 +184,7 @@ export class ClassSubjectsService {
               period: lesson.period,
               exclude: [lesson.id],
             })),
+            year.id,
           );
         }
 
@@ -214,6 +224,7 @@ export class ClassSubjectsService {
       },
     });
     if (!existing) throw new NotFoundException('Class subject not found');
+    await this.years.assertClassOpen(existing.classId);
     const classIds = [existing.classId];
 
     // Its lessons go too (cascade), so the timetable changes.

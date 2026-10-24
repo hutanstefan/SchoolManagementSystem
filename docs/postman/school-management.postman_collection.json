@@ -23,6 +23,14 @@
     {
       "key": "token",
       "value": ""
+    },
+    {
+      "key": "closedYearId",
+      "value": ""
+    },
+    {
+      "key": "closedClassId",
+      "value": ""
     }
   ],
   "item": [
@@ -2538,6 +2546,53 @@
           }
         },
         {
+          "name": "Change subject colour",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('The colour changed, the name did not', () => {",
+                  "  pm.expect(pm.response.json().color).to.equal('PINK');",
+                  "  pm.expect(pm.response.json().name).to.contain('Renamed subject');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/subjects/{{subjectId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subjects",
+                "{{subjectId}}"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"color\": \"PINK\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Each subject has a colour (one of 10), used wherever the subject appears: timetables, gradebooks, report cards. A new subject gets the colour fewest subjects have, unless one is given."
+          }
+        },
+        {
           "name": "Delete subject",
           "event": [
             {
@@ -3000,6 +3055,411 @@
               ]
             },
             "description": "Senders can delete their own messages; \"Message deleted\" stays in its place in the thread. Also cleans up after the requests above."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stats",
+      "item": [
+        {
+          "name": "School stats (as admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Grades 1 to 10, adding up to the total', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.gradeDistribution.map((d) => d.value)).to.eql([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);",
+                  "  const total = body.gradeDistribution.reduce((sum, d) => sum + d.count, 0);",
+                  "  pm.expect(total).to.equal(body.gradeCount);",
+                  "});",
+                  "pm.test('An average per class', () => pm.expect(pm.response.json().classes.length).to.be.above(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/stats/school",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stats",
+                "school"
+              ]
+            },
+            "description": "Figures for the admin dashboard: school average, students at risk (an average under 5 in a subject), grade distribution, grades given per week, and averages per class and per subject."
+          }
+        },
+        {
+          "name": "Teaching stats (as teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('One row per class and subject taught', () => {",
+                  "  const rows = pm.response.json().rows;",
+                  "  pm.expect(rows.length).to.be.above(0);",
+                  "  pm.expect(rows[0]).to.have.keys('class', 'subject', 'average', 'studentCount', 'studentsAtRisk', 'studentsMissingGrades');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/stats/teaching",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stats",
+                "teaching"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "The teacher dashboard: for each subject the teacher teaches in a class, the class average, students under 5 and students with fewer grades than the minimum (weekly hours + 1)."
+          }
+        },
+        {
+          "name": "School stats as a teacher (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/stats/school",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stats",
+                "school"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "School-wide figures are for administrators only."
+          }
+        }
+      ]
+    },
+    {
+      "name": "School years",
+      "description": "Two semesters per year; at the end of the year students move up into new classes. These requests only read, or show what is refused: ending a semester and closing the year change the whole database (try them in the app, on the School years page, or re-seed afterwards).",
+      "item": [
+        {
+          "name": "List school years",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const closed = (pm.response.json() || []).find((y) => y.status === 'CLOSED');",
+                  "if (closed) pm.collectionVariables.set('closedYearId', closed.id);",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('One open year, newest first', () => {",
+                  "  const years = pm.response.json();",
+                  "  pm.expect(years.filter((y) => y.status === 'ACTIVE')).to.have.length(1);",
+                  "  for (let i = 1; i < years.length; i++) pm.expect(years[i - 1].startYear).to.be.above(years[i].startYear);",
+                  "});",
+                  "pm.test('A closed year says how it ended', () => {",
+                  "  const closed = pm.response.json().find((y) => y.status === 'CLOSED');",
+                  "  pm.expect(closed.outcomes).to.have.keys('promoted', 'repeating', 'graduated');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/school-years",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "school-years"
+              ]
+            },
+            "description": "The admin sees every year; a teacher or a student only the years they took part in, plus the open one. Saves the id of a closed year for the next requests."
+          }
+        },
+        {
+          "name": "Current year",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('It is open, in semester 1 or 2', () => {",
+                  "  pm.expect(pm.response.json().status).to.equal('ACTIVE');",
+                  "  pm.expect([1, 2]).to.include(pm.response.json().currentSemester);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/school-years/current",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "school-years",
+                "current"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Classes of last year",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const first = (pm.response.json().data || [])[0];",
+                  "if (first) pm.collectionVariables.set('closedClassId', first.id);",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Every class belongs to that closed year', () => {",
+                  "  for (const c of pm.response.json().data) pm.expect(c.schoolYear.status).to.equal('CLOSED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/classes?schoolYearId={{closedYearId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "classes"
+              ],
+              "query": [
+                {
+                  "key": "schoolYearId",
+                  "value": "{{closedYearId}}"
+                }
+              ]
+            },
+            "description": "Every list that depends on the year takes `schoolYearId` (and `semester` where it matters). Without it, the open year is used."
+          }
+        },
+        {
+          "name": "Grades of last year, semester 2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Only grades of that year and semester', () => {",
+                  "  for (const g of pm.response.json().data) {",
+                  "    pm.expect(g.schoolYearId).to.equal(pm.collectionVariables.get('closedYearId'));",
+                  "    pm.expect(g.semester).to.equal(2);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/grades?schoolYearId={{closedYearId}}&semester=2&pageSize=5&sort=date&order=desc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grades"
+              ],
+              "query": [
+                {
+                  "key": "schoolYearId",
+                  "value": "{{closedYearId}}"
+                },
+                {
+                  "key": "semester",
+                  "value": "2"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "5"
+                },
+                {
+                  "key": "sort",
+                  "value": "date"
+                },
+                {
+                  "key": "order",
+                  "value": "desc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Change a closed year (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Says the year is closed', () => pm.expect(pm.response.json().message).to.contain('is closed'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/classes/{{closedClassId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "classes",
+                "{{closedClassId}}"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"9Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "A closed year can only be viewed: every change to its classes, students, timetable or grades is refused, even for the admin."
+          }
+        },
+        {
+          "name": "Closing preview",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 in semester 2, 409 before', () => pm.expect([200, 409]).to.include(pm.response.code));",
+                  "pm.test('In semester 2: every student with a suggested outcome', () => {",
+                  "  if (pm.response.code !== 200) return;",
+                  "  for (const c of pm.response.json().classes)",
+                  "    for (const s of c.students) pm.expect(['PROMOTED', 'GRADUATED', 'REPEATING', 'REEXAM']).to.include(s.suggestedOutcome);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/school-years/current/closing",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "school-years",
+                "current",
+                "closing"
+              ]
+            },
+            "description": "What closing the year would do, by Romanian rules: the annual average of a subject is the mean of the two semester averages; under 5 in one or two subjects means a re-exam, in three or more repeating the year. Only during semester 2 (the seeded year is in semester 1, so this answers 409)."
+          }
+        },
+        {
+          "name": "End semester as a teacher (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/school-years/current/end-semester",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "school-years",
+                "current",
+                "end-semester"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Ending a semester and closing the year are for administrators only."
           }
         }
       ]

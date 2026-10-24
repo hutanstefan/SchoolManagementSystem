@@ -1,12 +1,16 @@
-import { useAuth } from '@/auth/auth-context'
-import { useClass } from '@/features/classes/api'
+import { useClass, useClasses } from '@/features/classes/api'
 
-/** The logged-in student's class with its subjects and teachers. */
+/**
+ * The logged-in student's class in the picked school year, with its
+ * subjects and teachers. (A student is only shown their own class.)
+ */
 export function useMyClass() {
-  const { user } = useAuth()
-  const classId = user?.student?.class?.id
+  const classes = useClasses({ pageSize: 1 })
+  const classId = classes.data?.data[0]?.id ?? null
   return {
-    classId: classId ?? null,
+    classId,
+    /** Still finding out which class it is. */
+    isPending: classes.isPending,
     schoolClass: useClass(classId ?? '', { enabled: Boolean(classId) }),
   }
 }

@@ -46,6 +46,14 @@ const admin = {
     import('@/features/grades/grades-page').then((m) => ({
       Component: m.GradesPage,
     })),
+  schoolYears: () =>
+    import('@/features/school-years/school-years-page').then((m) => ({
+      Component: m.SchoolYearsPage,
+    })),
+  closeYear: () =>
+    import('@/features/school-years/close-year-page').then((m) => ({
+      Component: m.CloseYearPage,
+    })),
 }
 
 /** Shared by admins and teachers. */
@@ -140,6 +148,8 @@ export const routes: RouteObject[] = [
           { path: 'grades/import', lazy: importGrades },
           { path: 'subjects', lazy: admin.subjects },
           { path: 'grades', lazy: admin.grades },
+          { path: 'school-years', lazy: admin.schoolYears },
+          { path: 'school-years/close', lazy: admin.closeYear },
         ],
       },
       {

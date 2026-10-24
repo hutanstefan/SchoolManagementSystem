@@ -9,8 +9,12 @@ import { Role } from '../generated/prisma/enums';
 import { ClientEvents, userOf } from '../realtime/realtime.gateway';
 import { ChatService } from './chat.service';
 
-/** At most one "typing" per tab and conversation in this many ms. */
+/** At most one "typing" per tab and conversation in this many ms... */
 const TYPING_INTERVAL_MS = 1500;
+/** ...and at most one per tab in this many ms, whatever the conversation. */
+const ANY_TYPING_INTERVAL_MS = 200;
+/** Conversations remembered per tab (a tab only types in a few). */
+const MAX_TRACKED_CONVERSATIONS = 20;
 
 /**
  * Chat events the browser sends over the shared connection (which
@@ -36,9 +40,14 @@ export class ChatGateway {
     if (typeof conversationId !== 'string') return;
     if (!/^[0-9a-f-]{36}$/i.test(conversationId)) return;
 
+    // Each event costs a database lookup (is the user a member?), so a tab
+    // sending many of them, e.g. for made-up conversations, is ignored.
     const seen = this.lastTyping.get(socket) ?? new Map<string, number>();
     const now = Date.now();
+    const latest = Math.max(0, ...seen.values());
+    if (now - latest < ANY_TYPING_INTERVAL_MS) return;
     if (now - (seen.get(conversationId) ?? 0) < TYPING_INTERVAL_MS) return;
+    if (seen.size >= MAX_TRACKED_CONVERSATIONS) seen.clear();
     seen.set(conversationId, now);
     this.lastTyping.set(socket, seen);
 

@@ -9,6 +9,8 @@ export function useOpenNotification(onOpened?: () => void) {
   return (notification: Pick<Notification, 'id' | 'readAt' | 'link'>) => {
     if (notification.readAt === null) markRead.mutate(notification.id)
     onOpened?.()
-    if (notification.link) void navigate(notification.link)
+    // Links are paths inside the app ("/student/grades"), never other sites.
+    const link = notification.link
+    if (link?.startsWith('/') && !link.startsWith('//')) void navigate(link)
   }
 }

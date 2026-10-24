@@ -59,14 +59,25 @@ export class NotificationRulesListener {
             id: true,
             userId: true,
             user: { select: { firstName: true, lastName: true } },
-            class: {
-              select: { homeroomTeacher: { select: { userId: true } } },
+            // The class of the grades' school year.
+            enrollments: {
+              where: { schoolYearId: event.schoolYearId },
+              select: {
+                class: {
+                  select: { homeroomTeacher: { select: { userId: true } } },
+                },
+              },
             },
           },
         }),
-        // The grades as they are now, after the change.
+        // The grades of that semester as they are now, after the change.
         this.prisma.grade.findMany({
-          where: { studentId: { in: studentIds }, subjectId: event.subjectId },
+          where: {
+            studentId: { in: studentIds },
+            subjectId: event.subjectId,
+            schoolYearId: event.schoolYearId,
+            semester: event.semester,
+          },
           select: { id: true, studentId: true, value: true },
         }),
       ]);
@@ -83,7 +94,8 @@ export class NotificationRulesListener {
           });
         }
 
-        const homeroomUserId = student.class?.homeroomTeacher?.userId;
+        const homeroomUserId =
+          student.enrollments[0]?.class.homeroomTeacher?.userId;
         if (!homeroomUserId || homeroomUserId === event.actorId) continue;
 
         const now = grades.filter((g) => g.studentId === student.id);
@@ -131,14 +143,12 @@ export class NotificationRulesListener {
       if (changes.length === 0) return;
 
       const out: NewNotification[] = [];
-      const students = await this.prisma.student.findMany({
+      const enrollments = await this.prisma.enrollment.findMany({
         where: { classId: { in: event.classIds } },
-        select: { userId: true, classId: true },
+        select: { classId: true, student: { select: { userId: true } } },
       });
-      for (const student of students) {
-        const own = changes.filter(
-          (c) => lessonOf(c).classId === student.classId,
-        );
+      for (const { classId, student } of enrollments) {
+        const own = changes.filter((c) => lessonOf(c).classId === classId);
         if (own.length === 0) continue;
         out.push({
           userId: student.userId,

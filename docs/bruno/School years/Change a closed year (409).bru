@@ -1,0 +1,31 @@
+meta {
+  name: Change a closed year (409)
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/classes/{{closedClassId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "9Z"
+  }
+}
+
+tests {
+  test("Status is 409", function () {
+    expect(res.getStatus()).to.equal(409);
+  });
+  test("Says the year is closed", function () {
+    expect(res.getBody().message).to.contain("is closed");
+  });
+}
+
+docs {
+  A closed year can only be viewed: every change to its classes, students,
+  timetable or grades is refused, even for the admin.
+}

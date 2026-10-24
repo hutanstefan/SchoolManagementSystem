@@ -1,6 +1,13 @@
 import type { Weekday } from '../generated/prisma/client';
 import { PersonSummaryDto } from './dto/summaries.dto';
 
+/** Prisma select for a subject shown as a SubjectSummaryDto. */
+export const subjectSummarySelect = {
+  id: true,
+  name: true,
+  color: true,
+} as const;
+
 /** Prisma select for a teacher or student shown as a PersonSummaryDto. */
 export const personSelect = {
   id: true,

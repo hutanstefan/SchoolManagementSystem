@@ -13,6 +13,7 @@ import {
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Timetable } from './api'
+import { SubjectDot } from '@/features/subjects/subject-icon'
 
 /**
  * Today's lessons as a list, with the current one highlighted and the finished
@@ -82,7 +83,10 @@ export function TodayLessons({
                   {lesson.period}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{lesson.subject.name}</p>
+                  <p className="flex items-center gap-2 font-medium">
+                    <SubjectDot color={lesson.subject.color} />
+                    <span className="truncate">{lesson.subject.name}</span>
+                  </p>
                   <p className="text-muted-foreground truncate text-xs">
                     <span className="tabular-nums">
                       {periodTime(lesson.period)}

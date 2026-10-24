@@ -7,7 +7,20 @@ import { Gradebook } from './gradebook'
 
 const data: GradebookData = {
   class: { id: 'c-1', name: '9A' },
-  subject: { id: 's-1', name: 'Mathematics' },
+  period: {
+    semester: 1,
+    schoolYear: {
+      id: 'y-1',
+      startYear: 2026,
+      name: '2026–2027',
+      status: 'ACTIVE',
+      currentSemester: 1,
+      semester1EndedAt: null,
+      closedAt: null,
+    },
+  },
+  readOnly: false,
+  subject: { id: 's-1', name: 'Mathematics', color: 'INDIGO' },
   teacher: { id: 't-1', firstName: 'Mihai', lastName: 'Ionescu' },
   hoursPerWeek: 4,
   minimumGrades: 5,
@@ -44,7 +57,7 @@ vi.mock('./api', async (importActual) => ({
 const subjects: ClassSubject[] = [
   {
     classSubjectId: 'cs-1',
-    subject: { id: 's-1', name: 'Mathematics' },
+    subject: { id: 's-1', name: 'Mathematics', color: 'INDIGO' },
     teacher: { id: 't-1', firstName: 'Mihai', lastName: 'Ionescu' },
     hoursPerWeek: 4,
   },

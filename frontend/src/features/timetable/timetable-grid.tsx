@@ -10,6 +10,8 @@ import {
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Lesson, Timetable } from './api'
+import { SUBJECT_COLORS } from '@/features/subjects/subject-colors'
+import { SubjectDot } from '@/features/subjects/subject-icon'
 
 /**
  * The week as a grid: days across, periods down.
@@ -131,22 +133,23 @@ function LessonCard({
 
   const content = (
     <>
-      <span className="block truncate font-medium">{lesson.subject.name}</span>
+      <span className="flex items-center gap-1.5 font-medium">
+        <SubjectDot color={lesson.subject.color} />
+        <span className="truncate">{lesson.subject.name}</span>
+      </span>
       <span className="text-muted-foreground block truncate text-xs">
         {secondary}
         {lesson.room && ` · ${lesson.room}`}
       </span>
     </>
   )
-  const className =
-    'bg-primary/5 border-primary/20 block size-full min-h-14 rounded-md border px-2 py-1.5 text-left'
+  const className = cn(
+    'block size-full min-h-14 rounded-md border px-2 py-1.5 text-left transition',
+    SUBJECT_COLORS[lesson.subject.color].card,
+  )
 
   return onClick ? (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(className, 'hover:bg-primary/10 transition')}
-    >
+    <button type="button" onClick={onClick} className={className}>
       {content}
     </button>
   ) : (

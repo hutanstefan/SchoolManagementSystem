@@ -6,6 +6,11 @@ export function fullName(person: Person | null | undefined): string {
   return person ? `${person.firstName} ${person.lastName}` : '—'
 }
 
+/** "Ana Popescu" -> "AP" */
+export function initials(person: Person): string {
+  return `${person.firstName[0] ?? ''}${person.lastName[0] ?? ''}`.toUpperCase()
+}
+
 /** "2026-10-20" -> "20 Oct 2026" (date-only values, no time zone shift). */
 export function formatDate(value: string | null | undefined): string {
   if (!value) return '—'

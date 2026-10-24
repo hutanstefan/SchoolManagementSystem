@@ -1,0 +1,32 @@
+meta {
+  name: Classes of last year
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/classes?schoolYearId={{closedYearId}}
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  const first = (res.getBody().data || [])[0];
+  if (first) bru.setVar("closedClassId", first.id);
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Every class belongs to that closed year", function () {
+    for (const c of res.getBody().data) {
+      expect(c.schoolYear.status).to.equal("CLOSED");
+    }
+  });
+}
+
+docs {
+  Every list that depends on the year takes `schoolYearId` (and `semester`
+  where it matters). Without it, the open year is used.
+}

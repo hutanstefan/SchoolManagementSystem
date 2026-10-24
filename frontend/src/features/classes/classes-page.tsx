@@ -1,39 +1,69 @@
-import { Plus } from 'lucide-react'
+import { Plus, Users } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { DataTable, type Column } from '@/components/data-table'
+import { ClassTile } from '@/components/class-tile'
 import { PageHeader } from '@/components/page-header'
+import { PersonCell } from '@/components/person-avatar'
 import { PaginationBar } from '@/components/pagination-bar'
 import { SearchInput } from '@/components/search-input'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
-import { fullName } from '@/lib/format'
+import { usePeriod } from '@/periods/period-context'
 import { useClasses, type SchoolClass } from './api'
+import { describeClass } from './class-label'
 import { ClassFormDialog } from './class-form-dialog'
 
 const columns: Column<SchoolClass>[] = [
   {
     header: 'Class',
-    cell: (c) => <span className="font-medium">{c.name}</span>,
+    cell: (c) => (
+      <div className="flex items-center gap-3">
+        <ClassTile
+          name={c.name}
+          className="size-10 rounded-xl text-sm shadow-none"
+        />
+        <ClassCaption schoolClass={c} />
+      </div>
+    ),
   },
   {
     header: 'Homeroom teacher',
     cell: (c) =>
       c.homeroomTeacher ? (
-        fullName(c.homeroomTeacher)
+        <PersonCell person={c.homeroomTeacher} />
       ) : (
         <span className="text-muted-foreground">None</span>
       ),
   },
   {
     header: 'Students',
-    cell: (c) => c.studentCount,
-    className: 'text-right tabular-nums',
+    cell: (c) => (
+      <span className="inline-flex items-center gap-1.5 tabular-nums">
+        <Users className="text-muted-foreground size-3.5" aria-hidden />
+        {c.studentCount}
+      </span>
+    ),
+    className: 'text-right',
   },
 ]
 
+function ClassCaption({ schoolClass }: { schoolClass: SchoolClass }) {
+  const { title, section } = describeClass(schoolClass)
+  return (
+    <div className="min-w-0 leading-tight">
+      <p className="truncate font-medium">{title}</p>
+      <p className="text-muted-foreground truncate text-xs">
+        {section && `Section ${section} · `}
+        {schoolClass.schoolYear.name}
+      </p>
+    </div>
+  )
+}
+
 export function ClassesPage() {
+  const { isArchived, year } = usePeriod()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -50,11 +80,17 @@ export function ClassesPage() {
     <>
       <PageHeader
         title="Classes"
-        description="Open a class to manage its students, subjects, timetable and gradebook."
+        description={
+          isArchived
+            ? `The classes of ${year?.name ?? 'this year'}, as they were when the year ended.`
+            : 'Open a class to manage its students, subjects, timetable and gradebook.'
+        }
         actions={
-          <Button onClick={() => setFormOpen(true)}>
-            <Plus aria-hidden /> Add class
-          </Button>
+          !isArchived && (
+            <Button onClick={() => setFormOpen(true)}>
+              <Plus aria-hidden /> Add class
+            </Button>
+          )
         }
       />
       <Card className="gap-0 py-0">

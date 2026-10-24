@@ -35,8 +35,11 @@ type DialogState =
 /** The class timetable, editable: click an empty slot to add a lesson. */
 export function ClassTimetableEditor({
   schoolClass,
+  readOnly = false,
 }: {
   schoolClass: ClassDetail
+  /** A class of a closed year: the timetable is only shown. */
+  readOnly?: boolean
 }) {
   const timetable = useClassTimetable(schoolClass.id)
   const [dialog, setDialog] = useState<DialogState | null>(null)
@@ -68,17 +71,24 @@ export function ClassTimetableEditor({
   return (
     <Card className="gap-0 py-0">
       <p className="text-muted-foreground border-b p-4 text-sm">
-        Click an empty slot to add a lesson, or a lesson to move or remove it. A
-        teacher can't be in two classes at the same time.
+        {readOnly
+          ? `The timetable the class had in ${schoolClass.schoolYear.name}.`
+          : "Click an empty slot to add a lesson, or a lesson to move or remove it. A teacher can't be in two classes at the same time."}
       </p>
       <div className="p-2">
         <TimetableGrid
           timetable={timetable.data}
           mode="class"
-          onEmptyCellClick={(day, period) =>
-            setDialog({ mode: 'add', day, period })
+          onEmptyCellClick={
+            readOnly
+              ? undefined
+              : (day, period) => setDialog({ mode: 'add', day, period })
           }
-          onLessonClick={(lesson) => setDialog({ mode: 'edit', lesson })}
+          onLessonClick={
+            readOnly
+              ? undefined
+              : (lesson) => setDialog({ mode: 'edit', lesson })
+          }
         />
       </div>
       <LessonDialog

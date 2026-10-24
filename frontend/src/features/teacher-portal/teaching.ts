@@ -1,10 +1,12 @@
 import type { SchoolClass } from '@/features/classes/api'
 import type { TeacherDetail } from '@/features/teachers/api'
+import type { SubjectColor } from '@/features/subjects/subject-colors'
 import { compareClassNames } from '@/lib/format'
 
 export interface TaughtSubject {
   id: string
   name: string
+  color: SubjectColor
   hoursPerWeek: number
 }
 
@@ -50,6 +52,7 @@ export function groupTeaching(
     entry(assignment.class).subjects.push({
       id: assignment.subject.id,
       name: assignment.subject.name,
+      color: assignment.subject.color,
       hoursPerWeek: assignment.hoursPerWeek,
     })
   }

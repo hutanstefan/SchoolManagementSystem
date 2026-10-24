@@ -2,6 +2,8 @@ import { FileSpreadsheet, ScanLine } from 'lucide-react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { BackLink } from '@/components/back-link'
 import { DataTable, type Column } from '@/components/data-table'
+import { PersonCell } from '@/components/person-avatar'
+import { ClassTile } from '@/components/class-tile'
 import { PageHeader } from '@/components/page-header'
 import { ErrorState, LoadingBlock } from '@/components/states'
 import { Badge } from '@/components/ui/badge'
@@ -63,12 +65,14 @@ export function MyClassPage() {
     <>
       <BackLink to="/teacher/classes" label="My classes" />
       <PageHeader
+        leading={<ClassTile name={c.name} />}
         title={`Class ${c.name}`}
         description={
           <>
-            Homeroom teacher:{' '}
-            {c.homeroomTeacher ? fullName(c.homeroomTeacher) : 'none'} ·{' '}
-            {c.studentCount} {c.studentCount === 1 ? 'student' : 'students'}
+            {c.schoolYear.name}
+            {c.schoolYear.status === 'CLOSED' && ' (closed)'} · Homeroom
+            teacher: {c.homeroomTeacher ? fullName(c.homeroomTeacher) : 'none'}{' '}
+            · {c.studentCount} {c.studentCount === 1 ? 'student' : 'students'}
           </>
         }
         actions={
@@ -87,6 +91,7 @@ export function MyClassPage() {
         <TabsContent value="gradebook">
           <Gradebook
             classId={c.id}
+            schoolYearId={c.schoolYear.id}
             subjects={gradebookSubjects}
             canAddGrades={(gradebook) => gradebook.teacher?.id === me}
             canEditGrade={(grade) => grade.teacher?.id === me}
@@ -136,18 +141,12 @@ const studentColumns: Column<Student>[] = [
   {
     header: 'Name',
     cell: (s) => (
-      <Link
-        to={`/teacher/students/${s.id}`}
-        className="font-medium hover:underline"
-      >
-        {fullName(s)}
-      </Link>
+      <PersonCell person={s} secondary={s.email}>
+        <Link to={`/teacher/students/${s.id}`} className="hover:underline">
+          {fullName(s)}
+        </Link>
+      </PersonCell>
     ),
-  },
-  {
-    header: 'Email',
-    cell: (s) => s.email,
-    className: 'hidden sm:table-cell',
   },
   {
     header: 'Date of birth',

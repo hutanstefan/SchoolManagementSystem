@@ -5,6 +5,7 @@ import { ClassesService } from '../classes/classes.service';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { serializableTransaction } from '../prisma/serializable-transaction';
+import type { SchoolYearsService } from '../school-years/school-years.service';
 import { toWeek, TimetableService } from './timetable.service';
 
 const lessonRow = (
@@ -45,9 +46,13 @@ describe('TimetableService.create', () => {
   };
   const classes = { assertExists: jest.fn() };
   const events = { emitAsync: jest.fn() };
+  const years = {
+    assertClassOpen: () => Promise.resolve({ id: 'year-2026' }),
+  };
   const service = new TimetableService(
     prisma as unknown as PrismaService,
     classes as unknown as ClassesService,
+    years as unknown as SchoolYearsService,
     events as unknown as EventEmitter2,
   );
 
@@ -215,7 +220,7 @@ describe('toWeek', () => {
     classSubject: {
       id: 'cs',
       class: { id: className, name: className },
-      subject: { id: 's', name: 'Mathematics' },
+      subject: { id: 's', name: 'Mathematics', color: 'INDIGO' as const },
       teacher: null,
     },
   });

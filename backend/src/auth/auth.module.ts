@@ -13,9 +13,13 @@ import { AuthService } from './auth.service';
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => ({
         secret: config.get('JWT_SECRET', { infer: true }),
+        // One algorithm, both ways: a token signed any other way (or "none")
+        // is rejected.
         signOptions: {
+          algorithm: 'HS256',
           expiresIn: config.get('JWT_EXPIRES_IN_SECONDS', { infer: true }),
         },
+        verifyOptions: { algorithms: ['HS256'] },
       }),
     }),
   ],

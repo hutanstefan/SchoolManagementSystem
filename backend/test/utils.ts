@@ -73,3 +73,20 @@ export function uniqueName(label: string): string {
 export function uniqueClassName(): string {
   return `${E2E_PREFIX.toUpperCase()}${Math.floor(100000 + Math.random() * 900000)}`;
 }
+
+/** Classes of the open school year (names repeat from one year to the next). */
+export const OPEN_YEAR = { schoolYear: { status: 'ACTIVE' as const } };
+
+/** A class of the open school year, by name ("9A"). */
+export function currentClass(app: TestApp, name: string) {
+  return app.get(PrismaService).class.findFirstOrThrow({
+    where: { name, ...OPEN_YEAR },
+  });
+}
+
+/** Where-clause for the students of a class of the open year. */
+export function studentsOf(className: string) {
+  return {
+    enrollments: { some: { class: { name: className, ...OPEN_YEAR } } },
+  };
+}

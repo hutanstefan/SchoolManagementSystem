@@ -1,3 +1,4 @@
+import { subjectSummarySelect } from '../common/mappers';
 import {
   BadRequestException,
   ForbiddenException,
@@ -6,10 +7,13 @@ import {
 } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import type { AuthUser } from '../auth/auth.types';
-import { compareClassNames } from '../classes/classes.service';
-import type { ClassSummaryDto } from '../common/dto/summaries.dto';
+import { compareClassNames } from '../classes/class-names';
+import type {
+  ClassSummaryDto,
+  SubjectSummaryDto,
+} from '../common/dto/summaries.dto';
 import { todayInSchool } from '../common/dates';
-import { Role } from '../generated/prisma/client';
+import { Prisma, Role, SchoolYearStatus } from '../generated/prisma/client';
 import { GradesService } from '../grades/grades.service';
 import { nameMatches, studentsNamed, toWholeGrade } from '../grades/matching';
 import { PrismaService } from '../prisma/prisma.service';
@@ -31,16 +35,22 @@ import {
   readCsv,
   readXlsx,
 } from './spreadsheet';
+import { assertSafeZip, UnsafeZipError } from './zip-guard';
 
 export const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 500;
 
 /** The classes and students one import covers, for one subject. */
 interface Scope {
-  subject: { id: string; name: string };
+  subject: SubjectSummaryDto;
   classes: ClassSummaryDto[];
   students: ImportStudentDto[];
 }
+
+/** Classes of the open school year: grades are only added there. */
+const OPEN_YEAR = {
+  schoolYear: { status: SchoolYearStatus.ACTIVE },
+} as const satisfies Prisma.ClassWhereInput;
 
 @Injectable()
 export class GradeImportsService {
@@ -49,12 +59,18 @@ export class GradeImportsService {
     private readonly grades: GradesService,
   ) {}
 
-  /** The subjects the user can import grades for, each with its classes. */
+  /**
+   * The subjects the user can import grades for, each with its classes (of
+   * the open school year: grades are only added there).
+   */
   async options(user: AuthUser): Promise<GradeImportOptionDto[]> {
     const assignments = await this.prisma.classSubject.findMany({
-      where: user.role === Role.TEACHER ? { teacher: { userId: user.id } } : {},
+      where: {
+        class: OPEN_YEAR,
+        ...(user.role === Role.TEACHER && { teacher: { userId: user.id } }),
+      },
       select: {
-        subject: { select: { id: true, name: true } },
+        subject: { select: subjectSummarySelect },
         class: { select: { id: true, name: true } },
       },
     });
@@ -175,6 +191,16 @@ export class GradeImportsService {
         'Upload the .xlsx template (or a .csv file)',
       );
     }
+    if (isXlsx(file.buffer)) {
+      try {
+        assertSafeZip(file.buffer);
+      } catch (error) {
+        if (!(error instanceof UnsafeZipError)) throw error;
+        throw new BadRequestException(
+          `${error.message}. Upload the .xlsx template (or a .csv file).`,
+        );
+      }
+    }
     let rows: Cell[][];
     try {
       rows = isXlsx(file.buffer)
@@ -247,23 +273,24 @@ export class GradeImportsService {
     let classes: ClassSummaryDto[];
 
     if (classId) {
-      const { className, subjectName } = await this.grades.assertCanGrade(
+      const checked = await this.grades.assertCanGrade(
         user,
         classId,
         subjectId,
       );
-      subject = { id: subjectId, name: subjectName };
-      classes = [{ id: classId, name: className }];
+      subject = checked.subject;
+      classes = [{ id: classId, name: checked.className }];
     } else {
       const found = await this.prisma.subject.findUnique({
         where: { id: subjectId },
-        select: { id: true, name: true },
+        select: subjectSummarySelect,
       });
       if (!found) throw new NotFoundException('Subject not found');
       subject = found;
       const assignments = await this.prisma.classSubject.findMany({
         where: {
           subjectId,
+          class: OPEN_YEAR,
           ...(user.role === Role.TEACHER && {
             teacher: { userId: user.id },
           }),
@@ -282,24 +309,31 @@ export class GradeImportsService {
         .sort((a, b) => compareClassNames(a.name, b.name));
     }
 
-    const rows = await this.prisma.student.findMany({
+    const rows = await this.prisma.enrollment.findMany({
       where: { classId: { in: classes.map((c) => c.id) } },
       select: {
-        id: true,
-        registrationNumber: true,
         classId: true,
-        user: { select: { firstName: true, lastName: true } },
+        student: {
+          select: {
+            id: true,
+            registrationNumber: true,
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
       },
-      orderBy: [{ user: { lastName: 'asc' } }, { user: { firstName: 'asc' } }],
+      orderBy: [
+        { student: { user: { lastName: 'asc' } } },
+        { student: { user: { firstName: 'asc' } } },
+      ],
     });
     const order = new Map(classes.map((c, i) => [c.id, i]));
     const students = rows
-      .map((s) => ({
+      .map(({ classId, student: s }) => ({
         id: s.id,
         registrationNumber: s.registrationNumber,
         firstName: s.user.firstName,
         lastName: s.user.lastName,
-        class: classes[order.get(s.classId!)!],
+        class: classes[order.get(classId)!],
       }))
       // Class by class, alphabetically within a class (sort is stable).
       .sort((a, b) => order.get(a.class.id)! - order.get(b.class.id)!);

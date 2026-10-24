@@ -10,6 +10,7 @@ import { ClassesService } from '../classes/classes.service';
 import { DomainEvents } from '../events/domain-events';
 import { Prisma, Role, Weekday } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { SchoolYearsService } from '../school-years/school-years.service';
 import { serializableTransaction } from '../prisma/serializable-transaction';
 import { FreeSlotDto } from './dto/timetable-conflict.dto';
 import {
@@ -36,6 +37,7 @@ export class TimetableService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly classes: ClassesService,
+    private readonly years: SchoolYearsService,
     private readonly events: EventEmitter2,
   ) {}
 
@@ -45,29 +47,47 @@ export class TimetableService {
     return this.week({ classId });
   }
 
-  /** Everything a teacher teaches, across all their classes. */
-  async forTeacher(teacherId: string): Promise<TimetableDto> {
+  /** Everything a teacher teaches in a school year (the open one by default). */
+  async forTeacher(
+    teacherId: string,
+    schoolYearId?: string,
+  ): Promise<TimetableDto> {
     const teacher = await this.prisma.teacher.findUnique({
       where: { id: teacherId },
       select: { id: true },
     });
     if (!teacher) throw new NotFoundException('Teacher not found');
-    return this.week({ classSubject: { teacherId } });
+    const year = await this.years.resolveYear(schoolYearId);
+    return this.week({
+      classSubject: { teacherId, class: { schoolYearId: year.id } },
+    });
   }
 
-  /** "My timetable": a teacher's own lessons, or a student's class timetable. */
-  async forCurrentUser(user: AuthUser): Promise<TimetableDto> {
+  /**
+   * "My timetable" in a school year: a teacher's own lessons, or a student's
+   * class timetable.
+   */
+  async forCurrentUser(
+    user: AuthUser,
+    schoolYearId?: string,
+  ): Promise<TimetableDto> {
+    const year = await this.years.resolveYear(schoolYearId);
     if (user.role === Role.TEACHER) {
-      return this.week({ classSubject: { teacher: { userId: user.id } } });
+      return this.week({
+        classSubject: {
+          teacher: { userId: user.id },
+          class: { schoolYearId: year.id },
+        },
+      });
     }
     if (user.role === Role.STUDENT) {
-      const student = await this.prisma.student.findUnique({
-        where: { userId: user.id },
+      const enrollment = await this.prisma.enrollment.findFirst({
+        where: { student: { userId: user.id }, schoolYearId: year.id },
         select: { classId: true },
       });
       // A student without a class has an empty week.
-      return student?.classId
-        ? this.week({ classId: student.classId })
+      return enrollment
+        ? this.week({ classId: enrollment.classId })
         : toWeek([]);
     }
     throw new ForbiddenException('Admins have no personal timetable');
@@ -83,7 +103,11 @@ export class TimetableService {
   ): Promise<FreeSlotDto[]> {
     const classSubject = await this.prisma.classSubject.findUnique({
       where: { id: classSubjectId },
-      select: { classId: true, teacherId: true },
+      select: {
+        classId: true,
+        teacherId: true,
+        class: { select: { schoolYearId: true } },
+      },
     });
     if (!classSubject) throw new NotFoundException('Class subject not found');
 
@@ -93,7 +117,14 @@ export class TimetableService {
         OR: [
           { classId: classSubject.classId },
           ...(classSubject.teacherId
-            ? [{ classSubject: { teacherId: classSubject.teacherId } }]
+            ? [
+                {
+                  classSubject: {
+                    teacherId: classSubject.teacherId,
+                    class: { schoolYearId: classSubject.class.schoolYearId },
+                  },
+                },
+              ]
             : []),
         ],
       },
@@ -121,7 +152,7 @@ export class TimetableService {
     classId: string,
     dto: CreateTimetableEntryDto,
   ): Promise<TimetableLessonDto> {
-    await this.classes.assertExists(classId);
+    const year = await this.years.assertClassOpen(classId);
 
     return this.changeTimetable([classId], async (tx) => {
       const classSubject = await tx.classSubject.findUnique({
@@ -148,7 +179,7 @@ export class TimetableService {
         await this.removeLessonInSlot(tx, dto.replaceLessonId, classId, slot);
       }
       await assertClassIsFree(tx, classId, slot);
-      await assertTeacherIsFree(tx, classSubject.teacherId, slot);
+      await assertTeacherIsFree(tx, classSubject.teacherId, slot, year.id);
 
       const scheduled = await tx.timetableEntry.findMany({
         where: { classSubjectId: dto.classSubjectId },
@@ -206,6 +237,7 @@ export class TimetableService {
       select: { classId: true },
     });
     if (!lesson) throw new NotFoundException('Lesson not found');
+    const year = await this.years.assertClassOpen(lesson.classId);
 
     return this.changeTimetable([lesson.classId], async (tx) => {
       const current = await tx.timetableEntry.findUnique({
@@ -240,15 +272,18 @@ export class TimetableService {
         if (occupant && dto.swap) {
           // Each teacher must be free in the slot their lesson moves to.
           const both = [id, occupant.id];
-          await assertTeacherIsFree(tx, current.classSubject.teacherId, {
-            ...target,
-            exclude: both,
-          });
-          await assertTeacherIsFree(tx, occupant.classSubject.teacherId, {
-            day: current.day,
-            period: current.period,
-            exclude: both,
-          });
+          await assertTeacherIsFree(
+            tx,
+            current.classSubject.teacherId,
+            { ...target, exclude: both },
+            year.id,
+          );
+          await assertTeacherIsFree(
+            tx,
+            occupant.classSubject.teacherId,
+            { day: current.day, period: current.period, exclude: both },
+            year.id,
+          );
           // (class, day, period) is unique, so the other lesson is taken out
           // while this one moves, then put back (same id) in the old slot.
           await tx.timetableEntry.delete({ where: { id: occupant.id } });
@@ -282,10 +317,12 @@ export class TimetableService {
           ...target,
           exclude: [id],
         });
-        await assertTeacherIsFree(tx, current.classSubject.teacherId, {
-          ...target,
-          exclude: [id],
-        });
+        await assertTeacherIsFree(
+          tx,
+          current.classSubject.teacherId,
+          { ...target, exclude: [id] },
+          year.id,
+        );
       }
 
       const lesson = await tx.timetableEntry.update({
@@ -303,6 +340,7 @@ export class TimetableService {
       select: { classId: true },
     });
     if (!lesson) throw new NotFoundException('Lesson not found');
+    await this.years.assertClassOpen(lesson.classId);
     await this.changeTimetable([lesson.classId], async (tx) => {
       await tx.timetableEntry.delete({ where: { id } });
     });

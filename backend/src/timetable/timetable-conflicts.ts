@@ -35,8 +35,9 @@ export async function assertTeacherIsFree(
   tx: Tx,
   teacherId: string | null,
   slot: Slot,
+  schoolYearId: string,
 ): Promise<void> {
-  await assertTeacherIsFreeAt(tx, teacherId, [slot]);
+  await assertTeacherIsFreeAt(tx, teacherId, [slot], schoolYearId);
 }
 
 /**
@@ -47,12 +48,14 @@ export async function assertTeacherIsFreeAt(
   tx: Tx,
   teacherId: string | null,
   slots: Slot[],
+  schoolYearId: string,
 ): Promise<void> {
   if (!teacherId || slots.length === 0) return; // a vacant subject can't clash
 
+  // Only lessons of the same school year: last year's timetable is history.
   const clashes = await tx.timetableEntry.findMany({
     where: {
-      classSubject: { teacherId },
+      classSubject: { teacherId, class: { schoolYearId } },
       OR: slots.map(({ day, period, exclude = [] }) => ({
         day,
         period,

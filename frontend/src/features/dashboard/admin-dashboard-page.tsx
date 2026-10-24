@@ -1,6 +1,7 @@
-import { BookOpen, GraduationCap, School, UserX, Users } from 'lucide-react'
+import { AlertTriangle, GraduationCap, TrendingUp, Users } from 'lucide-react'
 import { Link } from 'react-router'
 import { useAuth } from '@/auth/auth-context'
+import { PersonCell } from '@/components/person-avatar'
 import { DataTable, type Column } from '@/components/data-table'
 import { PageHeader } from '@/components/page-header'
 import { SectionHeader } from '@/components/section-header'
@@ -10,32 +11,47 @@ import { Card } from '@/components/ui/card'
 import { useAllClasses, type SchoolClass } from '@/features/classes/api'
 import { useGrades, type Grade } from '@/features/grades/api'
 import { gradeTone } from '@/features/grades/grade-tone'
+import { useSchoolStats } from '@/features/stats/api'
+import { ChartCard } from '@/features/stats/chart-card'
+import {
+  ActivityChart,
+  AveragesChart,
+  GradeDistributionChart,
+  PassFailLegend,
+} from '@/features/stats/charts'
 import { useStudents } from '@/features/students/api'
 import { useSubjects } from '@/features/subjects/api'
 import { useTeachers } from '@/features/teachers/api'
-import { formatDate, fullName } from '@/lib/format'
+import { formatDate, formatLongDate, fullName } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { SubjectDot } from '@/features/subjects/subject-icon'
+import { usePeriod } from '@/periods/period-context'
 
 const gradeColumns: Column<Grade>[] = [
   {
     header: 'Student',
     cell: (g) => (
-      <Link
-        to={`/admin/students/${g.student.id}`}
-        className="font-medium hover:underline"
-      >
-        {fullName(g.student)}
-      </Link>
+      <PersonCell person={g.student}>
+        <Link
+          to={`/admin/students/${g.student.id}`}
+          className="hover:underline"
+        >
+          {fullName(g.student)}
+        </Link>
+      </PersonCell>
     ),
   },
   {
     header: 'Subject',
     cell: (g) => (
-      <span>
-        {g.subject.name}
-        {g.class && (
-          <span className="text-muted-foreground"> · {g.class.name}</span>
-        )}
+      <span className="flex items-center gap-2">
+        <SubjectDot color={g.subject.color} />
+        <span>
+          {g.subject.name}
+          {g.class && (
+            <span className="text-muted-foreground"> · {g.class.name}</span>
+          )}
+        </span>
       </span>
     ),
   },
@@ -84,12 +100,15 @@ const classColumns: Column<SchoolClass>[] = [
 
 export function AdminDashboardPage() {
   const { user } = useAuth()
-  // pageSize 1: only the totals in `meta` are needed.
-  const students = useStudents({ pageSize: 1 })
+  const { year, semester, isArchived } = usePeriod()
+  // pageSize 1: only the totals in `meta` are needed. Students: the ones in a
+  // class that year.
+  const students = useStudents({ pageSize: 1, unassigned: false })
   const unassigned = useStudents({ pageSize: 1, unassigned: true })
   const teachers = useTeachers({ pageSize: 1 })
   const classes = useAllClasses()
   const subjects = useSubjects()
+  const stats = useSchoolStats()
   const recentGrades = useGrades({
     pageSize: 8,
     sort: 'date',
@@ -97,34 +116,45 @@ export function AdminDashboardPage() {
   })
 
   const unassignedCount = unassigned.data?.meta.total ?? 0
+  const chartState = {
+    isLoading: stats.isPending,
+    error: stats.error,
+    onRetry: () => void stats.refetch(),
+    isEmpty: stats.data?.gradeCount === 0,
+    emptyTitle: 'No grades yet',
+    emptyDescription: 'Charts appear once teachers start grading.',
+  }
 
   return (
     <>
       <PageHeader
-        title={`Welcome, ${user?.firstName ?? ''}`}
-        description="An overview of the school."
+        title={`Welcome back, ${user?.firstName ?? ''}`}
+        description={
+          isArchived
+            ? `How ${year?.name ?? 'the year'} went · Semester ${semester}`
+            : `Here's how the school is doing · ${formatLongDate()}`
+        }
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Students"
           value={students.data?.meta.total}
           icon={GraduationCap}
+          tone="indigo"
           isLoading={students.isPending}
-        />
-        <StatCard
-          label="Without a class"
-          value={unassignedCount}
-          icon={UserX}
-          isLoading={unassigned.isPending}
           hint={
-            unassignedCount > 0 && (
+            isArchived ? (
+              'In a class that year'
+            ) : unassignedCount > 0 ? (
               <Link
                 to="/admin/students?class=unassigned"
-                className="hover:underline"
+                className="text-amber-600 hover:underline dark:text-amber-400"
               >
-                Assign them to a class
+                {unassignedCount} without a class
               </Link>
+            ) : (
+              'Everyone is in a class'
             )
           }
         />
@@ -132,23 +162,100 @@ export function AdminDashboardPage() {
           label="Teachers"
           value={teachers.data?.meta.total}
           icon={Users}
+          tone="violet"
           isLoading={teachers.isPending}
+          hint={
+            classes.data &&
+            subjects.data &&
+            `${classes.data.meta.total} classes · ${subjects.data.length} subjects`
+          }
         />
         <StatCard
-          label="Classes"
-          value={classes.data?.meta.total}
-          icon={School}
-          isLoading={classes.isPending}
+          label="School average"
+          value={stats.data?.average ?? '—'}
+          decimals={2}
+          icon={TrendingUp}
+          tone="emerald"
+          isLoading={stats.isPending}
+          hint={
+            stats.data &&
+            `From ${stats.data.gradeCount.toLocaleString()} grades`
+          }
         />
         <StatCard
-          label="Subjects"
-          value={subjects.data?.length}
-          icon={BookOpen}
-          isLoading={subjects.isPending}
+          label="Students at risk"
+          value={stats.data?.studentsAtRisk}
+          icon={AlertTriangle}
+          tone={stats.data?.studentsAtRisk ? 'rose' : 'emerald'}
+          isLoading={stats.isPending}
+          hint="Average under 5 in at least one subject"
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-5">
+        <ChartCard
+          title="Grade distribution"
+          description={`Every grade given in semester ${semester}`}
+          action={<PassFailLegend className="hidden sm:flex" />}
+          className="lg:col-span-3"
+          {...chartState}
+        >
+          {stats.data && (
+            <GradeDistributionChart data={stats.data.gradeDistribution} />
+          )}
+        </ChartCard>
+        <ChartCard
+          title="Grading activity"
+          description={
+            isArchived
+              ? 'Grades given per week that semester'
+              : 'Grades given per week'
+          }
+          className="lg:col-span-2"
+          {...chartState}
+        >
+          {stats.data && <ActivityChart data={stats.data.activity} />}
+        </ChartCard>
+
+        <ChartCard
+          title="Class averages"
+          description="Mean of the students' subject averages"
+          className="lg:col-span-2"
+          {...chartState}
+        >
+          {stats.data && (
+            <AveragesChart
+              caption="Class averages"
+              minRows={stats.data.subjects.length}
+              rows={stats.data.classes.map((c) => ({
+                key: c.class.id,
+                label: c.class.name,
+                average: c.average,
+                detail: `${c.studentCount} students · ${c.studentsAtRisk} at risk`,
+              }))}
+            />
+          )}
+        </ChartCard>
+        <ChartCard
+          title="Subject averages"
+          description="Across every class that studies the subject"
+          className="lg:col-span-3"
+          {...chartState}
+        >
+          {stats.data && (
+            <AveragesChart
+              caption="Subject averages"
+              minRows={stats.data.classes.length}
+              rows={stats.data.subjects.map((s) => ({
+                key: s.subject.id,
+                label: s.subject.name,
+                average: s.average,
+                detail: `${s.gradeCount} grades`,
+              }))}
+            />
+          )}
+        </ChartCard>
+
         <Card className="gap-0 py-0 lg:col-span-3">
           <SectionHeader
             title="Latest grades"

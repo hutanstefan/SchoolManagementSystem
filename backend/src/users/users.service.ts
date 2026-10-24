@@ -1,12 +1,17 @@
 import { ConflictException, Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { hashPassword } from '../common/password';
+import { DomainEvents, type SessionEndedEvent } from '../events/domain-events';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** Account-level helpers shared by the students and teachers modules. */
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventEmitter2,
+  ) {}
 
   /** Throws 409 if another user already has this email. */
   async assertEmailAvailable(
@@ -46,5 +51,17 @@ export class UsersService {
       // A password reset also ends every existing session of that user.
       tokenVersion: dto.password ? { increment: 1 } : undefined,
     };
+  }
+
+  /**
+   * Closes the user's live connections after a password reset or when the
+   * account is deleted. Their tokens are already refused by the API (the
+   * token version changed, or the user is gone); this stops the WebSocket
+   * pushes too, which were authenticated once, when the tab connected.
+   */
+  async endSessions(userId: string): Promise<void> {
+    await this.events.emitAsync(DomainEvents.SessionEnded, {
+      userId,
+    } satisfies SessionEndedEvent);
   }
 }
