@@ -5,13 +5,19 @@ import {
 } from '@nestjs/common';
 import { SubjectColor } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
+import { iconForName } from './subject-icons';
 import {
   CreateSubjectDto,
   SubjectDto,
   UpdateSubjectDto,
 } from './dto/subject.dto';
 
-const subjectSelect = { id: true, name: true, color: true } as const;
+const subjectSelect = {
+  id: true,
+  name: true,
+  color: true,
+  icon: true,
+} as const;
 
 @Injectable()
 export class SubjectsService {
@@ -36,7 +42,11 @@ export class SubjectsService {
   async create(dto: CreateSubjectDto): Promise<SubjectDto> {
     await this.assertNameIsFree(dto.name);
     return this.prisma.subject.create({
-      data: { name: dto.name, color: dto.color ?? (await this.freeColor()) },
+      data: {
+        name: dto.name,
+        color: dto.color ?? (await this.freeColor()),
+        icon: dto.icon ?? iconForName(dto.name),
+      },
       select: subjectSelect,
     });
   }
@@ -46,7 +56,7 @@ export class SubjectsService {
     if (dto.name !== undefined) await this.assertNameIsFree(dto.name, id);
     return this.prisma.subject.update({
       where: { id },
-      data: { name: dto.name, color: dto.color },
+      data: { name: dto.name, color: dto.color, icon: dto.icon },
       select: subjectSelect,
     });
   }
@@ -55,15 +65,25 @@ export class SubjectsService {
   async remove(id: string): Promise<void> {
     const subject = await this.prisma.subject.findUnique({
       where: { id },
-      select: { _count: { select: { classSubjects: true, grades: true } } },
+      select: {
+        _count: {
+          select: { classSubjects: true, grades: true, lectures: true },
+        },
+      },
     });
     if (!subject) throw new NotFoundException('Subject not found');
 
-    const { classSubjects, grades } = subject._count;
+    const { classSubjects, grades, lectures } = subject._count;
     if (classSubjects > 0 || grades > 0) {
       throw new ConflictException(
         `Subject is still taught in ${classSubjects} class(es) and has ${grades} grade(s). ` +
           'Remove it from those classes and delete its grades first.',
+      );
+    }
+
+    if (lectures > 0) {
+      throw new ConflictException(
+        `Subject has ${lectures} lecture(s). Delete them first.`,
       );
     }
 

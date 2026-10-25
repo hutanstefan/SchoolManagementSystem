@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { SubjectColor } from '../../generated/prisma/enums';
+import { SubjectColor, SubjectIcon } from '../../generated/prisma/enums';
 /** Small embedded objects reused across responses. */
 
 export class ClassSummaryDto {
@@ -15,6 +15,9 @@ export class SubjectSummaryDto {
   /** Its colour in the app, chosen by the admin. */
   @ApiProperty({ enum: SubjectColor, enumName: 'SubjectColor' })
   color!: SubjectColor;
+  /** Its icon in the app, chosen by the admin. */
+  @ApiProperty({ enum: SubjectIcon, enumName: 'SubjectIcon' })
+  icon!: SubjectIcon;
 }
 
 export class PersonSummaryDto {

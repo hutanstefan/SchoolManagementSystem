@@ -26,6 +26,7 @@ import { StudentDto } from '../students/dto/student.dto';
 import { studentSelect, toStudentDto } from '../students/student.mapper';
 import {
   ClassDetailDto,
+  ClassInYearDto,
   ClassDto,
   ClassQueryDto,
   CreateClassDto,
@@ -125,7 +126,84 @@ export class ClassesService {
         teacher: toPerson(cs.teacher),
         hoursPerWeek: cs.hoursPerWeek,
       })),
+      lineage: await this.lineageOf(user, id),
     };
+  }
+
+  /**
+   * The same class in every school year, oldest first: the classes it
+   * continues (previousClassId, back to the first) and the ones continuing
+   * it. Lets the app follow a class when another year is picked.
+   */
+  private async lineageOf(
+    user: AuthUser,
+    id: string,
+  ): Promise<ClassInYearDto[]> {
+    const select = {
+      id: true,
+      name: true,
+      previousClassId: true,
+      schoolYear: { select: { id: true, startYear: true, status: true } },
+    } as const satisfies Prisma.ClassSelect;
+    type Row = Prisma.ClassGetPayload<{ select: typeof select }>;
+
+    const current = await this.prisma.class.findUniqueOrThrow({
+      where: { id },
+      select,
+    });
+    const chain: Row[] = [current];
+    const seen = new Set([current.id]);
+    // Back: last year's class, the year before...
+    for (
+      let previousId = current.previousClassId;
+      previousId && !seen.has(previousId);
+    ) {
+      const row = await this.prisma.class.findUnique({
+        where: { id: previousId },
+        select,
+      });
+      if (!row) break;
+      chain.unshift(row);
+      seen.add(row.id);
+      previousId = row.previousClassId;
+    }
+    // Forward: next year's class, and so on.
+    for (let lastId = current.id; ;) {
+      const row = await this.prisma.class.findFirst({
+        where: { previousClassId: lastId },
+        select,
+        orderBy: { name: 'asc' },
+      });
+      if (!row || seen.has(row.id)) break;
+      chain.push(row);
+      seen.add(row.id);
+      lastId = row.id;
+    }
+
+    let visible = chain;
+    if (user.role !== Role.ADMIN) {
+      const ids = new Set(
+        (
+          await this.prisma.class.findMany({
+            where: {
+              id: { in: chain.map((row) => row.id) },
+              ...this.visibleTo(user),
+            },
+            select: { id: true },
+          })
+        ).map((row) => row.id),
+      );
+      visible = chain.filter((row) => ids.has(row.id));
+    }
+    return visible.map((row) => ({
+      id: row.id,
+      name: row.name,
+      schoolYear: {
+        id: row.schoolYear.id,
+        name: yearName(row.schoolYear.startYear),
+        status: row.schoolYear.status,
+      },
+    }));
   }
 
   async findStudents(user: AuthUser, id: string): Promise<StudentDto[]> {

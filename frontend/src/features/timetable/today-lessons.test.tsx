@@ -11,7 +11,7 @@ const lesson = (period: number, subject: string): Lesson => ({
   room: null,
   classSubjectId: `cs-${period}`,
   class: { id: 'c-1', name: '9A' },
-  subject: { id: `s-${period}`, name: subject, color: 'INDIGO' },
+  subject: { id: `s-${period}`, name: subject, color: 'INDIGO', icon: 'BOOK' },
   teacher: { id: 't-1', firstName: 'Ana', lastName: 'Pop' },
 })
 

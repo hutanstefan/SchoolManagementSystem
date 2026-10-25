@@ -29,6 +29,7 @@ import {
   todayWeekday,
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { LatestLectures } from '@/features/lectures/latest-lectures'
 import { useMyClass } from './use-my-class'
 
 /** The newest grades across all subjects. */
@@ -217,6 +218,8 @@ export function StudentDashboardPage() {
             <TodayLessons timetable={timetable.data} mode="class" />
           )}
         </Card>
+
+        <LatestLectures className="lg:col-span-5" />
 
         <Card className="gap-0 py-0 lg:col-span-5">
           <SectionHeader

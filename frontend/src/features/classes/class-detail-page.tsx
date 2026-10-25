@@ -1,6 +1,13 @@
 import { Pencil, FileSpreadsheet, ScanLine, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import {
+  Link,
+  Navigate,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router'
 import { BackLink } from '@/components/back-link'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { ClassTile } from '@/components/class-tile'
@@ -11,9 +18,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Gradebook } from '@/features/grades/gradebook'
 import { ClassTimetableEditor } from '@/features/timetable/class-timetable-editor'
 import { fullName } from '@/lib/format'
+import { usePeriod } from '@/periods/period-context'
 import { useClass, useDeleteClass } from './api'
 import { ClassFormDialog } from './class-form-dialog'
+import { ClassNotInYear } from './class-not-in-year'
 import { describeClass } from './class-label'
+import { classInYear } from './follow-year'
 import { ClassStudentsTab } from './class-students-tab'
 import { ClassSubjectsTab } from './class-subjects-tab'
 
@@ -25,6 +35,8 @@ export function ClassDetailPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const schoolClass = useClass(id)
+  const location = useLocation()
+  const follow = classInYear(schoolClass.data, usePeriod().year)
   const remove = useDeleteClass()
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -43,6 +55,26 @@ export function ClassDetailPage() {
       <ErrorState
         error={schoolClass.error}
         onRetry={() => void schoolClass.refetch()}
+      />
+    )
+  }
+
+  // The year picked in the sidebar decides which year's class is shown.
+  if (follow.status === 'moved') {
+    return (
+      <Navigate
+        to={`/admin/classes/${follow.classId}${location.search}`}
+        replace
+      />
+    )
+  }
+  if (follow.status === 'missing') {
+    return (
+      <ClassNotInYear
+        schoolClass={schoolClass.data}
+        year={follow.year}
+        listPath="/admin/classes"
+        listLabel="All classes"
       />
     )
   }

@@ -1,5 +1,11 @@
 import { FileSpreadsheet, ScanLine } from 'lucide-react'
-import { Link, useParams, useSearchParams } from 'react-router'
+import {
+  Link,
+  Navigate,
+  useLocation,
+  useParams,
+  useSearchParams,
+} from 'react-router'
 import { BackLink } from '@/components/back-link'
 import { DataTable, type Column } from '@/components/data-table'
 import { PersonCell } from '@/components/person-avatar'
@@ -11,12 +17,15 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useClass, useClassStudents } from '@/features/classes/api'
+import { ClassNotInYear } from '@/features/classes/class-not-in-year'
+import { classInYear } from '@/features/classes/follow-year'
 import { Gradebook } from '@/features/grades/gradebook'
 import type { Student } from '@/features/students/api'
 import { useMyTeacherProfile } from '@/features/teachers/api'
 import { useClassTimetable } from '@/features/timetable/api'
 import { TimetableGrid } from '@/features/timetable/timetable-grid'
 import { formatDate, fullName } from '@/lib/format'
+import { usePeriod } from '@/periods/period-context'
 
 const TABS = ['gradebook', 'students', 'timetable'] as const
 type Tab = (typeof TABS)[number]
@@ -30,6 +39,8 @@ export function MyClassPage() {
   const { id = '' } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const schoolClass = useClass(id)
+  const location = useLocation()
+  const follow = classInYear(schoolClass.data, usePeriod().year)
   const profile = useMyTeacherProfile()
 
   const tabParam = searchParams.get('tab')
@@ -48,6 +59,26 @@ export function MyClassPage() {
           void schoolClass.refetch()
           void profile.refetch()
         }}
+      />
+    )
+  }
+
+  // The year picked in the sidebar decides which year's class is shown.
+  if (follow.status === 'moved') {
+    return (
+      <Navigate
+        to={`/teacher/classes/${follow.classId}${location.search}`}
+        replace
+      />
+    )
+  }
+  if (follow.status === 'missing') {
+    return (
+      <ClassNotInYear
+        schoolClass={schoolClass.data}
+        year={follow.year}
+        listPath="/teacher/classes"
+        listLabel="My classes"
       />
     )
   }

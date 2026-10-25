@@ -10,6 +10,7 @@ export const DomainEvents = {
   TimetableChanged: 'timetable.changed',
   AssignmentsChanged: 'assignments.changed',
   SessionEnded: 'session.ended',
+  LectureShared: 'lecture.shared',
 } as const;
 
 export interface GradeChange {
@@ -88,4 +89,14 @@ export interface AssignmentsChangedEvent {
 /** The user logged out: every token they had is invalid now. */
 export interface SessionEndedEvent {
   userId: string;
+}
+
+/** A teacher let some students read a lecture (new readers only). */
+export interface LectureSharedEvent {
+  actorId: string;
+  lectureId: string;
+  title: string;
+  subjectName: string;
+  teacherName: string | null;
+  studentIds: string[];
 }

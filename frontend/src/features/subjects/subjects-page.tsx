@@ -31,11 +31,19 @@ import {
   SUBJECT_COLORS,
   type SubjectColor,
 } from './subject-colors'
+import { IconPicker } from './icon-picker'
 import { SubjectIcon } from './subject-icon'
+import {
+  iconForName,
+  SUBJECT_ICON_KEYS,
+  SUBJECT_ICONS,
+  type SubjectIconName,
+} from './subject-icons'
 
 const schema = z.object({
   name: nameField,
   color: z.enum(SUBJECT_COLOR_KEYS as [SubjectColor, ...SubjectColor[]]),
+  icon: z.enum(SUBJECT_ICON_KEYS as [SubjectIconName, ...SubjectIconName[]]),
 })
 type Values = z.infer<typeof schema>
 
@@ -74,14 +82,15 @@ export function SubjectsPage() {
       ),
     },
     {
-      header: 'Colour',
+      header: 'Look',
+      className: 'hidden sm:table-cell',
       cell: (s) => (
         <span className="text-muted-foreground inline-flex items-center gap-2 text-sm">
           <span
             aria-hidden
             className={cn('size-3 rounded-full', SUBJECT_COLORS[s.color].solid)}
           />
-          {SUBJECT_COLORS[s.color].label}
+          {SUBJECT_COLORS[s.color].label} · {SUBJECT_ICONS[s.icon].label}
         </span>
       ),
     },
@@ -170,22 +179,43 @@ function SubjectFormDialog({
   const update = useUpdateSubject()
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { name: '', color: 'INDIGO' },
+    defaultValues: { name: '', color: 'INDIGO', icon: 'BOOK' },
   })
+  /**
+   * Until the admin picks an icon, a new subject's icon follows its name.
+   * An existing subject keeps the one it has. Reset each time the dialog
+   * opens.
+   */
+  const [iconPicked, setIconPicked] = useState(false)
+  const [shown, setShown] = useState({ open: false, subject })
+  if (shown.open !== open || shown.subject !== subject) {
+    setShown({ open, subject })
+    if (open) setIconPicked(subject !== null)
+  }
 
   useEffect(() => {
-    if (open) form.reset({ name: subject?.name ?? '', color: initialColor })
+    if (!open) return
+    form.reset({
+      name: subject?.name ?? '',
+      color: initialColor,
+      icon: subject?.icon ?? 'BOOK',
+    })
   }, [open, subject, initialColor, form])
 
-  const submit = async (body: Values) => {
+  const submit = async (values: Values) => {
+    const body = {
+      ...values,
+      icon: iconPicked ? values.icon : iconForName(values.name),
+    }
     if (subject) await update.mutateAsync({ id: subject.id, body })
     else await create.mutateAsync(body)
     onOpenChange(false)
   }
-  const [name, color] = useWatch({
+  const [name, color, picked] = useWatch({
     control: form.control,
-    name: ['name', 'color'],
+    name: ['name', 'color', 'icon'],
   })
+  const icon = iconPicked ? picked : iconForName(name)
 
   return (
     <FormDialog
@@ -196,6 +226,7 @@ function SubjectFormDialog({
       onSubmit={submit}
       submitLabel={subject ? 'Save changes' : 'Add subject'}
       pending={create.isPending || update.isPending}
+      className="sm:max-w-lg"
     >
       <TextField
         control={form.control}
@@ -245,8 +276,28 @@ function SubjectFormDialog({
           </FormItem>
         )}
       />
+      <FormField
+        control={form.control}
+        name="icon"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Icon</FormLabel>
+            <FormControl>
+              <IconPicker
+                value={icon}
+                color={color}
+                onChange={(next) => {
+                  setIconPicked(true)
+                  field.onChange(next)
+                }}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
       <div className="bg-muted/40 flex items-center gap-3 rounded-lg border p-3">
-        <SubjectIcon subject={{ name: name || 'Subject', color }} />
+        <SubjectIcon subject={{ color, icon }} className="size-10" />
         <div className="min-w-0 text-sm">
           <p className="truncate font-medium">{name || 'New subject'}</p>
           <p className="text-muted-foreground text-xs">

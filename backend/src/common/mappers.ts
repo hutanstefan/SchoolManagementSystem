@@ -6,6 +6,7 @@ export const subjectSummarySelect = {
   id: true,
   name: true,
   color: true,
+  icon: true,
 } as const;
 
 /** Prisma select for a teacher or student shown as a PersonSummaryDto. */

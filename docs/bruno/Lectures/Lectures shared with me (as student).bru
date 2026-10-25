@@ -1,0 +1,38 @@
+meta {
+  name: Lectures shared with me (as student)
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/lectures?page=1&pageSize=12
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  pageSize: 12
+}
+
+auth:bearer {
+  token: {{studentToken}}
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("The new lecture is there, read-only, newest first", function () {
+    const lecture = res.getBody().data.find((l) => l.id === bru.getVar("lectureId"));
+    expect(res.getBody().data[0].id).to.equal(bru.getVar("lectureId"));
+    expect(res.getBody().meta.page).to.equal(1);
+    expect(lecture.canManage).to.equal(false);
+  });
+}
+
+docs {
+  A student sees only the lectures they can read now, newest first, a page at
+  a time (`page`, `pageSize`, `search`, `subjectId`). `subjects` lists the
+  subjects they have lectures in, for filters.
+}

@@ -1,0 +1,25 @@
+meta {
+  name: Read it without access (as student, 404)
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/lectures/{{lectureId}}/link
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{studentToken}}
+}
+
+tests {
+  test("Status is 404", function () {
+    expect(res.getStatus()).to.equal(404);
+  });
+}
+
+docs {
+  Not shared with the student any more: as far as they can tell, it doesn't exist.
+}

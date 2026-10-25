@@ -1,6 +1,7 @@
 import {
   Bell,
   BookOpen,
+  BookOpenText,
   CalendarRange,
   CalendarDays,
   ClipboardList,
@@ -49,6 +50,7 @@ export const NAV_SECTIONS: Record<Role, NavSection[]> = {
       title: 'Academics',
       items: [
         { label: 'Grades', to: '/admin/grades', icon: ClipboardList },
+        { label: 'Lectures', to: '/admin/lectures', icon: BookOpenText },
         {
           label: 'School years',
           to: '/admin/school-years',
@@ -73,6 +75,7 @@ export const NAV_SECTIONS: Record<Role, NavSection[]> = {
       title: 'Teaching',
       items: [
         { label: 'My classes', to: '/teacher/classes', icon: School },
+        { label: 'Lectures', to: '/teacher/lectures', icon: BookOpenText },
         { label: 'My timetable', to: '/teacher/timetable', icon: CalendarDays },
       ],
     },
@@ -110,6 +113,7 @@ export const NAV_SECTIONS: Record<Role, NavSection[]> = {
       title: 'Learning',
       items: [
         { label: 'My grades', to: '/student/grades', icon: ClipboardList },
+        { label: 'Lectures', to: '/student/lectures', icon: BookOpenText },
         { label: 'My class', to: '/student/class', icon: School },
         { label: 'My timetable', to: '/student/timetable', icon: CalendarDays },
       ],

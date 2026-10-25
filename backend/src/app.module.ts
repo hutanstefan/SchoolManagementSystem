@@ -9,6 +9,7 @@ import { ClassSubjectsModule } from './class-subjects/class-subjects.module';
 import { ClassesModule } from './classes/classes.module';
 import { GradeImportsModule } from './grade-imports/grade-imports.module';
 import { GradeScansModule } from './grade-scans/grade-scans.module';
+import { LecturesModule } from './lectures/lectures.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { validateEnv } from './config/env.validation';
@@ -18,6 +19,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SchoolYearsModule } from './school-years/school-years.module';
 import { StatsModule } from './stats/stats.module';
+import { StorageModule } from './storage/storage.module';
 import { StudentsModule } from './students/students.module';
 import { SubjectsModule } from './subjects/subjects.module';
 import { TeachersModule } from './teachers/teachers.module';
@@ -35,6 +37,7 @@ import { TimetableModule } from './timetable/timetable.module';
     // Domain events (a grade was given, the timetable changed...), see src/events.
     EventEmitterModule.forRoot(),
     PrismaModule,
+    StorageModule,
     SchoolYearsModule,
     AuthModule,
     HealthModule,
@@ -50,6 +53,7 @@ import { TimetableModule } from './timetable/timetable.module';
     NotificationsModule,
     ChatModule,
     StatsModule,
+    LecturesModule,
   ],
   providers: [
     // Global guards run in this order for every request:

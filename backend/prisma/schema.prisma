@@ -34,6 +34,8 @@ enum NotificationType {
   TIMETABLE_CHANGED
   ASSIGNMENT_CHANGED
   HOMEROOM_ALERT
+  /// A teacher shared a lecture (PDF) with the student.
+  LECTURE_SHARED
 }
 
 enum ConversationType {
@@ -85,6 +87,50 @@ enum SubjectColor {
   SKY
 }
 
+/// The icon a subject is drawn with, chosen by the admin (drawn by the web app).
+enum SubjectIcon {
+  BOOK
+  CALCULATOR
+  SIGMA
+  PI
+  RULER
+  SHAPES
+  PUZZLE
+  ATOM
+  MAGNET
+  FLASK
+  DNA
+  MICROSCOPE
+  LEAF
+  HEART
+  BRAIN
+  TELESCOPE
+  LANDMARK
+  SCROLL
+  GLOBE
+  MOUNTAIN
+  COMPASS
+  LANGUAGES
+  FEATHER
+  PENCIL
+  MESSAGE
+  LAPTOP
+  CODE
+  CPU
+  WRENCH
+  LIGHTBULB
+  PALETTE
+  MUSIC
+  DRAMA
+  CAMERA
+  DUMBBELL
+  SCALE
+  TRENDING
+  USERS
+  CHURCH
+  GRADUATION
+}
+
 enum Weekday {
   MONDAY
   TUESDAY
@@ -115,6 +161,8 @@ model User {
   createdConversations Conversation[]
   chatMemberships      ConversationMember[]
   messages             Message[]
+  /// Lecture access this user gave or removed.
+  lectureAccessEvents  LectureAccessEvent[]
 
   @@map("users")
 }
@@ -127,12 +175,15 @@ model Student {
   registrationNumber String   @unique @map("registration_number")
   dateOfBirth        DateTime @map("date_of_birth") @db.Date
 
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// The class the student was in, in each school year.
-  enrollments  Enrollment[]
-  grades       Grade[]
-  gradeHistory GradeHistory[]
-  reexams      Reexam[]
+  enrollments   Enrollment[]
+  grades        Grade[]
+  gradeHistory  GradeHistory[]
+  reexams       Reexam[]
+  /// Lectures shared with the student.
+  lectureAccess       LectureAccess[]
+  lectureAccessEvents LectureAccessEvent[]
 
   @@map("students")
 }
@@ -157,6 +208,7 @@ model Teacher {
   /// Subjects this teacher teaches, per class.
   classSubjects   ClassSubject[]
   grades          Grade[]
+  lectures        Lecture[]
 
   @@map("teachers")
 }
@@ -257,9 +309,11 @@ model Subject {
   id            String         @id @default(uuid()) @db.Uuid
   name          String         @unique
   color         SubjectColor   @default(INDIGO)
+  icon          SubjectIcon    @default(BOOK)
   classSubjects ClassSubject[]
   grades        Grade[]
   reexams       Reexam[]
+  lectures      Lecture[]
 
   gradeHistory GradeHistory[]
 
@@ -435,4 +489,74 @@ model Message {
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@map("messages")
+}
+
+/// Reading material (a PDF) in a teacher's library, not tied to a school
+/// year. The teacher shares it with the students they choose (LectureAccess);
+/// every change of who can read it is kept (LectureAccessEvent). The file itself is in the storage (a local folder or an S3-compatible
+/// bucket such as Cloudflare R2), under `fileKey`; the database only knows
+/// where it is.
+model Lecture {
+  id           String   @id @default(uuid()) @db.Uuid
+  /// Null after the teacher was deleted (the lecture stays for its readers).
+  teacherId    String?  @map("teacher_id") @db.Uuid
+  subjectId    String   @map("subject_id") @db.Uuid
+  title        String
+  description  String?
+  /// Where the file is in the storage, e.g. "lectures/<uuid>.pdf".
+  fileKey      String   @unique @map("file_key")
+  /// The uploaded file's name, used for downloads.
+  fileName     String   @map("file_name")
+  fileSize     Int      @map("file_size")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  teacher    Teacher?        @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  subject    Subject         @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  access       LectureAccess[]
+  accessEvents LectureAccessEvent[]
+
+  @@index([teacherId])
+  @@map("lectures")
+}
+
+/// A student who can read a lecture now (any student the teacher chooses).
+/// Access stays until the teacher removes it.
+model LectureAccess {
+  lectureId String   @map("lecture_id") @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  grantedAt DateTime @default(now()) @map("granted_at")
+
+  lecture Lecture @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([lectureId, studentId])
+  @@index([studentId])
+  @@map("lecture_access")
+}
+
+enum LectureAccessAction {
+  GRANTED
+  REVOKED
+}
+
+/// The access history of a lecture: who got or lost access, when and by
+/// whom. Rows written by one change share the same `createdAt`.
+model LectureAccessEvent {
+  id        String              @id @default(uuid()) @db.Uuid
+  lectureId String              @map("lecture_id") @db.Uuid
+  studentId String              @map("student_id") @db.Uuid
+  action    LectureAccessAction
+  /// Who changed it; null if that user was deleted.
+  actorId   String?             @map("actor_id") @db.Uuid
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  lecture Lecture @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([lectureId, createdAt])
+  @@index([studentId])
+  @@index([actorId])
+  @@map("lecture_access_events")
 }

@@ -1,0 +1,81 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [6 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Title (Functions and their graphs) /Producer (School Management seed) >>
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 7 0 R >>
+endobj
+7 0 obj
+<< /Length 3684 >>
+stream
+0.310 0.275 0.898 rg 0 710 595 132 re f
+BT /F2 24 Tf 1.000 1.000 1.000 rg 56.0 778.0 Td (Functions and their graphs) Tj ET
+BT /F1 11 Tf 1.000 1.000 1.000 rg 56.0 732.0 Td (Mathematics - Sample for API requests) Tj ET
+BT /F2 15 Tf 0.310 0.275 0.898 rg 56.0 672.0 Td (What a function is) Tj ET
+0.310 0.275 0.898 RG 1 w 56 664.0 m 96 664.0 l S
+BT /F1 11 Tf 0.173 0.173 0.165 rg 56.0 644.0 Td (A function f: A -> B gives every element x of the set A exactly one element f\(x\) of the set B. A is the) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 56.0 629.0 Td (domain, B is the codomain, and the set of all values f\(x\) is the image of f.) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 56.0 608.0 Td (The graph of f is the set of points \(x, f\(x\)\) in the plane. A vertical line meets the graph of a function) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 56.0 593.0 Td (at most once.) Tj ET
+BT /F2 15 Tf 0.310 0.275 0.898 rg 56.0 562.0 Td (The linear function) Tj ET
+0.310 0.275 0.898 RG 1 w 56 554.0 m 96 554.0 l S
+BT /F1 11 Tf 0.173 0.173 0.165 rg 56.0 534.0 Td (f\(x\) = ax + b. Its graph is a straight line: two points are enough to draw it, usually where it meets the) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 56.0 519.0 Td (axes, \(0, b\) and \(-b/a, 0\).) Tj ET
+BT /F2 11 Tf 0.310 0.275 0.898 rg 60.0 498.0 Td (-) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 78.0 498.0 Td (a > 0: the function is increasing.) Tj ET
+BT /F2 11 Tf 0.310 0.275 0.898 rg 60.0 479.0 Td (-) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 78.0 479.0 Td (a < 0: the function is decreasing.) Tj ET
+BT /F2 11 Tf 0.310 0.275 0.898 rg 60.0 460.0 Td (-) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 78.0 460.0 Td (a = 0: the function is constant and its graph is parallel to the x axis.) Tj ET
+BT /F2 15 Tf 0.310 0.275 0.898 rg 56.0 431.0 Td (The quadratic function) Tj ET
+0.310 0.275 0.898 RG 1 w 56 423.0 m 96 423.0 l S
+BT /F1 11 Tf 0.173 0.173 0.165 rg 56.0 403.0 Td (f\(x\) = ax^2 + bx + c, with a not 0. Its graph is a parabola with the vertex V\(-b/\(2a\), -D/\(4a\)\). The) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 56.0 388.0 Td (parabola opens upwards when a > 0 \(the vertex is a minimum\) and downwards when a < 0 \(the) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 56.0 373.0 Td (vertex is a maximum\).) Tj ET
+BT /F2 11 Tf 0.310 0.275 0.898 rg 60.0 352.0 Td (1.) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 78.0 352.0 Td (Find the vertex and the axis of symmetry x = -b/\(2a\).) Tj ET
+BT /F2 11 Tf 0.310 0.275 0.898 rg 60.0 333.0 Td (2.) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 78.0 333.0 Td (Find where the graph meets the axes: \(0, c\), and the solutions of f\(x\) = 0, if any.) Tj ET
+BT /F2 11 Tf 0.310 0.275 0.898 rg 60.0 314.0 Td (3.) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 78.0 314.0 Td (Make a table with two or three more values on each side of the vertex, then draw.) Tj ET
+BT /F2 15 Tf 0.310 0.275 0.898 rg 56.0 285.0 Td (Exercises) Tj ET
+0.310 0.275 0.898 RG 1 w 56 277.0 m 96 277.0 l S
+BT /F2 11 Tf 0.310 0.275 0.898 rg 60.0 257.0 Td (1.) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 78.0 257.0 Td (Draw the graphs of f\(x\) = 2x - 4 and g\(x\) = -x + 1 and find where they meet.) Tj ET
+BT /F2 11 Tf 0.310 0.275 0.898 rg 60.0 238.0 Td (2.) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 78.0 238.0 Td (Find the vertex of f\(x\) = x^2 - 6x + 5 and draw the parabola.) Tj ET
+BT /F2 11 Tf 0.310 0.275 0.898 rg 60.0 219.0 Td (3.) Tj ET
+BT /F1 11 Tf 0.173 0.173 0.165 rg 78.0 219.0 Td (Find the maximum of f\(x\) = -x^2 + 4x + 1.) Tj ET
+0.882 0.878 0.855 RG 0.5 w 56 44 m 539 44 l S
+BT /F1 8 Tf 0.431 0.431 0.412 rg 56 30 Td (School Management - Functions and their graphs) Tj ET
+BT /F1 8 Tf 0.431 0.431 0.412 rg 498.1 30 Td (Page 1 of 1) Tj ET
+endstream
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000218 00000 n 
+0000000320 00000 n 
+0000000412 00000 n 
+0000000548 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R /Info 5 0 R >>
+startxref
+4284
+%%EOF

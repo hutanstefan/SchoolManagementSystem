@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Form } from '@/components/ui/form'
+import { cn } from '@/lib/utils'
 import { SubmitButton } from './submit-button'
 
 /**
@@ -27,6 +28,7 @@ export function FormDialog<T extends FieldValues, TOut = T>({
   submitLabel = 'Save',
   pending,
   extraActions,
+  className,
   children,
 }: {
   open: boolean
@@ -39,6 +41,8 @@ export function FormDialog<T extends FieldValues, TOut = T>({
   pending?: boolean
   /** Shown on the left of the footer, e.g. a delete button. */
   extraActions?: ReactNode
+  /** e.g. a wider dialog: "sm:max-w-4xl" */
+  className?: string
   children: ReactNode
 }) {
   const submit = async (values: TOut) => {
@@ -51,7 +55,7 @@ export function FormDialog<T extends FieldValues, TOut = T>({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={cn('sm:max-w-md', className)}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}

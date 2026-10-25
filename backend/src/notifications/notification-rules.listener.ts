@@ -5,6 +5,7 @@ import {
   type AssignmentsChangedEvent,
   type GradeChange,
   type GradesChangedEvent,
+  type LectureSharedEvent,
   type TimetableChangedEvent,
 } from '../events/domain-events';
 import { subjectAverage } from '../grades/averages';
@@ -12,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   assignmentMessage,
   gradeMessage,
+  lectureMessage,
   lowAverageAlert,
   lowGradeAlert,
   PASSING_GRADE,
@@ -193,6 +195,29 @@ export class NotificationRulesListener {
         })),
       ),
     );
+  }
+
+  /** Students hear about the lectures shared with them. */
+  @OnEvent(DomainEvents.LectureShared)
+  async onLectureShared(event: LectureSharedEvent): Promise<void> {
+    await this.safely('lecture', async () => {
+      const students = await this.prisma.student.findMany({
+        where: { id: { in: event.studentIds } },
+        select: { userId: true },
+      });
+      const message = lectureMessage(
+        event.title,
+        event.subjectName,
+        event.teacherName,
+      );
+      await this.notifications.notify(
+        students.map(({ userId }) => ({
+          userId,
+          ...message,
+          link: '/student/lectures',
+        })),
+      );
+    });
   }
 
   private async safely(what: string, run: () => Promise<void>): Promise<void> {

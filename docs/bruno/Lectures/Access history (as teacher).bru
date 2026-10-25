@@ -1,0 +1,40 @@
+meta {
+  name: Access history (as teacher)
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/lectures/{{lectureId}}/history?page=1&pageSize=10
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  pageSize: 10
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Newest first: one student removed, after the upload shared it with two", function () {
+    const changes = res.getBody().data;
+    expect(res.getBody().meta.total).to.equal(2);
+    expect(changes.map((c) => c.action)).to.eql(["REVOKED", "GRANTED"]);
+    expect(changes[0].students).to.have.lengthOf(1);
+    expect(changes[1].students).to.have.lengthOf(2);
+    expect(changes[0].actor.firstName).to.equal("Mihai");
+  });
+}
+
+docs {
+  Who got or lost access to the lecture, newest first: one entry per change,
+  with the students it was about and who made it. For the lecture's teacher
+  and admins.
+}

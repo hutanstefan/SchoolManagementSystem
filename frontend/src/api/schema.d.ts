@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/files/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open a file through a signed link
+         * @description Only with the local storage: the links given by e.g. GET /lectures/:id/link point here. The token names the file and expires after FILE_LINK_SECONDS, so no login is needed (it works in a new tab or an iframe). With S3 storage the links go straight to the bucket. Errors are a small HTML page for browsers, JSON otherwise.
+         */
+        get: operations["FilesController_open"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/school-years": {
         parameters: {
             query?: never;
@@ -1176,6 +1196,132 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/lectures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lectures, a page at a time
+         * @description Admins: every lecture. Teachers: their library. Students: the ones they can read. Newest first; `subjects` lists every subject they have lectures in, for filters. Lectures are not tied to a school year.
+         */
+        get: operations["LecturesController_findAll"];
+        put?: never;
+        /**
+         * Add a lecture (a PDF) to the library and share it
+         * @description The lecture stays in the teacher's library; the students it is shared with can read it until the teacher removes them. The file is checked to really be a PDF and stored privately (local folder or S3 bucket). The students it is shared with get a notification.
+         */
+        post: operations["LecturesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lectures/recipients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Students a lecture can be shared with
+         * @description Every student of the open year, from any class (with their class), and the ones not in a class yet.
+         */
+        get: operations["LecturesController_recipients"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lectures/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One lecture
+         * @description The teacher whose lecture it is and admins also get the students who can read it. Anyone else who may not read it gets 404.
+         */
+        get: operations["LecturesController_findOne"];
+        put?: never;
+        post?: never;
+        /** Delete a lecture, its history and its file */
+        delete: operations["LecturesController_remove"];
+        options?: never;
+        head?: never;
+        /** Change the title, description or subject */
+        patch: operations["LecturesController_update"];
+        trace?: never;
+    };
+    "/api/lectures/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who got or lost access, and when
+         * @description Newest first, one entry per change (a change can be about many students), with who made it. For the teacher whose lecture it is and admins.
+         */
+        get: operations["LecturesController_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lectures/{id}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A short-lived link to preview or download the PDF
+         * @description Works for FILE_LINK_SECONDS (5 minutes by default) without a login, so it can be opened in a new tab or an iframe. With S3 storage it is a pre-signed URL of the bucket, which stays private.
+         */
+        get: operations["LecturesController_link"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lectures/{id}/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose who can read the lecture
+         * @description Replaces the list. Who got or lost access is written to the lecture's history. Students who just got access are notified; the others are not bothered again.
+         */
+        put: operations["LecturesController_setStudents"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1259,9 +1405,16 @@ export interface components {
          * @enum {string}
          */
         SubjectColor: "INDIGO" | "VIOLET" | "PINK" | "ROSE" | "ORANGE" | "AMBER" | "LIME" | "EMERALD" | "TEAL" | "SKY";
+        /**
+         * @description Its icon in the app, chosen by the admin.
+         * @enum {string}
+         */
+        SubjectIcon: "BOOK" | "CALCULATOR" | "SIGMA" | "PI" | "RULER" | "SHAPES" | "PUZZLE" | "ATOM" | "MAGNET" | "FLASK" | "DNA" | "MICROSCOPE" | "LEAF" | "HEART" | "BRAIN" | "TELESCOPE" | "LANDMARK" | "SCROLL" | "GLOBE" | "MOUNTAIN" | "COMPASS" | "LANGUAGES" | "FEATHER" | "PENCIL" | "MESSAGE" | "LAPTOP" | "CODE" | "CPU" | "WRENCH" | "LIGHTBULB" | "PALETTE" | "MUSIC" | "DRAMA" | "CAMERA" | "DUMBBELL" | "SCALE" | "TRENDING" | "USERS" | "CHURCH" | "GRADUATION";
         SubjectSummaryDto: {
             /** @description Its colour in the app, chosen by the admin. */
             color: components["schemas"]["SubjectColor"];
+            /** @description Its icon in the app, chosen by the admin. */
+            icon: components["schemas"]["SubjectIcon"];
             id: string;
             /** @example Mathematics */
             name: string;
@@ -1663,6 +1816,12 @@ export interface components {
             /** @example 4 */
             hoursPerWeek: number;
         };
+        ClassInYearDto: {
+            id: string;
+            /** @example 10A */
+            name: string;
+            schoolYear: components["schemas"]["ClassYearDto"];
+        };
         ClassDetailDto: {
             id: string;
             /** @example 9A */
@@ -1682,6 +1841,12 @@ export interface components {
             createdAt: string;
             /** @description Subjects studied by the class and who teaches each one. */
             subjects: components["schemas"]["ClassSubjectSummaryDto"][];
+            /**
+             * @description The same class in every school year, oldest first, this one included:
+             *     the class it continues (last year's 9A) and the one that continues it
+             *     (next year's 11A). Only the ones the user can see.
+             */
+            lineage: components["schemas"]["ClassInYearDto"][];
         };
         CreateClassDto: {
             /**
@@ -1713,6 +1878,7 @@ export interface components {
         };
         SubjectDto: {
             color: components["schemas"]["SubjectColor"];
+            icon: components["schemas"]["SubjectIcon"];
             id: string;
             /** @example Mathematics */
             name: string;
@@ -1723,6 +1889,11 @@ export interface components {
              *     When omitted, the colour used by the fewest subjects is picked.
              */
             color?: components["schemas"]["SubjectColor"];
+            /**
+             * @description Icon of the subject, drawn on its colour. When omitted, one that fits
+             *     the name is picked (a book when nothing fits).
+             */
+            icon?: components["schemas"]["SubjectIcon"];
             name: string;
         };
         UpdateSubjectDto: {
@@ -1731,6 +1902,11 @@ export interface components {
              *     When omitted, the colour used by the fewest subjects is picked.
              */
             color?: components["schemas"]["SubjectColor"];
+            /**
+             * @description Icon of the subject, drawn on its colour. When omitted, one that fits
+             *     the name is picked (a book when nothing fits).
+             */
+            icon?: components["schemas"]["SubjectIcon"];
             name?: string;
         };
         CreateClassSubjectDto: {
@@ -2254,7 +2430,7 @@ export interface components {
             skippedRows: number;
         };
         /** @enum {string} */
-        NotificationType: "GRADE_ADDED" | "GRADE_CHANGED" | "GRADE_REMOVED" | "TIMETABLE_CHANGED" | "ASSIGNMENT_CHANGED" | "HOMEROOM_ALERT";
+        NotificationType: "GRADE_ADDED" | "GRADE_CHANGED" | "GRADE_REMOVED" | "TIMETABLE_CHANGED" | "ASSIGNMENT_CHANGED" | "HOMEROOM_ALERT" | "LECTURE_SHARED";
         NotificationDto: {
             type: components["schemas"]["NotificationType"];
             id: string;
@@ -2494,6 +2670,117 @@ export interface components {
             /** @description Grades given in the teacher's subjects per week (see SchoolStatsDto.activity). */
             activity: components["schemas"]["WeekActivityDto"][];
         };
+        LectureDto: {
+            id: string;
+            title: string;
+            description: string | null;
+            subject: components["schemas"]["SubjectSummaryDto"];
+            /** @description Whose library it is in; null if that teacher was deleted. */
+            teacher: components["schemas"]["PersonSummaryDto"] | null;
+            /** @example quadratic-equations.pdf */
+            fileName: string;
+            /**
+             * @description Bytes.
+             * @example 482113
+             */
+            fileSize: number;
+            /** @description How many students can read it now (0 for students themselves). */
+            studentCount: number;
+            /** @description The user can edit it, change who reads it and delete it. */
+            canManage: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        PaginatedLecturesDto: {
+            /** @description Newest first. */
+            data: components["schemas"]["LectureDto"][];
+            meta: components["schemas"]["PaginationMetaDto"];
+            /** @description Every subject the user has lectures in (all pages), for filters. */
+            subjects: components["schemas"]["SubjectSummaryDto"][];
+        };
+        LectureStudentDto: {
+            /** @description Teacher or student id (not the user id). */
+            id: string;
+            /** @example Mihai */
+            firstName: string;
+            /** @example Ionescu */
+            lastName: string;
+            /** @example 2026-0042 */
+            registrationNumber: string;
+            /** @description The student's class: this year's, or their last one (null if none). */
+            class: components["schemas"]["ClassSummaryDto"] | null;
+        };
+        LectureDetailDto: {
+            id: string;
+            title: string;
+            description: string | null;
+            subject: components["schemas"]["SubjectSummaryDto"];
+            /** @description Whose library it is in; null if that teacher was deleted. */
+            teacher: components["schemas"]["PersonSummaryDto"] | null;
+            /** @example quadratic-equations.pdf */
+            fileName: string;
+            /**
+             * @description Bytes.
+             * @example 482113
+             */
+            fileSize: number;
+            /** @description How many students can read it now (0 for students themselves). */
+            studentCount: number;
+            /** @description The user can edit it, change who reads it and delete it. */
+            canManage: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description Who can read it now; only for the teacher whose lecture it is and admins. */
+            students: components["schemas"]["LectureStudentDto"][];
+        };
+        /** @enum {string} */
+        LectureAccessAction: "GRANTED" | "REVOKED";
+        LectureActorDto: {
+            /** @description The user id. */
+            id: string;
+            firstName: string;
+            lastName: string;
+        };
+        LectureAccessChangeDto: {
+            action: components["schemas"]["LectureAccessAction"];
+            /**
+             * Format: date-time
+             * @description When it happened.
+             */
+            at: string;
+            /** @description Who did it; null if that user was deleted or for changes made by the system. */
+            actor: components["schemas"]["LectureActorDto"] | null;
+            students: components["schemas"]["LectureStudentDto"][];
+        };
+        LectureHistoryDto: {
+            /** @description Newest first. */
+            data: components["schemas"]["LectureAccessChangeDto"][];
+            meta: components["schemas"]["PaginationMetaDto"];
+        };
+        FileLinkDto: {
+            /** @description Open it right away: it stops working after `expiresAt`. */
+            url: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        UpdateLectureDto: {
+            title?: string;
+            /** @description Send null or "" to remove it. */
+            description?: string | null;
+            /** Format: uuid */
+            subjectId?: string;
+        };
+        SetLectureStudentsDto: {
+            /**
+             * @description Everyone who may read the lecture; replaces the list. The change is
+             *     kept in the lecture's access history.
+             */
+            studentIds: string[];
+        };
     };
     responses: never;
     parameters: never;
@@ -2503,6 +2790,36 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    FilesController_open: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description Invalid or expired link, or the file is gone */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
     SchoolYearsController_list: {
         parameters: {
             query?: never;
@@ -6083,6 +6400,377 @@ export interface operations {
                 };
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    LecturesController_findAll: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page (max 100). */
+                pageSize?: number;
+                subjectId?: string;
+                /** @description Part of the title or the description. */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedLecturesDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    LecturesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    title: string;
+                    description?: string;
+                    /**
+                     * Format: uuid
+                     * @description A subject the teacher teaches this school year.
+                     */
+                    subjectId: string;
+                    /**
+                     * @description Who may read it, from any class: a JSON array of student ids or a comma-separated list. Can be changed later.
+                     * @example ["0b39a733-7b2b-45e6-9d19-7938ad3af0b6"]
+                     */
+                    studentIds?: string;
+                    /**
+                     * Format: binary
+                     * @description The PDF (at most 20 MB).
+                     */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureDetailDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    LecturesController_recipients: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureStudentDto"][];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    LecturesController_findOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureDetailDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    LecturesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    LecturesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLectureDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureDetailDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    LecturesController_history: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page (max 100). */
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureHistoryDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    LecturesController_link: {
+        parameters: {
+            query?: {
+                /** @description true: the browser saves the file; false (default): it shows it. */
+                download?: true | false;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileLinkDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    LecturesController_setStudents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetLectureStudentsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureDetailDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

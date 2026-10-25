@@ -30,8 +30,15 @@ services:
     build:
       context: ./backend
       target: tools
+    # The same storage settings as the API: the seed uploads demo lectures.
+    env_file:
+      - path: ./backend/.env
+        required: false
     environment:
       <<: *database-url
+      STORAGE_DIR: /app/storage
+    volumes:
+      - ./backend/storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,6 +64,12 @@ services:
       TRUST_PROXY: 1
       NODE_ENV: production
       PORT: 3000
+      # Lectures with the local storage driver (STORAGE_DRIVER=s3 uses a bucket
+      # instead): backend/storage, the same folder `npm run start:dev` and
+      # `npm run db:seed` use, so files seeded or uploaded either way are found.
+      STORAGE_DIR: /app/storage
+    volumes:
+      - ./backend/storage:/app/storage
     # The browser goes through nginx (port 8080). This port is only for API
     # tools on this computer: the API trusts nginx's X-Forwarded-For, so it
     # must not be reachable directly from other machines.

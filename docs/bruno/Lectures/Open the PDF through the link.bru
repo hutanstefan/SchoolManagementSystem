@@ -1,0 +1,26 @@
+meta {
+  name: Open the PDF through the link
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{lectureFileUrl}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("A PDF, shown in the browser", function () {
+    expect(res.getHeader("content-type")).to.equal("application/pdf");
+    expect(res.getHeader("content-disposition")).to.match(/^inline;/);
+  });
+}
+
+docs {
+  No login: the signed link is the permission, and it stops working after
+  FILE_LINK_SECONDS (5 minutes by default).
+}

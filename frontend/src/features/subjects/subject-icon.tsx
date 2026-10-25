@@ -1,14 +1,11 @@
 import { createElement } from 'react'
 import { cn } from '@/lib/utils'
-import {
-  SUBJECT_COLORS,
-  subjectIcon,
-  type SubjectColor,
-} from './subject-colors'
+import { SUBJECT_COLORS, type SubjectColor } from './subject-colors'
+import { SUBJECT_ICONS, type SubjectIconName } from './subject-icons'
 
 interface SubjectLike {
-  name: string
   color: SubjectColor
+  icon: SubjectIconName
 }
 
 /** The subject's icon on its colour. */
@@ -28,7 +25,7 @@ export function SubjectIcon({
         className,
       )}
     >
-      {createElement(subjectIcon(subject.name))}
+      {createElement(SUBJECT_ICONS[subject.icon].icon)}
     </span>
   )
 }

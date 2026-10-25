@@ -1,0 +1,35 @@
+meta {
+  name: Choose who can read it (as teacher)
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{baseUrl}}/lectures/{{lectureId}}/students
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+body:json {
+  {
+    "studentIds": ["{{lectureOtherReaderId}}"]
+  }
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Only the student of 11A is left", function () {
+    expect(res.getBody().students.map((s) => s.id)).to.eql([bru.getVar("lectureOtherReaderId")]);
+  });
+}
+
+docs {
+  Replaces the list. Who got or lost access is kept in the lecture's access
+  history. Only students who just got access are notified.
+}

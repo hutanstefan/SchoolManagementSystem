@@ -71,6 +71,11 @@ const notifications = () =>
   import('@/features/notifications/notifications-page').then((m) => ({
     Component: m.NotificationsPage,
   }))
+/** Shared by every role: what each one sees depends on the role. */
+const lectures = () =>
+  import('@/features/lectures/lectures-page').then((m) => ({
+    Component: m.LecturesPage,
+  }))
 const scanTests = () =>
   import('@/features/grade-scans/scan-tests-page').then((m) => ({
     Component: m.ScanTestsPage,
@@ -150,6 +155,7 @@ export const routes: RouteObject[] = [
           { path: 'grades', lazy: admin.grades },
           { path: 'school-years', lazy: admin.schoolYears },
           { path: 'school-years/close', lazy: admin.closeYear },
+          { path: 'lectures', lazy: lectures },
         ],
       },
       {
@@ -166,6 +172,7 @@ export const routes: RouteObject[] = [
           { path: 'classes/:id/scan', lazy: scanTests },
           { path: 'grades/import', lazy: importGrades },
           { path: 'students/:id', lazy: teacher.student },
+          { path: 'lectures', lazy: lectures },
           { path: 'timetable', lazy: myTimetable },
           { path: 'notifications', lazy: notifications },
           { path: 'messages', lazy: messages },
@@ -183,6 +190,7 @@ export const routes: RouteObject[] = [
           { index: true, lazy: student.dashboard },
           { path: 'grades', lazy: student.grades },
           { path: 'class', lazy: student.class },
+          { path: 'lectures', lazy: lectures },
           { path: 'timetable', lazy: myTimetable },
           { path: 'notifications', lazy: notifications },
           { path: 'messages', lazy: messages },

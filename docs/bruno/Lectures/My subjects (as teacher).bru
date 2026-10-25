@@ -1,0 +1,30 @@
+meta {
+  name: My subjects (as teacher)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/teachers/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+script:post-response {
+  const teaching = (res.getBody() || {}).teaching || [];
+  if (teaching[0]) bru.setVar("lectureSubjectId", teaching[0].subject.id);
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Lectures are shared in a subject the teacher teaches this year.
+}

@@ -1,0 +1,34 @@
+meta {
+  name: Share a file that is not a PDF (400)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/lectures
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+body:multipart-form {
+  title: Not a PDF
+  subjectId: {{lectureSubjectId}}
+  file: @file(../sample-grades/grades-9A.csv)
+}
+
+tests {
+  test("Status is 400", function () {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Says why", function () {
+    expect(res.getBody().message).to.contain("is not a PDF file");
+  });
+}
+
+docs {
+  The file's bytes are checked, not its name or the type the browser says.
+}

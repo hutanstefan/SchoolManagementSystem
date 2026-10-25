@@ -1,0 +1,45 @@
+meta {
+  name: Share a lecture (as teacher)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/lectures
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+body:multipart-form {
+  title: Functions and their graphs (Bruno)
+  description: Uploaded from the Bruno collection.
+  subjectId: {{lectureSubjectId}}
+  studentIds: ["{{lectureReaderId}}","{{lectureOtherReaderId}}"]
+  file: @file(../sample-lectures/functions-and-graphs.pdf)
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("lectureId", res.getBody().id);
+}
+
+tests {
+  test("Status is 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Shared with the two students", function () {
+    expect(res.getBody().studentCount).to.equal(2);
+    expect(res.getBody().fileName).to.equal("functions-and-graphs.pdf");
+  });
+}
+
+docs {
+  The PDF (at most 20 MB) is checked to really be a PDF and stored privately:
+  in a local folder, or in an S3-compatible bucket such as Cloudflare R2
+  (STORAGE_DRIVER=s3). `studentIds` is a JSON array (or a comma-separated
+  list); the students get a notification and can read it until the teacher
+  removes them. The lecture stays in the teacher's library.
+}

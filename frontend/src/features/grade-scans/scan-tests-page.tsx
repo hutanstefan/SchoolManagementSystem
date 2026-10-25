@@ -169,6 +169,7 @@ export function ScanTestsPage() {
         id: subjectId,
         name: '',
         color: 'INDIGO',
+        icon: 'BOOK',
       },
       tests,
     })

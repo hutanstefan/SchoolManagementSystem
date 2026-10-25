@@ -3,6 +3,7 @@ import {
   compareClassNames,
   currentPeriod,
   formatAverage,
+  formatBytes,
   formatDate,
   formatTimeAgo,
   fullName,
@@ -12,6 +13,13 @@ import {
 } from './format'
 
 describe('format helpers', () => {
+  it('shows file sizes the way people read them', () => {
+    expect(formatBytes(900)).toBe('900 B')
+    expect(formatBytes(482_113)).toBe('471 KB')
+    expect(formatBytes(2_400_000)).toBe('2.3 MB')
+    expect(formatBytes(20 * 1024 * 1024)).toBe('20 MB')
+  })
+
   it('formats date-only values without shifting the day', () => {
     expect(formatDate('2026-10-20')).toBe('20 Oct 2026')
     expect(formatDate(null)).toBe('—')

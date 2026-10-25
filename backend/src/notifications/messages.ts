@@ -231,3 +231,17 @@ export function assignmentMessage(change: AssignmentChange): Message {
       };
   }
 }
+
+// ---------------------------------------------------------------- lectures
+
+export function lectureMessage(
+  title: string,
+  subjectName: string,
+  teacherName: string | null,
+): Message {
+  return {
+    type: 'LECTURE_SHARED',
+    title: `New lecture in ${subjectName}: ${title}`,
+    body: `${teacherName ?? 'Your teacher'} shared it with you. Open it from Lectures.`,
+  };
+}

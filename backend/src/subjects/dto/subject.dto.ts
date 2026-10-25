@@ -7,7 +7,7 @@ import {
   MaxLength,
 } from 'class-validator';
 import { Trim } from '../../common/transformers';
-import { SubjectColor } from '../../generated/prisma/enums';
+import { SubjectColor, SubjectIcon } from '../../generated/prisma/enums';
 
 export class CreateSubjectDto {
   /** @example Computer Science */
@@ -25,9 +25,18 @@ export class CreateSubjectDto {
   @IsOptional()
   @IsEnum(SubjectColor)
   color?: SubjectColor;
+
+  /**
+   * Icon of the subject, drawn on its colour. When omitted, one that fits
+   * the name is picked (a book when nothing fits).
+   */
+  @ApiPropertyOptional({ enum: SubjectIcon, enumName: 'SubjectIcon' })
+  @IsOptional()
+  @IsEnum(SubjectIcon)
+  icon?: SubjectIcon;
 }
 
-/** Rename a subject, change its colour, or both. */
+/** Rename a subject, change its colour or its icon. */
 export class UpdateSubjectDto extends PartialType(CreateSubjectDto, {
   skipNullProperties: false,
 }) {}
@@ -38,4 +47,6 @@ export class SubjectDto {
   name!: string;
   @ApiProperty({ enum: SubjectColor, enumName: 'SubjectColor' })
   color!: SubjectColor;
+  @ApiProperty({ enum: SubjectIcon, enumName: 'SubjectIcon' })
+  icon!: SubjectIcon;
 }

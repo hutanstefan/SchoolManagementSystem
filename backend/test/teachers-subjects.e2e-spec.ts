@@ -188,6 +188,34 @@ describe('Teachers and subjects (e2e)', () => {
       );
     });
 
+    it('have an icon: guessed from the name, or picked by the admin', async () => {
+      const { body: guessed } = await as(adminToken)(
+        api()
+          .post('/api/subjects')
+          .send({ name: `${uniqueName('subject')} Chemistry` }),
+      ).expect(201);
+      expect(guessed.icon).toBe('FLASK');
+
+      const { body: changed } = await as(adminToken)(
+        api().patch(`/api/subjects/${guessed.id}`).send({ icon: 'MICROSCOPE' }),
+      ).expect(200);
+      expect(changed).toMatchObject({
+        icon: 'MICROSCOPE',
+        color: guessed.color,
+      });
+      await as(adminToken)(
+        api().patch(`/api/subjects/${guessed.id}`).send({ icon: 'UNICORN' }),
+      ).expect(400);
+
+      const { body: list } = await as(adminToken)(api().get('/api/subjects'));
+      expect(list).toContainEqual(
+        expect.objectContaining({ id: guessed.id, icon: 'MICROSCOPE' }),
+      );
+      await as(adminToken)(api().delete(`/api/subjects/${guessed.id}`)).expect(
+        204,
+      );
+    });
+
     it('rejects a duplicate name regardless of case', async () => {
       await as(adminToken)(
         api().post('/api/subjects').send({ name: 'mathematics' }),

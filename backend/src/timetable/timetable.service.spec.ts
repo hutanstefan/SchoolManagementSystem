@@ -220,7 +220,12 @@ describe('toWeek', () => {
     classSubject: {
       id: 'cs',
       class: { id: className, name: className },
-      subject: { id: 's', name: 'Mathematics', color: 'INDIGO' as const },
+      subject: {
+        id: 's',
+        name: 'Mathematics',
+        color: 'INDIGO' as const,
+        icon: 'CALCULATOR' as const,
+      },
       teacher: null,
     },
   });

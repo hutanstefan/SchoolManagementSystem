@@ -31,6 +31,26 @@
     {
       "key": "closedClassId",
       "value": ""
+    },
+    {
+      "key": "lectureSubjectId",
+      "value": ""
+    },
+    {
+      "key": "lectureReaderId",
+      "value": ""
+    },
+    {
+      "key": "lectureOtherReaderId",
+      "value": ""
+    },
+    {
+      "key": "lectureId",
+      "value": ""
+    },
+    {
+      "key": "lectureFileUrl",
+      "value": ""
     }
   ],
   "item": [
@@ -2546,7 +2566,7 @@
           }
         },
         {
-          "name": "Change subject colour",
+          "name": "Change subject colour and icon",
           "event": [
             {
               "listen": "test",
@@ -2554,8 +2574,9 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('The colour changed, the name did not', () => {",
+                  "pm.test('The colour and icon changed, the name did not', () => {",
                   "  pm.expect(pm.response.json().color).to.equal('PINK');",
+                  "  pm.expect(pm.response.json().icon).to.equal('MICROSCOPE');",
                   "  pm.expect(pm.response.json().name).to.contain('Renamed subject');",
                   "});"
                 ]
@@ -2582,14 +2603,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"color\": \"PINK\"\n}",
+              "raw": "{\n  \"color\": \"PINK\",\n  \"icon\": \"MICROSCOPE\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "Each subject has a colour (one of 10), used wherever the subject appears: timetables, gradebooks, report cards. A new subject gets the colour fewest subjects have, unless one is given."
+            "description": "Each subject has a colour (one of 10) and an icon (one of 40), used wherever the subject appears: timetables, gradebooks, report cards. A new subject gets the colour fewest subjects have and an icon that fits its name, unless they are given."
           }
         },
         {
@@ -3460,6 +3481,518 @@
               ]
             },
             "description": "Ending a semester and closing the year are for administrators only."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lectures",
+      "description": "Each teacher has a library of PDFs and shares them with any students they choose; access stays until the teacher removes it, and every change is kept in the lecture's access history. Uses teacherToken (Auth > Login as teacher) and studentToken (Grades > Login as student), so run those first. The files are private: readers get links that work for a few minutes. The last request deletes the demo lecture again.",
+      "item": [
+        {
+          "name": "My subjects (as teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const teaching = pm.response.json().teaching || [];",
+                  "if (teaching[0]) pm.collectionVariables.set('lectureSubjectId', teaching[0].subject.id);",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/teachers/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "teachers",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Lectures are shared in a subject the teacher teaches this year."
+          }
+        },
+        {
+          "name": "Students to share with (as teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const students = pm.response.json() || [];",
+                  "const me = students.find((s) => s.registrationNumber === '2026-0001');",
+                  "const other = students.find((s) => s.class && s.class.name === '11A');",
+                  "if (me) pm.collectionVariables.set('lectureReaderId', me.id);",
+                  "if (other) pm.collectionVariables.set('lectureOtherReaderId', other.id);",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test(\"Students of every class, not only the teacher's\", () => {",
+                  "  const classes = new Set(pm.response.json().map((s) => s.class && s.class.name));",
+                  "  pm.expect(classes.has('11A') && classes.has('12A')).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/lectures/recipients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lectures",
+                "recipients"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Every student of the open year, from any class, with their class. Saves student@school.test (2026-0001) and a student of 11A for the next requests."
+          }
+        },
+        {
+          "name": "Share a lecture (as teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set('lectureId', pm.response.json().id);",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Shared with the two students', () => pm.expect(pm.response.json().studentCount).to.equal(2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/lectures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lectures"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "Functions and their graphs (Postman)",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Uploaded from the Postman collection.",
+                  "type": "text"
+                },
+                {
+                  "key": "subjectId",
+                  "value": "{{lectureSubjectId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "studentIds",
+                  "value": "[\"{{lectureReaderId}}\",\"{{lectureOtherReaderId}}\"]",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "../sample-lectures/functions-and-graphs.pdf"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "The PDF (at most 20 MB) is checked to really be a PDF and stored privately: in a local folder, or in an S3-compatible bucket such as Cloudflare R2 (STORAGE_DRIVER=s3). `studentIds` is a JSON array (or a comma-separated list); the students get a notification and can read it until the teacher removes them. The lecture stays in the teacher's library."
+          }
+        },
+        {
+          "name": "Share a file that is not a PDF (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Says why', () => pm.expect(pm.response.json().message).to.contain('is not a PDF file'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/lectures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lectures"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "Not a PDF",
+                  "type": "text"
+                },
+                {
+                  "key": "subjectId",
+                  "value": "{{lectureSubjectId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "../sample-grades/grades-9A.csv"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "The file's bytes are checked, not its name or the type the browser says."
+          }
+        },
+        {
+          "name": "Lectures shared with me (as student)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('The new lecture is there, read-only, newest first', () => {",
+                  "  const lecture = pm.response.json().data.find((l) => l.id === pm.collectionVariables.get('lectureId'));",
+                  "  pm.expect(pm.response.json().data[0].id).to.equal(pm.collectionVariables.get('lectureId'));",
+                  "  pm.expect(lecture.canManage).to.equal(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/lectures?page=1&pageSize=12",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lectures"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "12"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "A student sees only the lectures they can read now, newest first, a page at a time (page, pageSize, search, subjectId). subjects lists the subjects they have lectures in, for filters."
+          }
+        },
+        {
+          "name": "Preview link (as student)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const url = pm.response.json().url;",
+                  "  // Local storage gives a path of the API; S3 storage a full URL.",
+                  "  const origin = pm.collectionVariables.get('baseUrl').replace(/\\/api$/, '');",
+                  "  pm.collectionVariables.set('lectureFileUrl', url.startsWith('http') ? url : origin + url);",
+                  "}",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('It expires', () => pm.expect(new Date(pm.response.json().expiresAt) > new Date()).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/lectures/{{lectureId}}/link",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lectures",
+                "{{lectureId}}",
+                "link"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Add `?download=true` for a link that saves the file instead of showing it."
+          }
+        },
+        {
+          "name": "Open the PDF through the link",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('A PDF, shown in the browser', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.equal('application/pdf');",
+                  "  pm.expect(pm.response.headers.get('Content-Disposition')).to.match(/^inline;/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{lectureFileUrl}}",
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "No login: the signed link is the permission, and it stops working after FILE_LINK_SECONDS (5 minutes by default)."
+          }
+        },
+        {
+          "name": "Choose who can read it (as teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Only the student of 11A is left', () => pm.expect(pm.response.json().students.map((s) => s.id)).to.eql([pm.collectionVariables.get('lectureOtherReaderId')]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/lectures/{{lectureId}}/students",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lectures",
+                "{{lectureId}}",
+                "students"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentIds\": [\"{{lectureOtherReaderId}}\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Replaces the list. Who got or lost access is kept in the lecture's access history. Only students who just got access are notified."
+          }
+        },
+        {
+          "name": "Access history (as teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Newest first: one student removed, after the upload shared it with two', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.meta.total).to.equal(2);",
+                  "  pm.expect(body.data.map((c) => c.action)).to.eql(['REVOKED', 'GRANTED']);",
+                  "  pm.expect(body.data[0].students).to.have.lengthOf(1);",
+                  "  pm.expect(body.data[1].students).to.have.lengthOf(2);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/lectures/{{lectureId}}/history?page=1&pageSize=10",
+            "description": "Who got or lost access to the lecture, newest first: one entry per change, with the students it was about and who made it. For the lecture's teacher and admins."
+          }
+        },
+        {
+          "name": "Read it without access (as student, 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/lectures/{{lectureId}}/link",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lectures",
+                "{{lectureId}}",
+                "link"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Not shared with the student any more: as far as they can tell, it doesn't exist."
+          }
+        },
+        {
+          "name": "Delete the lecture (as teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/lectures/{{lectureId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lectures",
+                "{{lectureId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Deletes the lecture and its file."
           }
         }
       ]

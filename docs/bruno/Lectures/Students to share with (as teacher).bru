@@ -1,0 +1,39 @@
+meta {
+  name: Students to share with (as teacher)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/lectures/recipients
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+script:post-response {
+  const students = res.getBody() || [];
+  const me = students.find((s) => s.registrationNumber === "2026-0001");
+  const other = students.find((s) => s.class && s.class.name === "11A");
+  if (me) bru.setVar("lectureReaderId", me.id);
+  if (other) bru.setVar("lectureOtherReaderId", other.id);
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Students of every class, not only the teacher's", function () {
+    const classes = new Set(res.getBody().map((s) => s.class && s.class.name));
+    expect(classes.has("11A")).to.equal(true);
+    expect(classes.has("12A")).to.equal(true);
+  });
+}
+
+docs {
+  Every student of the open year, from any class, with their class. Saves
+  student@school.test (2026-0001) and a student of 11A for the next requests.
+}

@@ -1,0 +1,41 @@
+meta {
+  name: Preview link (as student)
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/lectures/{{lectureId}}/link
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{studentToken}}
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    const url = res.getBody().url;
+    // Local storage gives a path of the API; S3 storage a full URL.
+    bru.setVar(
+      "lectureFileUrl",
+      url.startsWith("http")
+        ? url
+        : req.getUrl().replace(/\/api\/lectures\/.*$/, "") + url,
+    );
+  }
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("It expires", function () {
+    expect(new Date(res.getBody().expiresAt) > new Date()).to.equal(true);
+  });
+}
+
+docs {
+  Add `?download=true` for a link that saves the file instead of showing it.
+}

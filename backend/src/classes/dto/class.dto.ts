@@ -107,9 +107,23 @@ export class ClassSubjectSummaryDto {
   hoursPerWeek!: number;
 }
 
+/** The same class in one school year. */
+export class ClassInYearDto {
+  id!: string;
+  /** @example 10A */
+  name!: string;
+  schoolYear!: ClassYearDto;
+}
+
 export class ClassDetailDto extends ClassDto {
   /** Subjects studied by the class and who teaches each one. */
   subjects!: ClassSubjectSummaryDto[];
+  /**
+   * The same class in every school year, oldest first, this one included:
+   * the class it continues (last year's 9A) and the one that continues it
+   * (next year's 11A). Only the ones the user can see.
+   */
+  lineage!: ClassInYearDto[];
 }
 
 export class PaginatedClassesDto {

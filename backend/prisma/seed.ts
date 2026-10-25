@@ -11,10 +11,12 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
 import {
   GradeAction,
+  LectureAccessAction,
   PrismaClient,
   Role,
   SchoolYearStatus,
   SubjectColor,
+  SubjectIcon,
   Weekday,
   YearOutcome,
   type ClassSubject,
@@ -23,12 +25,32 @@ import { yearResult } from '../src/school-years/promotion';
 import {
   assignmentMessage,
   gradeMessage,
+  lectureMessage,
   lowGradeAlert,
   PASSING_GRADE,
 } from '../src/notifications/messages';
+import { compareClassNames } from '../src/classes/class-names';
+import { createStorage } from '../src/storage/create-storage';
+import { DEMO_LECTURES } from './demo-lectures';
+import { makeLecturePdf } from './lecture-pdfs';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
+
+/** Where the API keeps uploaded files: the demo lectures go there too. */
+const storage = createStorage({
+  STORAGE_DRIVER: process.env.STORAGE_DRIVER === 's3' ? 's3' : 'local',
+  STORAGE_DIR: process.env.STORAGE_DIR || 'storage',
+  S3_ENDPOINT: process.env.S3_ENDPOINT,
+  S3_REGION: process.env.S3_REGION || 'auto',
+  S3_BUCKET: process.env.S3_BUCKET,
+  S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
+  S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
+  S3_FORCE_PATH_STYLE: process.env.S3_FORCE_PATH_STYLE === 'true',
+  // Only used to sign links, which the seed doesn't make.
+  FILE_LINK_SECONDS: 300,
+  JWT_SECRET: 'seed',
 });
 
 /** Every seeded account uses this password (see README > Test credentials). */
@@ -43,34 +65,57 @@ const SUBJECTS = [
     hoursPerWeek: 4,
     room: null,
     color: SubjectColor.INDIGO,
+    icon: SubjectIcon.CALCULATOR,
   },
   {
     name: 'Romanian Language',
     hoursPerWeek: 4,
     room: null,
     color: SubjectColor.ROSE,
+    icon: SubjectIcon.FEATHER,
   },
-  { name: 'English', hoursPerWeek: 2, room: null, color: SubjectColor.SKY },
+  {
+    name: 'English',
+    hoursPerWeek: 2,
+    room: null,
+    color: SubjectColor.SKY,
+    icon: SubjectIcon.LANGUAGES,
+  },
   {
     name: 'Physics',
     hoursPerWeek: 2,
     room: 'Physics lab',
     color: SubjectColor.VIOLET,
+    icon: SubjectIcon.ATOM,
   },
   {
     name: 'Chemistry',
     hoursPerWeek: 2,
     room: 'Chemistry lab',
     color: SubjectColor.TEAL,
+    icon: SubjectIcon.FLASK,
   },
   {
     name: 'Biology',
     hoursPerWeek: 2,
     room: 'Biology lab',
     color: SubjectColor.EMERALD,
+    icon: SubjectIcon.DNA,
   },
-  { name: 'History', hoursPerWeek: 2, room: null, color: SubjectColor.AMBER },
-  { name: 'Geography', hoursPerWeek: 2, room: null, color: SubjectColor.LIME },
+  {
+    name: 'History',
+    hoursPerWeek: 2,
+    room: null,
+    color: SubjectColor.AMBER,
+    icon: SubjectIcon.LANDMARK,
+  },
+  {
+    name: 'Geography',
+    hoursPerWeek: 2,
+    room: null,
+    color: SubjectColor.LIME,
+    icon: SubjectIcon.GLOBE,
+  },
 ] as const;
 
 type SubjectName = (typeof SUBJECTS)[number]['name'];
@@ -288,6 +333,12 @@ function hashPassword(): Promise<string> {
 }
 
 async function clearDatabase(): Promise<void> {
+  // The lectures' files first, while we still know where they are.
+  const files = await prisma.lecture.findMany({ select: { fileKey: true } });
+  for (const { fileKey } of files) {
+    await storage.remove(fileKey).catch(() => undefined);
+  }
+  await prisma.lecture.deleteMany();
   // Order matters because of foreign keys.
   await prisma.gradeHistory.deleteMany();
   await prisma.grade.deleteMany();
@@ -339,7 +390,11 @@ async function main(): Promise<void> {
   const subjects = new Map<SubjectName, string>();
   for (const subject of SUBJECTS) {
     const created = await prisma.subject.create({
-      data: { name: subject.name, color: subject.color },
+      data: {
+        name: subject.name,
+        color: subject.color,
+        icon: subject.icon,
+      },
     });
     subjects.set(subject.name, created.id);
   }
@@ -623,6 +678,18 @@ async function main(): Promise<void> {
     rooms: new Map(classSubjects.map((cs) => [cs.id, cs.room])),
   });
 
+  console.log(`Sharing lectures (${storage.driver} storage)...`);
+  const lectures = await seedLectures({
+    thisYearId: thisYear.id,
+    lastYearId: lastYear.id,
+    yearStart,
+    lastYearStart: new Date(Date.UTC(startYear - 1, 8, 15)),
+    today,
+  });
+
+  console.log(
+    `Lectures: ${lectures.lectures} PDFs shared with ${lectures.readers} students.`,
+  );
   console.log(
     `Done: 1 admin, ${teacherIds.length} teachers, ${classIds.length} classes, ` +
       `${subjects.size} subjects, ${classSubjects.length} teaching assignments, ` +
@@ -1266,9 +1333,199 @@ async function seedChat(today: Date): Promise<number> {
 
 main()
   .catch((error: unknown) => {
-    console.error(error);
+    // P2021: a table is missing, i.e. the migrations haven't been applied.
+    if ((error as { code?: string }).code === 'P2021') {
+      console.error(
+        'The database is missing tables: apply the migrations first with `npm run db:deploy`.',
+      );
+    } else {
+      console.error(error);
+    }
     process.exitCode = 1;
   })
   .finally(() => {
     void prisma.$disconnect();
   });
+
+/**
+ * Demo lectures (PDFs made on the fly), shared the way teachers would: with
+ * a whole class, or with a few students from different classes. The
+ * students got a notification for each, as in the app.
+ */
+async function seedLectures(options: {
+  thisYearId: string;
+  lastYearId: string;
+  yearStart: Date;
+  lastYearStart: Date;
+  today: Date;
+}): Promise<{ lectures: number; readers: number }> {
+  const readers = new Set<string>();
+  const day = 24 * 60 * 60 * 1000;
+  for (const demo of DEMO_LECTURES) {
+    const schoolYearId =
+      demo.year === 'this' ? options.thisYearId : options.lastYearId;
+    const start =
+      demo.year === 'this' ? options.yearStart : options.lastYearStart;
+    // Never in the future: a few hours ago at the latest.
+    const createdAt = new Date(
+      Math.min(
+        start.getTime() + demo.day * day + 11 * 60 * 60 * 1000,
+        options.today.getTime() - 3 * 60 * 60 * 1000,
+      ),
+    );
+
+    const classes = await prisma.class.findMany({
+      where: { schoolYearId },
+      select: {
+        id: true,
+        name: true,
+        subjects: {
+          select: {
+            teacherId: true,
+            subject: { select: { id: true, name: true, color: true } },
+          },
+        },
+        enrollments: {
+          select: {
+            studentId: true,
+            student: { select: { registrationNumber: true } },
+          },
+          orderBy: { student: { registrationNumber: 'asc' } },
+        },
+      },
+    });
+    classes.sort((a, b) => compareClassNames(a.name, b.name));
+    const byName = new Map(classes.map((c) => [c.name, c]));
+    const taught = byName
+      .get(demo.teacherOfClass)
+      ?.subjects.find((cs) => cs.subject.name === demo.subject);
+    if (!taught?.teacherId) continue;
+    const teacher = await prisma.teacher.findUniqueOrThrow({
+      where: { id: taught.teacherId },
+      select: {
+        id: true,
+        userId: true,
+        user: { select: { firstName: true, lastName: true } },
+      },
+    });
+
+    const studentIds = new Set<string>();
+    // Someone the teacher shared it with by mistake and removed later: the
+    // access history shows both changes.
+    let removedLater: string | undefined;
+    if ('classes' in demo.audience) {
+      for (const name of demo.audience.classes) {
+        byName
+          .get(name)
+          ?.enrollments.forEach((e) => studentIds.add(e.studentId));
+      }
+    } else {
+      for (const [name, count] of Object.entries(demo.audience.picks)) {
+        const enrolled = byName.get(name)?.enrollments ?? [];
+        enrolled.slice(0, count).forEach((e) => studentIds.add(e.studentId));
+        removedLater ??= enrolled[count]?.studentId;
+      }
+      if (demo.audience.includeDemoStudent) {
+        const demoStudent = await prisma.student.findFirst({
+          where: { user: { email: `student@${EMAIL_DOMAIN}` } },
+          select: { id: true },
+        });
+        if (demoStudent) studentIds.add(demoStudent.id);
+      }
+    }
+
+    const teacherName = `${teacher.user.firstName} ${teacher.user.lastName}`;
+    const startYear = start.getUTCFullYear();
+    const rgb = SUBJECT_RGB[taught.subject.color];
+    const pdf = makeLecturePdf({
+      title: demo.title,
+      subtitle: `${demo.subject} · ${teacherName} · ${startYear}–${startYear + 1}`,
+      color: rgb,
+      sections: demo.sections,
+    });
+    const fileKey = `lectures/${crypto.randomUUID()}.pdf`;
+    await storage.put(fileKey, pdf, 'application/pdf');
+    await prisma.lecture.create({
+      data: {
+        teacherId: teacher.id,
+        subjectId: taught.subject.id,
+        title: demo.title,
+        description: demo.description,
+        fileKey,
+        fileName: demo.fileName,
+        fileSize: pdf.length,
+        createdAt,
+        updatedAt: createdAt,
+        access: {
+          createMany: {
+            data: [...studentIds].map((studentId) => ({
+              studentId,
+              grantedAt: createdAt,
+            })),
+          },
+        },
+        accessEvents: {
+          createMany: {
+            data: [
+              ...[...studentIds, ...(removedLater ? [removedLater] : [])].map(
+                (studentId) => ({
+                  studentId,
+                  action: LectureAccessAction.GRANTED,
+                  actorId: teacher.userId,
+                  createdAt,
+                }),
+              ),
+              ...(removedLater
+                ? [
+                    {
+                      studentId: removedLater,
+                      action: LectureAccessAction.REVOKED,
+                      actorId: teacher.userId,
+                      createdAt: new Date(
+                        Math.min(
+                          createdAt.getTime() + 2 * 60 * 60 * 1000,
+                          options.today.getTime() - 60 * 60 * 1000,
+                        ),
+                      ),
+                    },
+                  ]
+                : []),
+            ],
+          },
+        },
+      },
+    });
+    studentIds.forEach((id) => readers.add(id));
+
+    if (demo.year === 'this') {
+      const users = await prisma.student.findMany({
+        where: { id: { in: [...studentIds] } },
+        select: { userId: true },
+      });
+      const message = lectureMessage(demo.title, demo.subject, teacherName);
+      await prisma.notification.createMany({
+        data: users.map(({ userId }) => ({
+          userId,
+          ...message,
+          link: '/student/lectures',
+          createdAt: new Date(createdAt.getTime() + 60_000),
+        })),
+      });
+    }
+  }
+  return { lectures: DEMO_LECTURES.length, readers: readers.size };
+}
+
+/** The subjects' colours in the PDFs' headers (Tailwind's 600 shades). */
+const SUBJECT_RGB: Record<SubjectColor, [number, number, number]> = {
+  INDIGO: [79, 70, 229],
+  VIOLET: [124, 58, 237],
+  PINK: [219, 39, 119],
+  ROSE: [225, 29, 72],
+  ORANGE: [234, 88, 12],
+  AMBER: [217, 119, 6],
+  LIME: [101, 163, 13],
+  EMERALD: [5, 150, 105],
+  TEAL: [13, 148, 136],
+  SKY: [2, 132, 199],
+};

@@ -1,0 +1,36 @@
+meta {
+  name: Change subject colour and icon
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/subjects/{{subjectId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "color": "PINK",
+    "icon": "MICROSCOPE"
+  }
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("The colour and icon changed, the name did not", function () {
+    expect(res.getBody().color).to.equal("PINK");
+    expect(res.getBody().icon).to.equal("MICROSCOPE");
+    expect(res.getBody().name).to.contain("Renamed subject");
+  });
+}
+
+docs {
+  Each subject has a colour (one of 10) and an icon (one of 40), used
+  wherever the subject appears: timetables, gradebooks, report cards. A new
+  subject gets the colour fewest subjects have and an icon that fits its
+  name, unless they are given.
+}

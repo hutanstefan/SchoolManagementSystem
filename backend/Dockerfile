@@ -27,7 +27,9 @@ RUN npm run build
 
 # ---- Migrations + seed (needs the dev tools: Prisma CLI, tsx, faker) ----
 FROM build AS tools
-CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx prisma/seed.ts --if-empty"]
+# The seed puts demo lectures in the storage volume shared with the API, then
+# hands the files over to the API's user (node).
+CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx prisma/seed.ts --if-empty && chown -R node:node /app/storage"]
 
 # ---- Production dependencies only ----
 FROM build AS prod-deps
@@ -40,6 +42,8 @@ WORKDIR /app
 COPY --chown=node:node package.json ./
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
+# Uploaded lectures (local storage driver), a volume in docker-compose.yml.
+RUN mkdir -p /app/storage && chown node:node /app/storage
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=5 \

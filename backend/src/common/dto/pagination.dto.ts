@@ -68,8 +68,10 @@ export interface Paginated<T> {
   meta: PaginationMetaDto;
 }
 
+type PageQuery = Pick<PaginationQueryDto, 'page' | 'pageSize'>;
+
 /** Prisma `skip`/`take` for a page. */
-export function pageArgs(query: PaginationQueryDto): {
+export function pageArgs(query: PageQuery): {
   skip: number;
   take: number;
 } {
@@ -79,7 +81,7 @@ export function pageArgs(query: PaginationQueryDto): {
 export function paginated<T>(
   data: T[],
   total: number,
-  query: PaginationQueryDto,
+  query: PageQuery,
 ): Paginated<T> {
   return {
     data,

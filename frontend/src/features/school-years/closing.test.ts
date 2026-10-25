@@ -8,7 +8,7 @@ import {
 } from './closing'
 
 const failed = (name: string) => ({
-  subject: { id: name, name, color: 'INDIGO' as const },
+  subject: { id: name, name, color: 'INDIGO' as const, icon: 'BOOK' as const },
   semester1: 4,
   semester2: 4,
   annual: 4,

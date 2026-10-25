@@ -1,4 +1,5 @@
 import {
+  BookOpenText,
   CalendarClock,
   ClipboardCheck,
   ClipboardX,
@@ -36,6 +37,10 @@ const LOOK: Record<NotificationType, { icon: LucideIcon; className: string }> =
     HOMEROOM_ALERT: {
       icon: TriangleAlert,
       className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    },
+    LECTURE_SHARED: {
+      icon: BookOpenText,
+      className: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
     },
   }
 

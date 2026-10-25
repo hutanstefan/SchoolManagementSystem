@@ -1,6 +1,49 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/api/files/{token}": {
+      "get": {
+        "description": "Only with the local storage: the links given by e.g. GET /lectures/:id/link point here. The token names the file and expires after FILE_LINK_SECONDS, so no login is needed (it works in a new tab or an iframe). With S3 storage the links go straight to the bucket. Errors are a small HTML page for browsers, JSON otherwise.",
+        "operationId": "FilesController_open",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invalid or expired link, or the file is gone",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Open a file through a signed link",
+        "tags": [
+          "Files"
+        ]
+      }
+    },
     "/api/school-years": {
       "get": {
         "description": "Admins get every year. Teachers and students get the years they had classes in, and the open one. Closed years are a read-only archive.",
@@ -5513,6 +5556,624 @@
           "Stats"
         ]
       }
+    },
+    "/api/lectures": {
+      "get": {
+        "description": "Admins: every lecture. Teachers: their library. Students: the ones they can read. Newest first; `subjects` lists every subject they have lectures in, for filters. Lectures are not tied to a school year.",
+        "operationId": "LecturesController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "Items per page (max 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Part of the title or the description.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedLecturesDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lectures, a page at a time",
+        "tags": [
+          "Lectures"
+        ]
+      },
+      "post": {
+        "description": "The lecture stays in the teacher's library; the students it is shared with can read it until the teacher removes them. The file is checked to really be a PDF and stored privately (local folder or S3 bucket). The students it is shared with get a notification.",
+        "operationId": "LecturesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "subjectId",
+                  "file"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "subjectId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "A subject the teacher teaches this school year."
+                  },
+                  "studentIds": {
+                    "type": "string",
+                    "description": "Who may read it, from any class: a JSON array of student ids or a comma-separated list. Can be changed later.",
+                    "example": "[\"0b39a733-7b2b-45e6-9d19-7938ad3af0b6\"]"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The PDF (at most 20 MB)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LectureDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a lecture (a PDF) to the library and share it",
+        "tags": [
+          "Lectures"
+        ]
+      }
+    },
+    "/api/lectures/recipients": {
+      "get": {
+        "description": "Every student of the open year, from any class (with their class), and the ones not in a class yet.",
+        "operationId": "LecturesController_recipients",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LectureStudentDto"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Students a lecture can be shared with",
+        "tags": [
+          "Lectures"
+        ]
+      }
+    },
+    "/api/lectures/{id}": {
+      "get": {
+        "description": "The teacher whose lecture it is and admins also get the students who can read it. Anyone else who may not read it gets 404.",
+        "operationId": "LecturesController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LectureDetailDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One lecture",
+        "tags": [
+          "Lectures"
+        ]
+      },
+      "patch": {
+        "operationId": "LecturesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLectureDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LectureDetailDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change the title, description or subject",
+        "tags": [
+          "Lectures"
+        ]
+      },
+      "delete": {
+        "operationId": "LecturesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a lecture, its history and its file",
+        "tags": [
+          "Lectures"
+        ]
+      }
+    },
+    "/api/lectures/{id}/history": {
+      "get": {
+        "description": "Newest first, one entry per change (a change can be about many students), with who made it. For the teacher whose lecture it is and admins.",
+        "operationId": "LecturesController_history",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "Items per page (max 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LectureHistoryDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Who got or lost access, and when",
+        "tags": [
+          "Lectures"
+        ]
+      }
+    },
+    "/api/lectures/{id}/link": {
+      "get": {
+        "description": "Works for FILE_LINK_SECONDS (5 minutes by default) without a login, so it can be opened in a new tab or an iframe. With S3 storage it is a pre-signed URL of the bucket, which stays private.",
+        "operationId": "LecturesController_link",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "download",
+            "required": false,
+            "in": "query",
+            "description": "true: the browser saves the file; false (default): it shows it.",
+            "schema": {
+              "default": false,
+              "type": "boolean",
+              "enum": [
+                true,
+                false
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileLinkDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A short-lived link to preview or download the PDF",
+        "tags": [
+          "Lectures"
+        ]
+      }
+    },
+    "/api/lectures/{id}/students": {
+      "put": {
+        "description": "Replaces the list. Who got or lost access is written to the lecture's history. Students who just got access are notified; the others are not bothered again.",
+        "operationId": "LecturesController_setStudents",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetLectureStudentsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LectureDetailDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Choose who can read the lecture",
+        "tags": [
+          "Lectures"
+        ]
+      }
     }
   },
   "info": {
@@ -5749,6 +6410,52 @@
         ],
         "description": "Its colour in the app, chosen by the admin."
       },
+      "SubjectIcon": {
+        "type": "string",
+        "enum": [
+          "BOOK",
+          "CALCULATOR",
+          "SIGMA",
+          "PI",
+          "RULER",
+          "SHAPES",
+          "PUZZLE",
+          "ATOM",
+          "MAGNET",
+          "FLASK",
+          "DNA",
+          "MICROSCOPE",
+          "LEAF",
+          "HEART",
+          "BRAIN",
+          "TELESCOPE",
+          "LANDMARK",
+          "SCROLL",
+          "GLOBE",
+          "MOUNTAIN",
+          "COMPASS",
+          "LANGUAGES",
+          "FEATHER",
+          "PENCIL",
+          "MESSAGE",
+          "LAPTOP",
+          "CODE",
+          "CPU",
+          "WRENCH",
+          "LIGHTBULB",
+          "PALETTE",
+          "MUSIC",
+          "DRAMA",
+          "CAMERA",
+          "DUMBBELL",
+          "SCALE",
+          "TRENDING",
+          "USERS",
+          "CHURCH",
+          "GRADUATION"
+        ],
+        "description": "Its icon in the app, chosen by the admin."
+      },
       "SubjectSummaryDto": {
         "type": "object",
         "properties": {
@@ -5757,6 +6464,14 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/SubjectColor"
+              }
+            ]
+          },
+          "icon": {
+            "description": "Its icon in the app, chosen by the admin.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubjectIcon"
               }
             ]
           },
@@ -5770,6 +6485,7 @@
         },
         "required": [
           "color",
+          "icon",
           "id",
           "name"
         ]
@@ -6819,6 +7535,26 @@
           "hoursPerWeek"
         ]
       },
+      "ClassInYearDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "10A"
+          },
+          "schoolYear": {
+            "$ref": "#/components/schemas/ClassYearDto"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "schoolYear"
+        ]
+      },
       "ClassDetailDto": {
         "type": "object",
         "properties": {
@@ -6867,6 +7603,13 @@
             "items": {
               "$ref": "#/components/schemas/ClassSubjectSummaryDto"
             }
+          },
+          "lineage": {
+            "description": "The same class in every school year, oldest first, this one included:\nthe class it continues (last year's 9A) and the one that continues it\n(next year's 11A). Only the ones the user can see.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassInYearDto"
+            }
           }
         },
         "required": [
@@ -6877,7 +7620,8 @@
           "homeroomTeacher",
           "studentCount",
           "createdAt",
-          "subjects"
+          "subjects",
+          "lineage"
         ]
       },
       "CreateClassDto": {
@@ -6948,6 +7692,13 @@
               }
             ]
           },
+          "icon": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubjectIcon"
+              }
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -6958,6 +7709,7 @@
         },
         "required": [
           "color",
+          "icon",
           "id",
           "name"
         ]
@@ -6970,6 +7722,14 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/SubjectColor"
+              }
+            ]
+          },
+          "icon": {
+            "description": "Icon of the subject, drawn on its colour. When omitted, one that fits\nthe name is picked (a book when nothing fits).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubjectIcon"
               }
             ]
           },
@@ -6990,6 +7750,14 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/SubjectColor"
+              }
+            ]
+          },
+          "icon": {
+            "description": "Icon of the subject, drawn on its colour. When omitted, one that fits\nthe name is picked (a book when nothing fits).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubjectIcon"
               }
             ]
           },
@@ -8321,7 +9089,8 @@
           "GRADE_REMOVED",
           "TIMETABLE_CHANGED",
           "ASSIGNMENT_CHANGED",
-          "HOMEROOM_ALERT"
+          "HOMEROOM_ALERT",
+          "LECTURE_SHARED"
         ]
       },
       "NotificationDto": {
@@ -9013,6 +9782,348 @@
           "rows",
           "gradeDistribution",
           "activity"
+        ]
+      },
+      "LectureDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "teacher": {
+            "nullable": true,
+            "description": "Whose library it is in; null if that teacher was deleted.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonSummaryDto"
+              }
+            ]
+          },
+          "fileName": {
+            "type": "string",
+            "example": "quadratic-equations.pdf"
+          },
+          "fileSize": {
+            "type": "number",
+            "description": "Bytes.",
+            "example": 482113
+          },
+          "studentCount": {
+            "type": "number",
+            "description": "How many students can read it now (0 for students themselves)."
+          },
+          "canManage": {
+            "type": "boolean",
+            "description": "The user can edit it, change who reads it and delete it."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "subject",
+          "teacher",
+          "fileName",
+          "fileSize",
+          "studentCount",
+          "canManage",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PaginatedLecturesDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Newest first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LectureDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          },
+          "subjects": {
+            "description": "Every subject the user has lectures in (all pages), for filters.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectSummaryDto"
+            }
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "subjects"
+        ]
+      },
+      "LectureStudentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Teacher or student id (not the user id)."
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Mihai"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Ionescu"
+          },
+          "registrationNumber": {
+            "type": "string",
+            "example": "2026-0042"
+          },
+          "class": {
+            "nullable": true,
+            "description": "The student's class: this year's, or their last one (null if none).",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClassSummaryDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "registrationNumber",
+          "class"
+        ]
+      },
+      "LectureDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "teacher": {
+            "nullable": true,
+            "description": "Whose library it is in; null if that teacher was deleted.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonSummaryDto"
+              }
+            ]
+          },
+          "fileName": {
+            "type": "string",
+            "example": "quadratic-equations.pdf"
+          },
+          "fileSize": {
+            "type": "number",
+            "description": "Bytes.",
+            "example": 482113
+          },
+          "studentCount": {
+            "type": "number",
+            "description": "How many students can read it now (0 for students themselves)."
+          },
+          "canManage": {
+            "type": "boolean",
+            "description": "The user can edit it, change who reads it and delete it."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "students": {
+            "description": "Who can read it now; only for the teacher whose lecture it is and admins.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LectureStudentDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "subject",
+          "teacher",
+          "fileName",
+          "fileSize",
+          "studentCount",
+          "canManage",
+          "createdAt",
+          "updatedAt",
+          "students"
+        ]
+      },
+      "LectureAccessAction": {
+        "type": "string",
+        "enum": [
+          "GRANTED",
+          "REVOKED"
+        ]
+      },
+      "LectureActorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The user id."
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName"
+        ]
+      },
+      "LectureAccessChangeDto": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LectureAccessAction"
+              }
+            ]
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string",
+            "description": "When it happened."
+          },
+          "actor": {
+            "nullable": true,
+            "description": "Who did it; null if that user was deleted or for changes made by the system.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LectureActorDto"
+              }
+            ]
+          },
+          "students": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LectureStudentDto"
+            }
+          }
+        },
+        "required": [
+          "action",
+          "at",
+          "actor",
+          "students"
+        ]
+      },
+      "LectureHistoryDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Newest first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LectureAccessChangeDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "FileLinkDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Open it right away: it stops working after `expiresAt`."
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt"
+        ]
+      },
+      "UpdateLectureDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Send null or \"\" to remove it.",
+            "maxLength": 1000
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SetLectureStudentsDto": {
+        "type": "object",
+        "properties": {
+          "studentIds": {
+            "description": "Everyone who may read the lecture; replaces the list. The change is\nkept in the lecture's access history.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "studentIds"
         ]
       }
     }

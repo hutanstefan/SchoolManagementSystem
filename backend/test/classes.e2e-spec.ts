@@ -56,6 +56,25 @@ describe('Classes (e2e)', () => {
       ]);
     });
 
+    it("knows the same class in other years (last year's 9A is this year's 10A)", async () => {
+      const { body } = await as(adminToken)(
+        api().get(`/api/classes/${classIds['10A']}`),
+      ).expect(200);
+      expect(
+        body.lineage.map(
+          (c: { name: string; schoolYear: { status: string } }) =>
+            `${c.name} ${c.schoolYear.status}`,
+        ),
+      ).toEqual(['9A CLOSED', '10A ACTIVE']);
+      expect(body.lineage[1].id).toBe(classIds['10A']);
+
+      // And forward, from last year's class.
+      const { body: older } = await as(adminToken)(
+        api().get(`/api/classes/${body.lineage[0].id}`),
+      ).expect(200);
+      expect(older.lineage).toEqual(body.lineage);
+    });
+
     it('creates, renames and deletes a class', async () => {
       const name = uniqueClassName();
       const { body: created } = await as(adminToken)(
@@ -130,6 +149,20 @@ describe('Classes (e2e)', () => {
         '9B',
         '10A',
       ]);
+    });
+
+    it('follows a class only into years they could see it', async () => {
+      // Today's 9A is a new entry class: it has no past.
+      const { body } = await as(teacherToken)(
+        api().get(`/api/classes/${classIds['9A']}`),
+      ).expect(200);
+      expect(body.lineage.map((c: { id: string }) => c.id)).toEqual([
+        classIds['9A'],
+      ]);
+      const { body: admins } = await as(adminToken)(
+        api().get(`/api/classes/${classIds['12A']}`),
+      ).expect(200);
+      expect(admins.lineage.length).toBeGreaterThan(1);
     });
 
     it('can list the students of an assigned class', async () => {

@@ -3,6 +3,7 @@ import {
   assignmentMessage,
   formatDay,
   gradeMessage,
+  lectureMessage,
   lowAverageAlert,
   lowGradeAlert,
   timetableMessage,
@@ -130,5 +131,20 @@ describe('notification messages', () => {
         className: '9A',
       }).title,
     ).toBe('You are the homeroom teacher of 9A');
+  });
+});
+
+describe('lectureMessage', () => {
+  it('names the subject, the lecture and who shared it', () => {
+    expect(lectureMessage('Functions', 'Mathematics', 'Mihai Ionescu')).toEqual(
+      {
+        type: 'LECTURE_SHARED',
+        title: 'New lecture in Mathematics: Functions',
+        body: 'Mihai Ionescu shared it with you. Open it from Lectures.',
+      },
+    );
+    expect(lectureMessage('Functions', 'Mathematics', null).body).toBe(
+      'Your teacher shared it with you. Open it from Lectures.',
+    );
   });
 });

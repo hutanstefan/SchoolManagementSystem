@@ -50,6 +50,14 @@ export const queryKeys = {
     list: ['school-years', 'list'] as const,
     closing: ['school-years', 'closing'] as const,
   },
+  lectures: {
+    all: ['lectures'] as const,
+    list: (params: object) => ['lectures', 'list', params] as const,
+    detail: (id: string) => ['lectures', 'detail', id] as const,
+    history: (id: string, page: number) =>
+      ['lectures', 'history', id, page] as const,
+    recipients: ['lectures', 'recipients'] as const,
+  },
   notifications: {
     all: ['notifications'] as const,
     list: (params: object) => ['notifications', 'list', params] as const,

@@ -20,7 +20,7 @@ const data: GradebookData = {
     },
   },
   readOnly: false,
-  subject: { id: 's-1', name: 'Mathematics', color: 'INDIGO' },
+  subject: { id: 's-1', name: 'Mathematics', color: 'INDIGO', icon: 'BOOK' },
   teacher: { id: 't-1', firstName: 'Mihai', lastName: 'Ionescu' },
   hoursPerWeek: 4,
   minimumGrades: 5,
@@ -57,7 +57,7 @@ vi.mock('./api', async (importActual) => ({
 const subjects: ClassSubject[] = [
   {
     classSubjectId: 'cs-1',
-    subject: { id: 's-1', name: 'Mathematics', color: 'INDIGO' },
+    subject: { id: 's-1', name: 'Mathematics', color: 'INDIGO', icon: 'BOOK' },
     teacher: { id: 't-1', firstName: 'Mihai', lastName: 'Ionescu' },
     hoursPerWeek: 4,
   },

@@ -21,6 +21,17 @@ export function formatDate(value: string | null | undefined): string {
   )
 }
 
+/** "2026-10-24T14:03:00Z" -> "24 Oct 2026, 17:03" (in the viewer's time zone). */
+export function formatDateTime(value: string): string {
+  return new Date(value).toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 /** Two decimals, as shown in Romanian report cards: 8.5 -> "8.50". */
 export function formatAverage(value: number | null | undefined): string {
   return value === null || value === undefined ? '—' : value.toFixed(2)
@@ -123,4 +134,12 @@ export function formatTimeAgo(value: string, now: Date = new Date()): string {
     month: 'short',
     ...(then.getFullYear() !== now.getFullYear() && { year: 'numeric' }),
   })
+}
+
+/** 482113 -> "471 KB", 2400000 -> "2.3 MB" */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  const mb = bytes / (1024 * 1024)
+  return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`
 }

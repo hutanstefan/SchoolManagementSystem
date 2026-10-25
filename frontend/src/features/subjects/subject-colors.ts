@@ -1,18 +1,3 @@
-import {
-  Atom,
-  BookOpen,
-  Calculator,
-  Dumbbell,
-  FlaskConical,
-  Globe2,
-  Landmark,
-  Languages,
-  Laptop,
-  Leaf,
-  Music,
-  Palette,
-  type LucideIcon,
-} from 'lucide-react'
 import type { Schemas } from '@/api/client'
 
 export type SubjectColor = Schemas['SubjectColor']
@@ -95,22 +80,3 @@ export const SUBJECT_COLORS: Record<SubjectColor, ColorClasses> = {
 }
 
 export const SUBJECT_COLOR_KEYS = Object.keys(SUBJECT_COLORS) as SubjectColor[]
-
-/** An icon that fits the subject's name; a book for anything else. */
-const ICONS: [RegExp, LucideIcon][] = [
-  [/sport|physical education|gym/i, Dumbbell],
-  [/math|algebra|geometr/i, Calculator],
-  [/physic/i, Atom],
-  [/chemi/i, FlaskConical],
-  [/biolog|science/i, Leaf],
-  [/histor/i, Landmark],
-  [/geograph/i, Globe2],
-  [/english|romanian|french|german|spanish|latin|language|literat/i, Languages],
-  [/comput|informati|program|ict/i, Laptop],
-  [/\bart\b|drawing|design/i, Palette],
-  [/music/i, Music],
-]
-
-export function subjectIcon(name: string): LucideIcon {
-  return ICONS.find(([pattern]) => pattern.test(name))?.[1] ?? BookOpen
-}

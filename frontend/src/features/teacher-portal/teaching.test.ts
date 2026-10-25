@@ -6,8 +6,18 @@ import { groupTeaching } from './teaching'
 const c9A = { id: 'c-9a', name: '9A' }
 const c10A = { id: 'c-10a', name: '10A' }
 const c11B = { id: 'c-11b', name: '11B' }
-const maths = { id: 's-maths', name: 'Mathematics', color: 'INDIGO' as const }
-const physics = { id: 's-physics', name: 'Physics', color: 'VIOLET' as const }
+const maths = {
+  id: 's-maths',
+  name: 'Mathematics',
+  color: 'INDIGO' as const,
+  icon: 'BOOK' as const,
+}
+const physics = {
+  id: 's-physics',
+  name: 'Physics',
+  color: 'VIOLET' as const,
+  icon: 'BOOK' as const,
+}
 
 const profile = {
   id: 't-1',
