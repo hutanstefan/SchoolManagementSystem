@@ -119,6 +119,7 @@ erDiagram
     lectures ||--o{ lecture_access_events : "access history"
     students ||--o{ lecture_access_events : "got or lost access"
     users |o--o{ lecture_access_events : "changed"
+    users |o--o{ audit_logs : "did"
     classes ||--o{ class_subjects : "studies"
     subjects ||--o{ class_subjects : "is taught in"
     teachers |o--o{ class_subjects : "teaches"
@@ -286,6 +287,19 @@ erDiagram
         uuid actor_id FK "nullable"
         timestamp created_at "same for one change"
     }
+    audit_logs {
+        uuid id PK
+        timestamp created_at
+        enum kind "CHANGE | LOGIN | LOGOUT | LOGIN_FAILED"
+        uuid actor_id FK "nullable"
+        string actor_name "kept if the user is deleted"
+        string category "e.g. Grades"
+        string action "e.g. Gave a grade"
+        string target "what it was about"
+        int change_count
+        jsonb details "fields before and after"
+        string ip
+    }
 ```
 
 **Design decisions**
@@ -303,6 +317,7 @@ erDiagram
 - **UUID primary keys**, so IDs in URLs can't be guessed or enumerated.
 - **Value ranges are enforced twice:** in the API validation and with database `CHECK` constraints (grade 1-10, period 1-8, hours per week 1-10).
 - **Averages are computed, never stored**, so they can never get out of sync with the grades. As in Romanian schools, each subject gets its own average, and the overall average is the mean of the subject averages.
+- **Everything is in the activity log** (`audit_logs`), one row per action, with what changed stored as JSON (see [Activity log](#activity-log)). The changes are collected in one place, a Prisma extension, instead of in every service, so a new feature is logged without extra code.
 - **Every grade change is audited** in `grade_history`, written in the same transaction as the change (see [Grades and averages](#grades-and-averages)).
 - **A direct conversation exists once per pair of people.** `conversations.direct_key` holds the two user ids sorted and joined, with a unique index, so two people opening a chat at the same moment still get one conversation. A `CHECK` makes a group have a name and a direct conversation a key.
 - **Unread counts are computed, not stored.** Each member has a `last_read_at`; unread messages are the ones from others after it, so a counter can never drift.
@@ -329,100 +344,102 @@ erDiagram
 
 All endpoints are under `/api`. "Teacher (own)" means a teacher only sees the classes they teach or are homeroom teacher of; any other class returns `403`.
 
-| Method | Path                                      | Access                                    | Description                                                                                         |
-| ------ | ----------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| GET    | `/health`                                 | Public                                    | API and database status                                                                             |
-| POST   | `/auth/login`                             | Public                                    | Log in, returns a JWT (max 5 attempts/min)                                                          |
-| GET    | `/auth/me`                                | Any logged-in                             | The current user with their role and profile                                                        |
-| POST   | `/auth/logout`                            | Any logged-in                             | Log out: revokes every token of the user (all devices)                                              |
-| GET    | `/students`                               | Admin                                     | List students (paginated, search by name, email or reg. no., class filter)                          |
-| POST   | `/students`                               | Admin                                     | Create a student account, optionally in a class                                                     |
-| GET    | `/students/:id`                           | Admin                                     | Student details                                                                                     |
-| PATCH  | `/students/:id`                           | Admin                                     | Update a student, move or unassign, reset password                                                  |
-| DELETE | `/students/:id`                           | Admin                                     | Delete a student and their grades                                                                   |
-| GET    | `/teachers`                               | Admin                                     | List teachers (paginated, search)                                                                   |
-| GET    | `/teachers/me`                            | Teacher                                   | My profile, homeroom classes and teaching assignments                                               |
-| POST   | `/teachers`                               | Admin                                     | Create a teacher account                                                                            |
-| GET    | `/teachers/:id`                           | Admin                                     | Teacher details, homeroom classes and subjects                                                      |
-| PATCH  | `/teachers/:id`                           | Admin                                     | Update a teacher, reset password                                                                    |
-| DELETE | `/teachers/:id`                           | Admin                                     | Delete a teacher (their grades are kept)                                                            |
-| GET    | `/classes`                                | Admin, Teacher (own)                      | List classes (paginated, natural order 9A → 12A)                                                    |
-| POST   | `/classes`                                | Admin                                     | Create a class                                                                                      |
-| GET    | `/classes/:id`                            | Admin, Teacher (own), Student (own class) | Class details with subjects and teachers                                                            |
-| PATCH  | `/classes/:id`                            | Admin                                     | Rename, change homeroom teacher                                                                     |
-| DELETE | `/classes/:id`                            | Admin                                     | Delete a class (students become unassigned)                                                         |
-| GET    | `/classes/:id/students`                   | Admin, Teacher (own)                      | Students enrolled in the class                                                                      |
-| POST   | `/classes/:id/students`                   | Admin                                     | Assign several students to the class at once                                                        |
-| DELETE | `/classes/:id/students/:studentId`        | Admin                                     | Remove a student from the class                                                                     |
-| GET    | `/subjects`                               | Any logged-in                             | List subjects                                                                                       |
-| GET    | `/subjects/:id`                           | Any logged-in                             | Subject details                                                                                     |
-| POST   | `/subjects`                               | Admin                                     | Create a subject                                                                                    |
-| PATCH  | `/subjects/:id`                           | Admin                                     | Rename a subject or change its colour or icon                                                       |
-| DELETE | `/subjects/:id`                           | Admin                                     | Delete a subject (blocked while in use: `409`)                                                      |
-| POST   | `/classes/:id/subjects`                   | Admin                                     | Add a subject to a class, with its teacher and weekly hours                                         |
-| PATCH  | `/class-subjects/:id`                     | Admin                                     | Change the teacher or the weekly hours; can remove extra lessons at once                            |
-| DELETE | `/class-subjects/:id`                     | Admin                                     | Remove a subject from a class with its lessons (grades are kept)                                    |
-| GET    | `/classes/:id/timetable`                  | Admin, Teacher (own), Student (own class) | Weekly timetable of a class                                                                         |
-| GET    | `/teachers/:id/timetable`                 | Admin                                     | Weekly timetable of a teacher                                                                       |
-| GET    | `/timetable/me`                           | Teacher, Student                          | My lessons (teacher) or my class timetable (student)                                                |
-| POST   | `/classes/:id/timetable`                  | Admin                                     | Add a lesson; can replace the lesson in that slot or add a weekly hour                              |
-| PATCH  | `/timetable-entries/:id`                  | Admin                                     | Move a lesson to another slot or room; can swap or replace                                          |
-| GET    | `/class-subjects/:id/free-slots`          | Admin                                     | Slots where both the class and the teacher are free                                                 |
-| DELETE | `/timetable-entries/:id`                  | Admin                                     | Remove a lesson                                                                                     |
-| GET    | `/grades`                                 | Admin, Teacher (own)                      | List grades (paginated, filter by class, subject, student)                                          |
-| POST   | `/grades`                                 | Admin, Teacher (own)                      | Give a grade (teachers: only their subject in that class)                                           |
-| PATCH  | `/grades/:id`                             | Admin, Teacher (own grades)               | Change the value or date of a grade                                                                 |
-| DELETE | `/grades/:id`                             | Admin, Teacher (own grades)               | Delete a grade (kept in the history)                                                                |
-| GET    | `/grades/:id/history`                     | Admin                                     | Who created, changed or deleted a grade, and when                                                   |
-| GET    | `/grades/me`                              | Student                                   | My grades, subject averages and overall average                                                     |
-| GET    | `/grades/me/year`                         | Student                                   | My whole year: both semesters, annual averages, re-exams, outcome                                   |
-| GET    | `/students/:id/grades`                    | Admin, Teacher (own)                      | A student's grades and averages                                                                     |
-| GET    | `/students/:id/grades/year`               | Admin, Teacher (own)                      | A student's whole year: both semesters, annual averages, re-exams, outcome                          |
-| GET    | `/classes/:id/gradebook?subjectId=`       | Admin, subject teacher, homeroom teacher  | All students of a class with their grades in one subject                                            |
-| POST   | `/classes/:id/grades`                     | Admin, subject teacher                    | Give or replace many grades at once, all or none (scans, Excel import)                              |
-| POST   | `/classes/:id/grade-scans`                | Admin, subject teacher                    | Read student and grade from photos of tests with AI (saves nothing)                                 |
-| POST   | `/grades/batch`                           | Admin, subject teacher                    | Give or replace grades of students in several classes, all or none                                  |
-| GET    | `/grade-imports/options`                  | Admin, Teacher                            | Subjects and classes the user can import grades for                                                 |
-| GET    | `/grade-imports/template`                 | Admin, subject teacher                    | Excel template for one class or all classes of a subject                                            |
-| POST   | `/grade-imports`                          | Admin, subject teacher                    | Read grades from a filled template or a CSV (saves nothing)                                         |
-| GET    | `/stats/school`                           | Admin                                     | Dashboard figures: averages per class and subject, grade distribution, activity                     |
-| GET    | `/stats/teaching`                         | Teacher                                   | My classes at a glance: averages, failing averages, students missing grades                         |
-| GET    | `/school-years`                           | Any logged-in                             | The years the user can look at (admin: all), with class and outcome counts                          |
-| GET    | `/school-years/current`                   | Any logged-in                             | The open year and its current semester                                                              |
-| POST   | `/school-years/current/end-semester`      | Admin                                     | End semester 1: its grades are locked for teachers, new ones go to semester 2                       |
-| GET    | `/school-years/current/closing`           | Admin                                     | Closing preview: every student's annual result and suggested outcome                                |
-| PUT    | `/school-years/current/reexams`           | Admin                                     | Save a re-exam grade (only for a failed subject)                                                    |
-| DELETE | `/school-years/current/reexams/:s/:sub`   | Admin                                     | Remove a re-exam grade                                                                              |
-| POST   | `/school-years/current/close`             | Admin                                     | Close the year with the admin's decisions and open the next one                                     |
-| GET    | `/lectures`                               | Any logged-in                             | Admin all, teacher their library, student the ones they can read (paginated; `search`, `subjectId`) |
-| GET    | `/lectures/recipients`                    | Admin, Teacher                            | Every student a lecture can be shared with, from any class                                          |
-| POST   | `/lectures`                               | Teacher                                   | Add a PDF to the library (multipart, at most 20 MB) and share it with any students                  |
-| GET    | `/lectures/:id`                           | Readers, its teacher, Admin               | A lecture; its teacher and admins also see who can read it                                          |
-| GET    | `/lectures/:id/history`                   | Its teacher, Admin                        | Who got or lost access, when and by whom (paginated)                                                |
-| GET    | `/lectures/:id/link`                      | Readers, its teacher, Admin               | A link that works for 5 minutes, to preview or download (`download=true`)                           |
-| PATCH  | `/lectures/:id`                           | Its teacher, Admin                        | Change the title, description or subject                                                            |
-| PUT    | `/lectures/:id/students`                  | Its teacher, Admin                        | Choose who can read it (the new readers are notified, the change is kept)                           |
-| DELETE | `/lectures/:id`                           | Its teacher, Admin                        | Delete a lecture, its history and its file                                                          |
-| GET    | `/files/:token`                           | Public (signed link)                      | The file a signed link points to (local storage only)                                               |
-| GET    | `/notifications`                          | Any logged-in                             | My notifications, newest first (paginated, `unread=true` filter)                                    |
-| GET    | `/notifications/unread-count`             | Any logged-in                             | How many are unread                                                                                 |
-| PATCH  | `/notifications/:id/read`                 | Any logged-in (own only)                  | Mark one as read                                                                                    |
-| PATCH  | `/notifications/read-all`                 | Any logged-in                             | Mark all as read                                                                                    |
-| GET    | `/chat/contacts`                          | Teacher, Student                          | People I can write to (search)                                                                      |
-| GET    | `/chat/conversations`                     | Teacher, Student                          | My conversations with last message and unread count                                                 |
-| GET    | `/chat/unread-count`                      | Teacher, Student                          | Unread messages in all my conversations                                                             |
-| POST   | `/chat/conversations/direct`              | Teacher, Student                          | Open the direct conversation with someone (existing or new)                                         |
-| POST   | `/chat/conversations/group`               | Teacher                                   | Create a group                                                                                      |
-| GET    | `/chat/conversations/:id`                 | Members                                   | A conversation with its members                                                                     |
-| PATCH  | `/chat/conversations/:id`                 | Group creator                             | Rename a group                                                                                      |
-| DELETE | `/chat/conversations/:id`                 | Group creator                             | Delete a group                                                                                      |
-| POST   | `/chat/conversations/:id/members`         | Group creator                             | Add people                                                                                          |
-| DELETE | `/chat/conversations/:id/members/:userId` | Group creator, or the member (leave)      | Remove someone, or leave                                                                            |
-| GET    | `/chat/conversations/:id/messages`        | Members                                   | Messages, newest page first (`before`, `limit`)                                                     |
-| POST   | `/chat/conversations/:id/messages`        | Members                                   | Send a message (30 a minute)                                                                        |
-| POST   | `/chat/conversations/:id/read`            | Members                                   | Mark as read                                                                                        |
-| DELETE | `/chat/messages/:id`                      | The sender                                | Delete a message                                                                                    |
-| WS     | `/api/socket.io`                          | Teacher, Student (token in handshake)     | Live notifications and chat (`notification`, `chat:message`, `chat:typing`...)                      |
+| Method | Path                                      | Access                                    | Description                                                                                               |
+| ------ | ----------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| GET    | `/health`                                 | Public                                    | API and database status                                                                                   |
+| POST   | `/auth/login`                             | Public                                    | Log in, returns a JWT (max 5 attempts/min)                                                                |
+| GET    | `/auth/me`                                | Any logged-in                             | The current user with their role and profile                                                              |
+| POST   | `/auth/logout`                            | Any logged-in                             | Log out: revokes every token of the user (all devices)                                                    |
+| GET    | `/students`                               | Admin                                     | List students (paginated, search by name, email or reg. no., class filter)                                |
+| POST   | `/students`                               | Admin                                     | Create a student account, optionally in a class                                                           |
+| GET    | `/students/:id`                           | Admin                                     | Student details                                                                                           |
+| PATCH  | `/students/:id`                           | Admin                                     | Update a student, move or unassign, reset password                                                        |
+| DELETE | `/students/:id`                           | Admin                                     | Delete a student and their grades                                                                         |
+| GET    | `/teachers`                               | Admin                                     | List teachers (paginated, search)                                                                         |
+| GET    | `/teachers/me`                            | Teacher                                   | My profile, homeroom classes and teaching assignments                                                     |
+| POST   | `/teachers`                               | Admin                                     | Create a teacher account                                                                                  |
+| GET    | `/teachers/:id`                           | Admin                                     | Teacher details, homeroom classes and subjects                                                            |
+| PATCH  | `/teachers/:id`                           | Admin                                     | Update a teacher, reset password                                                                          |
+| DELETE | `/teachers/:id`                           | Admin                                     | Delete a teacher (their grades are kept)                                                                  |
+| GET    | `/classes`                                | Admin, Teacher (own)                      | List classes (paginated, natural order 9A → 12A)                                                          |
+| POST   | `/classes`                                | Admin                                     | Create a class                                                                                            |
+| GET    | `/classes/:id`                            | Admin, Teacher (own), Student (own class) | Class details with subjects and teachers                                                                  |
+| PATCH  | `/classes/:id`                            | Admin                                     | Rename, change homeroom teacher                                                                           |
+| DELETE | `/classes/:id`                            | Admin                                     | Delete a class (students become unassigned)                                                               |
+| GET    | `/classes/:id/students`                   | Admin, Teacher (own)                      | Students enrolled in the class                                                                            |
+| POST   | `/classes/:id/students`                   | Admin                                     | Assign several students to the class at once                                                              |
+| DELETE | `/classes/:id/students/:studentId`        | Admin                                     | Remove a student from the class                                                                           |
+| GET    | `/subjects`                               | Any logged-in                             | List subjects                                                                                             |
+| GET    | `/subjects/:id`                           | Any logged-in                             | Subject details                                                                                           |
+| POST   | `/subjects`                               | Admin                                     | Create a subject                                                                                          |
+| PATCH  | `/subjects/:id`                           | Admin                                     | Rename a subject or change its colour or icon                                                             |
+| DELETE | `/subjects/:id`                           | Admin                                     | Delete a subject (blocked while in use: `409`)                                                            |
+| POST   | `/classes/:id/subjects`                   | Admin                                     | Add a subject to a class, with its teacher and weekly hours                                               |
+| PATCH  | `/class-subjects/:id`                     | Admin                                     | Change the teacher or the weekly hours; can remove extra lessons at once                                  |
+| DELETE | `/class-subjects/:id`                     | Admin                                     | Remove a subject from a class with its lessons (grades are kept)                                          |
+| GET    | `/classes/:id/timetable`                  | Admin, Teacher (own), Student (own class) | Weekly timetable of a class                                                                               |
+| GET    | `/teachers/:id/timetable`                 | Admin                                     | Weekly timetable of a teacher                                                                             |
+| GET    | `/timetable/me`                           | Teacher, Student                          | My lessons (teacher) or my class timetable (student)                                                      |
+| POST   | `/classes/:id/timetable`                  | Admin                                     | Add a lesson; can replace the lesson in that slot or add a weekly hour                                    |
+| PATCH  | `/timetable-entries/:id`                  | Admin                                     | Move a lesson to another slot or room; can swap or replace                                                |
+| GET    | `/class-subjects/:id/free-slots`          | Admin                                     | Slots where both the class and the teacher are free                                                       |
+| DELETE | `/timetable-entries/:id`                  | Admin                                     | Remove a lesson                                                                                           |
+| GET    | `/grades`                                 | Admin, Teacher (own)                      | List grades (paginated, filter by class, subject, student)                                                |
+| POST   | `/grades`                                 | Admin, Teacher (own)                      | Give a grade (teachers: only their subject in that class)                                                 |
+| PATCH  | `/grades/:id`                             | Admin, Teacher (own grades)               | Change the value or date of a grade                                                                       |
+| DELETE | `/grades/:id`                             | Admin, Teacher (own grades)               | Delete a grade (kept in the history)                                                                      |
+| GET    | `/grades/:id/history`                     | Admin                                     | Who created, changed or deleted a grade, and when                                                         |
+| GET    | `/grades/me`                              | Student                                   | My grades, subject averages and overall average                                                           |
+| GET    | `/grades/me/year`                         | Student                                   | My whole year: both semesters, annual averages, re-exams, outcome                                         |
+| GET    | `/students/:id/grades`                    | Admin, Teacher (own)                      | A student's grades and averages                                                                           |
+| GET    | `/students/:id/grades/year`               | Admin, Teacher (own)                      | A student's whole year: both semesters, annual averages, re-exams, outcome                                |
+| GET    | `/classes/:id/gradebook?subjectId=`       | Admin, subject teacher, homeroom teacher  | All students of a class with their grades in one subject                                                  |
+| POST   | `/classes/:id/grades`                     | Admin, subject teacher                    | Give or replace many grades at once, all or none (scans, Excel import)                                    |
+| POST   | `/classes/:id/grade-scans`                | Admin, subject teacher                    | Read student and grade from photos of tests with AI (saves nothing)                                       |
+| POST   | `/grades/batch`                           | Admin, subject teacher                    | Give or replace grades of students in several classes, all or none                                        |
+| GET    | `/grade-imports/options`                  | Admin, Teacher                            | Subjects and classes the user can import grades for                                                       |
+| GET    | `/grade-imports/template`                 | Admin, subject teacher                    | Excel template for one class or all classes of a subject                                                  |
+| POST   | `/grade-imports`                          | Admin, subject teacher                    | Read grades from a filled template or a CSV (saves nothing)                                               |
+| GET    | `/stats/school`                           | Admin                                     | Dashboard figures: averages per class and subject, grade distribution, activity                           |
+| GET    | `/stats/teaching`                         | Teacher                                   | My classes at a glance: averages, failing averages, students missing grades                               |
+| GET    | `/school-years`                           | Any logged-in                             | The years the user can look at (admin: all), with class and outcome counts                                |
+| GET    | `/school-years/current`                   | Any logged-in                             | The open year and its current semester                                                                    |
+| POST   | `/school-years/current/end-semester`      | Admin                                     | End semester 1: its grades are locked for teachers, new ones go to semester 2                             |
+| GET    | `/school-years/current/closing`           | Admin                                     | Closing preview: every student's annual result and suggested outcome                                      |
+| PUT    | `/school-years/current/reexams`           | Admin                                     | Save a re-exam grade (only for a failed subject)                                                          |
+| DELETE | `/school-years/current/reexams/:s/:sub`   | Admin                                     | Remove a re-exam grade                                                                                    |
+| POST   | `/school-years/current/close`             | Admin                                     | Close the year with the admin's decisions and open the next one                                           |
+| GET    | `/lectures`                               | Any logged-in                             | Admin all, teacher their library, student the ones they can read (paginated; `search`, `subjectId`)       |
+| GET    | `/lectures/recipients`                    | Admin, Teacher                            | Every student a lecture can be shared with, from any class                                                |
+| POST   | `/lectures`                               | Teacher                                   | Add a PDF to the library (multipart, at most 20 MB) and share it with any students                        |
+| GET    | `/lectures/:id`                           | Readers, its teacher, Admin               | A lecture; its teacher and admins also see who can read it                                                |
+| GET    | `/lectures/:id/history`                   | Its teacher, Admin                        | Who got or lost access, when and by whom (paginated)                                                      |
+| GET    | `/lectures/:id/link`                      | Readers, its teacher, Admin               | A link that works for 5 minutes, to preview or download (`download=true`)                                 |
+| PATCH  | `/lectures/:id`                           | Its teacher, Admin                        | Change the title, description or subject                                                                  |
+| PUT    | `/lectures/:id/students`                  | Its teacher, Admin                        | Choose who can read it (the new readers are notified, the change is kept)                                 |
+| DELETE | `/lectures/:id`                           | Its teacher, Admin                        | Delete a lecture, its history and its file                                                                |
+| GET    | `/files/:token`                           | Public (signed link)                      | The file a signed link points to (local storage only)                                                     |
+| GET    | `/notifications`                          | Any logged-in                             | My notifications, newest first (paginated, `unread=true` filter)                                          |
+| GET    | `/notifications/unread-count`             | Any logged-in                             | How many are unread                                                                                       |
+| PATCH  | `/notifications/:id/read`                 | Any logged-in (own only)                  | Mark one as read                                                                                          |
+| PATCH  | `/notifications/read-all`                 | Any logged-in                             | Mark all as read                                                                                          |
+| GET    | `/chat/contacts`                          | Teacher, Student                          | People I can write to (search)                                                                            |
+| GET    | `/chat/conversations`                     | Teacher, Student                          | My conversations with last message and unread count                                                       |
+| GET    | `/chat/unread-count`                      | Teacher, Student                          | Unread messages in all my conversations                                                                   |
+| POST   | `/chat/conversations/direct`              | Teacher, Student                          | Open the direct conversation with someone (existing or new)                                               |
+| POST   | `/chat/conversations/group`               | Teacher                                   | Create a group                                                                                            |
+| GET    | `/chat/conversations/:id`                 | Members                                   | A conversation with its members                                                                           |
+| PATCH  | `/chat/conversations/:id`                 | Group creator                             | Rename a group                                                                                            |
+| DELETE | `/chat/conversations/:id`                 | Group creator                             | Delete a group                                                                                            |
+| POST   | `/chat/conversations/:id/members`         | Group creator                             | Add people                                                                                                |
+| DELETE | `/chat/conversations/:id/members/:userId` | Group creator, or the member (leave)      | Remove someone, or leave                                                                                  |
+| GET    | `/chat/conversations/:id/messages`        | Members                                   | Messages, newest page first (`before`, `limit`)                                                           |
+| POST   | `/chat/conversations/:id/messages`        | Members                                   | Send a message (30 a minute)                                                                              |
+| POST   | `/chat/conversations/:id/read`            | Members                                   | Mark as read                                                                                              |
+| DELETE | `/chat/messages/:id`                      | The sender                                | Delete a message                                                                                          |
+| GET    | `/audit-logs`                             | Admin                                     | The activity log, newest first (`kind`, `category`, `role`, `actorId`, `from`, `to`, `search`; paginated) |
+| GET    | `/audit-logs/:id`                         | Admin                                     | One entry, with every record it changed (before and after)                                                |
+| WS     | `/api/socket.io`                          | Teacher, Student (token in handshake)     | Live notifications and chat (`notification`, `chat:message`, `chat:typing`...)                            |
 
 ### Conventions
 
@@ -476,11 +493,11 @@ The checks and the write run in one **serializable** transaction, so two admins 
 
 **Pages per role**
 
-| Role    | Pages                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Admin   | Dashboard (school average, students at risk, charts: grade distribution, weekly activity, class and subject averages), students, teachers, classes (students, subjects, timetable editor with conflict resolution, gradebook with test scanning and Excel import), subjects (colour and icon), all grades with history, **school years** (end a semester, close the year with re-exams and promotion, archive), all **lectures** |
-| Teacher | Dashboard (averages by class with the passing line, failing averages, students missing grades, today's lessons), my classes, class page (gradebook, students, timetable), **scan tests with AI**, **import grades from Excel**, a student's report card, my timetable, **lectures** (a library of PDFs, shared with any students, with an access history)                                                                        |
-| Student | Dashboard (general average, subject averages chart, progress over time, today's lessons, latest grades, profile), my grades (report card per semester or for the whole year, averages by subject), **lectures** (preview or download the PDFs shared with them), my class (homeroom teacher, subjects and teachers), my timetable                                                                                                |
+| Role    | Pages                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Admin   | Dashboard (school average, students at risk, charts: grade distribution, weekly activity, class and subject averages), students, teachers, classes (students, subjects, timetable editor with conflict resolution, gradebook with test scanning and Excel import), subjects (colour and icon), all grades with history, **school years** (end a semester, close the year with re-exams and promotion, archive), all **lectures**, the **activity log** |
+| Teacher | Dashboard (averages by class with the passing line, failing averages, students missing grades, today's lessons), my classes, class page (gradebook, students, timetable), **scan tests with AI**, **import grades from Excel**, a student's report card, my timetable, **lectures** (a library of PDFs, shared with any students, with an access history)                                                                                              |
+| Student | Dashboard (general average, subject averages chart, progress over time, today's lessons, latest grades, profile), my grades (report card per semester or for the whole year, averages by subject), **lectures** (preview or download the PDFs shared with them), my class (homeroom teacher, subjects and teachers), my timetable                                                                                                                      |
 
 Every role has the **school year and semester picker** in the sidebar (see [School years and semesters](#school-years-and-semesters)): every page shows the period picked there (except lectures, which are a library), and a closed year is read-only. **Subject colours and icons**, chosen by the admin (10 colours, 40 icons; a new subject gets an icon that fits its name until one is picked), are used everywhere a subject appears: timetables, gradebooks, report cards, averages, lectures.
 
@@ -573,6 +590,19 @@ Either way, the API checks who is asking first, then hands out a link that works
 4. Restart the API, and run `npm run db:seed` to put the demo lectures in the bucket.
 
 The web app's Content Security Policy (`frontend/nginx.conf`) allows previews from `*.r2.cloudflarestorage.com` and `*.backblazeb2.com`; for another S3 provider, add its domain to `frame-src`. The S3 driver has its own tests against a local S3 server: `pip install "moto[server]" && moto_server -p 5055`, then `S3_TEST_ENDPOINT=http://127.0.0.1:5055 npm run test:e2e -- storage-s3`.
+
+## Activity log
+
+Admins have an **Activity log** page: everything that changed in the app, who did it and when, plus every login, logout and failed login. Each entry says what was done in plain words ("Gave a grade", "Closed the school year") and what it was about ("9 in Mathematics for Andrei Georgescu"); opening it shows every record created, changed or deleted, with its fields **before → after**, names instead of ids, the IP address and the browser. The list can be filtered by part of the app, kind, role, days and text, and is paginated.
+
+How it works:
+
+- **One entry per action.** A Nest interceptor opens a context (AsyncLocalStorage) around each request that changes something and writes one entry when it succeeds, before the response is sent. Closing a school year, which changes hundreds of records, is one entry (the first 100 changes are kept, the rest counted).
+- **The changes are collected by a Prisma extension**, not by each service: every create, update, upsert and delete made during the request (including inside transactions and nested writes such as a student's account) is recorded with its fields before and after. Only the fields that really changed are kept. A new feature is logged without writing any logging code.
+- **What is never logged:** passwords (shown as `[hidden]`), private chat messages and who reads what (only group management is logged), marking notifications as read, and pages people only look at. A test checks that every route that changes something has a name in the log (`src/audit/audit-actions.ts`), or is deliberately left out.
+- **Failed logins** are logged with the email that was tried and the IP address, without saying whether the account exists.
+- **Kept for two years:** every night, entries older than `AUDIT_RETENTION_DAYS` (730 by default, `0` keeps them forever) are deleted, in batches of 5,000 so the table is never locked for long, and the deletion itself is logged ("Deleted old activity log entries · 1,240 entries older than 730 days"). An entry is 0.3–2 KB, so a school of 1,000 students fills a few hundred MB a year at most.
+- The entry keeps the person's name and role as they were, so it still reads correctly after the account is deleted. The log itself can't be changed from the API.
 
 ## Reading grades from photos of tests (AI)
 
@@ -739,6 +769,7 @@ The API validates its environment on startup and refuses to start if something i
 
 ## What I would do with more time
 
+- **Activity log export and archiving:** export a filtered list as CSV, and archive old entries to cheap storage before they are deleted; with millions of rows, partition the table by month.
 - **Refresh tokens** in an httpOnly cookie, so the access token can be short-lived (minutes) without logging users out every hour.
 - **httpOnly cookie for the token** instead of `localStorage`, with CSRF protection, so injected scripts can never read it.
 - **Per-device logout**: store a session id (`jti`) per login and revoke only that one, instead of all sessions of the user.

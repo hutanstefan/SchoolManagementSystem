@@ -1,0 +1,28 @@
+meta {
+  name: One entry, with what changed (admin)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/audit-logs/{{auditId}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("The deleted lecture, with its fields before", function () {
+    const [change] = res.getBody().details.changes;
+    expect(change).to.include({ model: "Lecture", op: "delete" });
+    expect(change.fields.title[1]).to.equal(null);
+  });
+}
+
+docs {
+  Each record created, changed or deleted, with its fields before and after
+  (`[before, after]`), and the names of the records the ids point to.
+  Passwords are never logged.
+}

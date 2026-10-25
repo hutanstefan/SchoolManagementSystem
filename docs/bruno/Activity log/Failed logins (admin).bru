@@ -1,0 +1,30 @@
+meta {
+  name: Failed logins (admin)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/audit-logs?kind=LOGIN_FAILED
+  body: none
+  auth: inherit
+}
+
+params:query {
+  kind: LOGIN_FAILED
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Only failed logins, with the email that was tried", function () {
+    const entries = res.getBody().data;
+    expect(entries.length).to.be.greaterThan(0);
+    entries.forEach((entry) => {
+      expect(entry.kind).to.equal("LOGIN_FAILED");
+      expect(entry.actor.id).to.equal(null);
+    });
+    expect(entries[0].target).to.equal("admin@school.test");
+  });
+}

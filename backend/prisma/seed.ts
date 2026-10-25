@@ -339,6 +339,7 @@ async function clearDatabase(): Promise<void> {
     await storage.remove(fileKey).catch(() => undefined);
   }
   await prisma.lecture.deleteMany();
+  await prisma.auditLog.deleteMany();
   // Order matters because of foreign keys.
   await prisma.gradeHistory.deleteMany();
   await prisma.grade.deleteMany();

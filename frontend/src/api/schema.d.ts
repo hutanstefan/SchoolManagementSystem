@@ -212,6 +212,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The activity log (admin)
+         * @description Every action that changed something, every login and logout, and every failed login, newest first. Filter by kind, part of the app, user, role, days or text. Entries older than AUDIT_RETENTION_DAYS are deleted every night (`retentionDays`).
+         */
+        get: operations["AuditController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/audit-logs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One entry of the activity log, with what changed (admin)
+         * @description Each record created, changed or deleted, with its fields before and after. Passwords are never logged.
+         */
+        get: operations["AuditController_findOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -446,7 +486,7 @@ export interface paths {
         delete: operations["SubjectsController_remove"];
         options?: never;
         head?: never;
-        /** Rename a subject or change its colour */
+        /** Rename a subject or change its colour or icon */
         patch: operations["SubjectsController_update"];
         trace?: never;
     };
@@ -1565,6 +1605,118 @@ export interface components {
             expiresIn: number;
             user: components["schemas"]["AuthUserDto"];
         };
+        /** @enum {string} */
+        AuditKind: "CHANGE" | "LOGIN" | "LOGOUT" | "LOGIN_FAILED";
+        /** @enum {string} */
+        AuditCategory: "Auth" | "School years" | "Students" | "Teachers" | "Classes" | "Subjects" | "Teaching assignments" | "Timetable" | "Grades" | "Grade scans (AI)" | "Grade imports (Excel)" | "Chat" | "Lectures" | "System";
+        AuditActorDto: {
+            role: components["schemas"]["Role"] | null;
+            /** @description The user id; null for failed logins or once the user was deleted. */
+            id: string | null;
+            /** @description Their name when it happened. */
+            name: string | null;
+        };
+        AuditLogDto: {
+            kind: components["schemas"]["AuditKind"];
+            id: string;
+            /** Format: date-time */
+            createdAt: string;
+            actor: components["schemas"]["AuditActorDto"];
+            /** @example Grades */
+            category: string;
+            action: string;
+            /** @example 9 in Mathematics for Andrei Georgescu */
+            target: string | null;
+            /** @example POST */
+            method: string | null;
+            /** @example /api/grades */
+            path: string | null;
+            /** @description How many records were created, changed or deleted. */
+            changeCount: number;
+            ip: string | null;
+        };
+        PaginationMetaDto: {
+            /** @example 1 */
+            page: number;
+            /** @example 20 */
+            pageSize: number;
+            /** @example 62 */
+            total: number;
+            /** @example 4 */
+            totalPages: number;
+        };
+        PaginatedAuditLogsDto: {
+            data: components["schemas"]["AuditLogDto"][];
+            meta: components["schemas"]["PaginationMetaDto"];
+            /** @description Entries older than this many days are deleted every night; null: kept forever. */
+            retentionDays: number | null;
+        };
+        AuditChangeDto: {
+            /** @enum {string} */
+            op: "create" | "update" | "delete";
+            /**
+             * @description Field -> [before, after]; null on the missing side. Passwords are "[hidden]".
+             * @example {
+             *       "value": [
+             *         7,
+             *         9
+             *       ]
+             *     }
+             */
+            fields: {
+                [key: string]: unknown[];
+            };
+            /**
+             * @description The kind of record.
+             * @example Grade
+             */
+            model: string;
+            id: string | null;
+            /**
+             * @description The record's name.
+             * @example 9 in Mathematics for Andrei Georgescu
+             */
+            label: string | null;
+        };
+        AuditDetailsDto: {
+            /**
+             * @description Names of the records the ids in `fields` point to.
+             * @example {
+             *       "0b39a733-7b2b-45e6-9d19-7938ad3af0b6": "Andrei Georgescu"
+             *     }
+             */
+            names: {
+                [key: string]: string;
+            };
+            changes: components["schemas"]["AuditChangeDto"][];
+            /** @description Changes past the first 100: counted, not kept. */
+            more: number;
+            /** @description Failed logins: the email that was tried. */
+            email?: string;
+            /** @description The HTTP status of a failed request. */
+            status?: number;
+        };
+        AuditLogDetailDto: {
+            kind: components["schemas"]["AuditKind"];
+            id: string;
+            /** Format: date-time */
+            createdAt: string;
+            actor: components["schemas"]["AuditActorDto"];
+            /** @example Grades */
+            category: string;
+            action: string;
+            /** @example 9 in Mathematics for Andrei Georgescu */
+            target: string | null;
+            /** @example POST */
+            method: string | null;
+            /** @example /api/grades */
+            path: string | null;
+            /** @description How many records were created, changed or deleted. */
+            changeCount: number;
+            ip: string | null;
+            userAgent: string | null;
+            details: components["schemas"]["AuditDetailsDto"];
+        };
         StudentDto: {
             id: string;
             userId: string;
@@ -1591,16 +1743,6 @@ export interface components {
             graduatedIn: string | null;
             /** Format: date-time */
             createdAt: string;
-        };
-        PaginationMetaDto: {
-            /** @example 1 */
-            page: number;
-            /** @example 20 */
-            pageSize: number;
-            /** @example 62 */
-            total: number;
-            /** @example 4 */
-            totalPages: number;
         };
         PaginatedStudentsDto: {
             data: components["schemas"]["StudentDto"][];
@@ -3135,6 +3277,88 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    AuditController_list: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page (max 100). */
+                pageSize?: number;
+                /** @description Case-insensitive text search. */
+                search?: string;
+                kind?: components["schemas"]["AuditKind"];
+                /** @description The part of the app. */
+                category?: components["schemas"]["AuditCategory"];
+                /** @description Only what users with this role did. */
+                role?: components["schemas"]["Role"];
+                /** @description Only what this user did. */
+                actorId?: string;
+                /** @description From this day (inclusive). */
+                from?: string;
+                /** @description Up to this day (inclusive). */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedAuditLogsDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AuditController_findOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogDetailDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
             };
         };
     };

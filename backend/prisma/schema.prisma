@@ -163,6 +163,8 @@ model User {
   messages             Message[]
   /// Lecture access this user gave or removed.
   lectureAccessEvents  LectureAccessEvent[]
+  /// What this user did (the activity log).
+  auditLogs            AuditLog[]
 
   @@map("users")
 }
@@ -559,4 +561,48 @@ model LectureAccessEvent {
   @@index([studentId])
   @@index([actorId])
   @@map("lecture_access_events")
+}
+
+enum AuditKind {
+  /// Something was created, changed or deleted.
+  CHANGE
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+}
+
+/// The activity log: one row per action in the app (a request that changed
+/// something, a login or logout), with who did it and what changed. Written
+/// by the API, read by admins.
+model AuditLog {
+  id          String    @id @default(uuid()) @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  kind        AuditKind
+  /// Null for failed logins, or after the user was deleted.
+  actorId     String?   @map("actor_id") @db.Uuid
+  /// The actor's name and role when it happened, kept if the user is deleted.
+  actorName   String?   @map("actor_name")
+  actorRole   Role?     @map("actor_role")
+  /// The part of the app, e.g. "Grades".
+  category    String
+  /// What was done, e.g. "Gave a grade".
+  action      String
+  /// What it was done to, e.g. "9 in Mathematics for Andrei Georgescu".
+  target      String?
+  method      String?
+  path        String?
+  /// How many records were created, changed or deleted.
+  changeCount Int       @default(0) @map("change_count")
+  /// The changes (before and after), the names of the records they refer to.
+  details     Json?
+  ip          String?
+  userAgent   String?   @map("user_agent")
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([category, createdAt])
+  @@index([kind, createdAt])
+  @@map("audit_logs")
 }

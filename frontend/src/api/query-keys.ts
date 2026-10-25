@@ -58,6 +58,11 @@ export const queryKeys = {
       ['lectures', 'history', id, page] as const,
     recipients: ['lectures', 'recipients'] as const,
   },
+  audit: {
+    all: ['audit'] as const,
+    list: (params: object) => ['audit', 'list', params] as const,
+    detail: (id: string) => ['audit', 'detail', id] as const,
+  },
   notifications: {
     all: ['notifications'] as const,
     list: (params: object) => ['notifications', 'list', params] as const,

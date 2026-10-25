@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ClipboardList,
   GraduationCap,
+  History,
   LayoutDashboard,
   MessagesSquare,
   School,
@@ -57,6 +58,10 @@ export const NAV_SECTIONS: Record<Role, NavSection[]> = {
           icon: CalendarRange,
         },
       ],
+    },
+    {
+      title: 'System',
+      items: [{ label: 'Activity log', to: '/admin/activity', icon: History }],
     },
   ],
   TEACHER: [

@@ -51,6 +51,10 @@
     {
       "key": "lectureFileUrl",
       "value": ""
+    },
+    {
+      "key": "auditId",
+      "value": ""
     }
   ],
   "item": [
@@ -3993,6 +3997,113 @@
               ]
             },
             "description": "Deletes the lecture and its file."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activity log",
+      "description": "The admin's activity log: every action that changed something, every login, logout and failed login. Run last: it checks what the requests before it did. Uses the admin token (Auth > Login as admin).",
+      "item": [
+        {
+          "name": "Latest activity (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const first = pm.response.json().data[0];",
+                  "if (first) pm.collectionVariables.set('auditId', first.id);",
+                  "pm.test('Newest first: the lecture deleted at the end of Lectures', () => {",
+                  "  pm.expect(first).to.include({ kind: 'CHANGE', category: 'Lectures', action: 'Deleted a lecture' });",
+                  "  pm.expect(first.actor.name).to.equal('Mihai Ionescu');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/audit-logs?page=1&pageSize=10",
+            "description": "Newest first, a page at a time. Filters: kind (CHANGE, LOGIN, LOGOUT, LOGIN_FAILED), category, actorId, role, from and to (days) and search."
+          }
+        },
+        {
+          "name": "One entry, with what changed (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('The deleted lecture, with its fields before', () => {",
+                  "  const [change] = pm.response.json().details.changes;",
+                  "  pm.expect(change).to.include({ model: 'Lecture', op: 'delete' });",
+                  "  pm.expect(change.fields.title[1]).to.equal(null);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/audit-logs/{{auditId}}",
+            "description": "Each record created, changed or deleted, with its fields before and after ([before, after]), and the names of the records the ids point to. Passwords are never logged."
+          }
+        },
+        {
+          "name": "Failed logins (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Only failed logins, with the email that was tried', () => {",
+                  "  const entries = pm.response.json().data;",
+                  "  pm.expect(entries.length).to.be.above(0);",
+                  "  entries.forEach((e) => { pm.expect(e.kind).to.equal('LOGIN_FAILED'); pm.expect(e.actor.id).to.equal(null); });",
+                  "  pm.expect(entries[0].target).to.equal('admin@school.test');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/audit-logs?kind=LOGIN_FAILED"
+          }
+        },
+        {
+          "name": "Activity log as a teacher (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/audit-logs",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         }
       ]

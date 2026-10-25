@@ -38,6 +38,10 @@ const admin = {
     import('@/features/classes/class-detail-page').then((m) => ({
       Component: m.ClassDetailPage,
     })),
+  activity: () =>
+    import('@/features/audit/activity-page').then((m) => ({
+      Component: m.ActivityPage,
+    })),
   subjects: () =>
     import('@/features/subjects/subjects-page').then((m) => ({
       Component: m.SubjectsPage,
@@ -156,6 +160,7 @@ export const routes: RouteObject[] = [
           { path: 'school-years', lazy: admin.schoolYears },
           { path: 'school-years/close', lazy: admin.closeYear },
           { path: 'lectures', lazy: lectures },
+          { path: 'activity', lazy: admin.activity },
         ],
       },
       {

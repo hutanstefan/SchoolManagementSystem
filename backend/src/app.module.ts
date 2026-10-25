@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
 import { ClassSubjectsModule } from './class-subjects/class-subjects.module';
@@ -40,6 +41,7 @@ import { TimetableModule } from './timetable/timetable.module';
     StorageModule,
     SchoolYearsModule,
     AuthModule,
+    AuditModule,
     HealthModule,
     StudentsModule,
     TeachersModule,

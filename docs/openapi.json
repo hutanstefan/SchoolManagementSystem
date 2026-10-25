@@ -466,6 +466,193 @@
         ]
       }
     },
+    "/api/audit-logs": {
+      "get": {
+        "description": "Every action that changed something, every login and logout, and every failed login, newest first. Filter by kind, part of the app, user, role, days or text. Entries older than AUDIT_RETENTION_DAYS are deleted every night (`retentionDays`).",
+        "operationId": "AuditController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "Items per page (max 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive text search.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/AuditKind"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "The part of the app.",
+            "schema": {
+              "$ref": "#/components/schemas/AuditCategory"
+            }
+          },
+          {
+            "name": "role",
+            "required": false,
+            "in": "query",
+            "description": "Only what users with this role did.",
+            "schema": {
+              "$ref": "#/components/schemas/Role"
+            }
+          },
+          {
+            "name": "actorId",
+            "required": false,
+            "in": "query",
+            "description": "Only what this user did.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "From this day (inclusive).",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Up to this day (inclusive).",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedAuditLogsDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The activity log (admin)",
+        "tags": [
+          "Activity log"
+        ]
+      }
+    },
+    "/api/audit-logs/{id}": {
+      "get": {
+        "description": "Each record created, changed or deleted, with its fields before and after. Passwords are never logged.",
+        "operationId": "AuditController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogDetailDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One entry of the activity log, with what changed (admin)",
+        "tags": [
+          "Activity log"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "HealthController_check",
@@ -2220,7 +2407,7 @@
             "bearer": []
           }
         ],
-        "summary": "Rename a subject or change its colour",
+        "summary": "Rename a subject or change its colour or icon",
         "tags": [
           "Subjects"
         ]
@@ -6893,6 +7080,341 @@
           "user"
         ]
       },
+      "AuditKind": {
+        "type": "string",
+        "enum": [
+          "CHANGE",
+          "LOGIN",
+          "LOGOUT",
+          "LOGIN_FAILED"
+        ]
+      },
+      "AuditCategory": {
+        "type": "string",
+        "enum": [
+          "Auth",
+          "School years",
+          "Students",
+          "Teachers",
+          "Classes",
+          "Subjects",
+          "Teaching assignments",
+          "Timetable",
+          "Grades",
+          "Grade scans (AI)",
+          "Grade imports (Excel)",
+          "Chat",
+          "Lectures",
+          "System"
+        ]
+      },
+      "AuditActorDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              }
+            ]
+          },
+          "id": {
+            "type": "string",
+            "nullable": true,
+            "description": "The user id; null for failed logins or once the user was deleted."
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Their name when it happened."
+          }
+        },
+        "required": [
+          "role",
+          "id",
+          "name"
+        ]
+      },
+      "AuditLogDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AuditKind"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/AuditActorDto"
+          },
+          "category": {
+            "type": "string",
+            "example": "Grades"
+          },
+          "action": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string",
+            "nullable": true,
+            "example": "9 in Mathematics for Andrei Georgescu"
+          },
+          "method": {
+            "type": "string",
+            "nullable": true,
+            "example": "POST"
+          },
+          "path": {
+            "type": "string",
+            "nullable": true,
+            "example": "/api/grades"
+          },
+          "changeCount": {
+            "type": "number",
+            "description": "How many records were created, changed or deleted."
+          },
+          "ip": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "createdAt",
+          "actor",
+          "category",
+          "action",
+          "target",
+          "method",
+          "path",
+          "changeCount",
+          "ip"
+        ]
+      },
+      "PaginationMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "number",
+            "example": 20
+          },
+          "total": {
+            "type": "number",
+            "example": 62
+          },
+          "totalPages": {
+            "type": "number",
+            "example": 4
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "totalPages"
+        ]
+      },
+      "PaginatedAuditLogsDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLogDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          },
+          "retentionDays": {
+            "type": "number",
+            "nullable": true,
+            "description": "Entries older than this many days are deleted every night; null: kept forever."
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "retentionDays"
+        ]
+      },
+      "AuditChangeDto": {
+        "type": "object",
+        "properties": {
+          "op": {
+            "enum": [
+              "create",
+              "update",
+              "delete"
+            ],
+            "type": "string"
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {},
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "description": "Field -> [before, after]; null on the missing side. Passwords are \"[hidden]\".",
+            "example": {
+              "value": [
+                7,
+                9
+              ]
+            }
+          },
+          "model": {
+            "type": "string",
+            "description": "The kind of record.",
+            "example": "Grade"
+          },
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true,
+            "description": "The record's name.",
+            "example": "9 in Mathematics for Andrei Georgescu"
+          }
+        },
+        "required": [
+          "op",
+          "fields",
+          "model",
+          "id",
+          "label"
+        ]
+      },
+      "AuditDetailsDto": {
+        "type": "object",
+        "properties": {
+          "names": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Names of the records the ids in `fields` point to.",
+            "example": {
+              "0b39a733-7b2b-45e6-9d19-7938ad3af0b6": "Andrei Georgescu"
+            }
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditChangeDto"
+            }
+          },
+          "more": {
+            "type": "number",
+            "description": "Changes past the first 100: counted, not kept."
+          },
+          "email": {
+            "type": "string",
+            "description": "Failed logins: the email that was tried."
+          },
+          "status": {
+            "type": "number",
+            "description": "The HTTP status of a failed request."
+          }
+        },
+        "required": [
+          "names",
+          "changes",
+          "more"
+        ]
+      },
+      "AuditLogDetailDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AuditKind"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/AuditActorDto"
+          },
+          "category": {
+            "type": "string",
+            "example": "Grades"
+          },
+          "action": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string",
+            "nullable": true,
+            "example": "9 in Mathematics for Andrei Georgescu"
+          },
+          "method": {
+            "type": "string",
+            "nullable": true,
+            "example": "POST"
+          },
+          "path": {
+            "type": "string",
+            "nullable": true,
+            "example": "/api/grades"
+          },
+          "changeCount": {
+            "type": "number",
+            "description": "How many records were created, changed or deleted."
+          },
+          "ip": {
+            "type": "string",
+            "nullable": true
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "details": {
+            "$ref": "#/components/schemas/AuditDetailsDto"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "createdAt",
+          "actor",
+          "category",
+          "action",
+          "target",
+          "method",
+          "path",
+          "changeCount",
+          "ip",
+          "userAgent",
+          "details"
+        ]
+      },
       "StudentDto": {
         "type": "object",
         "properties": {
@@ -6955,33 +7477,6 @@
           "class",
           "graduatedIn",
           "createdAt"
-        ]
-      },
-      "PaginationMetaDto": {
-        "type": "object",
-        "properties": {
-          "page": {
-            "type": "number",
-            "example": 1
-          },
-          "pageSize": {
-            "type": "number",
-            "example": 20
-          },
-          "total": {
-            "type": "number",
-            "example": 62
-          },
-          "totalPages": {
-            "type": "number",
-            "example": 4
-          }
-        },
-        "required": [
-          "page",
-          "pageSize",
-          "total",
-          "totalPages"
         ]
       },
       "PaginatedStudentsDto": {

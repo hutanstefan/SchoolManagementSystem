@@ -96,6 +96,11 @@ export const envSchema = z
       .transform((value) => value === 'true'),
     /** How long a preview or download link works. */
     FILE_LINK_SECONDS: z.coerce.number().int().min(10).max(3600).default(300),
+    /**
+     * Activity log entries older than this many days are deleted every
+     * night (0: keep them forever).
+     */
+    AUDIT_RETENTION_DAYS: z.coerce.number().int().min(0).max(3650).default(730),
   })
   .superRefine((env, ctx) => {
     if (env.STORAGE_DRIVER !== 's3') return;

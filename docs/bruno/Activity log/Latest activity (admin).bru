@@ -1,0 +1,39 @@
+meta {
+  name: Latest activity (admin)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/audit-logs?page=1&pageSize=10
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  pageSize: 10
+}
+
+script:post-response {
+  const first = res.getBody().data && res.getBody().data[0];
+  if (first) bru.setVar("auditId", first.id);
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Newest first: the lecture deleted at the end of Lectures", function () {
+    const [first] = res.getBody().data;
+    expect(first).to.include({ kind: "CHANGE", category: "Lectures", action: "Deleted a lecture" });
+    expect(first.actor.name).to.equal("Mihai Ionescu");
+    expect(res.getBody().meta.page).to.equal(1);
+  });
+}
+
+docs {
+  Newest first, a page at a time. Filters: `kind` (CHANGE, LOGIN, LOGOUT,
+  LOGIN_FAILED), `category`, `actorId`, `role`, `from` and `to` (days) and
+  `search`.
+}
