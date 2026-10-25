@@ -29,6 +29,7 @@ import {
   Role,
   SchoolYearStatus,
 } from '../generated/prisma/client';
+import type { AbsenceCountDto } from '../absences/dto/absence.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PeriodQueryDto } from '../school-years/dto/school-year.dto';
 import { yearResult } from '../school-years/promotion';
@@ -712,6 +713,7 @@ export class GradesService {
       where: { classId_subjectId: { classId, subjectId } },
       select: {
         hoursPerWeek: true,
+        maxAbsences: true,
         subject: { select: subjectSummarySelect },
         teacher: { select: { ...personSelect, userId: true } },
       },
@@ -746,6 +748,10 @@ export class GradesService {
       select: gradeEntrySelect,
       orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
     });
+    const absences = await this.absenceCounts(
+      students.map((s) => s.id),
+      { schoolYearId: year.id, semester: shown, subjectId },
+    );
 
     const writable =
       year.status === SchoolYearStatus.ACTIVE &&
@@ -760,6 +766,9 @@ export class GradesService {
       teacher: toPerson(assignment.teacher),
       hoursPerWeek: assignment.hoursPerWeek,
       minimumGrades: minimum,
+      maxAbsences: assignment.maxAbsences,
+      // Attendance is taken in the current semester (admins: any).
+      canTakeAttendance: writable,
       students: students.map((student) => {
         const own = grades.filter((g) => g.studentId === student.id);
         return {
@@ -768,9 +777,29 @@ export class GradesService {
           grades: own.map(toGradeEntry),
           ...subjectAverage(own.map((g) => g.value)),
           hasMinimumGrades: own.length >= minimum,
+          absences: absences(student.id),
         };
       }),
     };
+  }
+
+  /** Each student's absences (unexcused, excused) in one subject and semester. */
+  private async absenceCounts(
+    studentIds: string[],
+    where: { schoolYearId: string; semester: number; subjectId: string },
+  ): Promise<(studentId: string) => AbsenceCountDto> {
+    const rows = await this.prisma.absence.groupBy({
+      by: ['studentId', 'excused'],
+      where: { ...where, studentId: { in: studentIds } },
+      _count: { _all: true },
+    });
+    const count = (studentId: string, excused: boolean) =>
+      rows.find((r) => r.studentId === studentId && r.excused === excused)
+        ?._count._all ?? 0;
+    return (studentId) => ({
+      unexcused: count(studentId, false),
+      excused: count(studentId, true),
+    });
   }
 
   /** Audit trail of one grade, still available after the grade is deleted. */
@@ -907,6 +936,7 @@ export class GradesService {
                 subjects: {
                   select: {
                     hoursPerWeek: true,
+                    maxAbsences: true,
                     subject: { select: subjectSummarySelect },
                     teacher: { select: personSelect },
                   },
@@ -953,22 +983,33 @@ export class GradesService {
       subject: (typeof extraSubjects)[number];
       teacher: PersonSummaryDto | null;
       hoursPerWeek: number | null;
+      maxAbsences: number | null;
     }[] = [
       ...classSubjects.map((cs) => ({
         subject: cs.subject,
         teacher: toPerson(cs.teacher),
         hoursPerWeek: cs.hoursPerWeek,
+        maxAbsences: cs.maxAbsences,
       })),
       ...extraSubjects.map((subject) => ({
         subject,
         teacher: null,
         hoursPerWeek: null,
+        maxAbsences: null,
       })),
     ];
+    const absences = await this.prisma.absence.groupBy({
+      by: ['subjectId', 'excused'],
+      where: { studentId, schoolYearId: year.id, semester },
+      _count: { _all: true },
+    });
+    const absencesIn = (subjectId: string, excused: boolean) =>
+      absences.find((a) => a.subjectId === subjectId && a.excused === excused)
+        ?._count._all ?? 0;
 
     const subjects: SubjectGradesDto[] = reportSubjects
       .sort((a, b) => a.subject.name.localeCompare(b.subject.name))
-      .map(({ subject, teacher, hoursPerWeek }) => {
+      .map(({ subject, teacher, hoursPerWeek, maxAbsences }) => {
         const own = grades.filter((g) => g.subjectId === subject.id);
         const minimum =
           hoursPerWeek === null ? null : minimumGrades(hoursPerWeek);
@@ -979,6 +1020,11 @@ export class GradesService {
           ...subjectAverage(own.map((g) => g.value)),
           minimumGrades: minimum,
           hasMinimumGrades: minimum === null ? null : own.length >= minimum,
+          absences: {
+            unexcused: absencesIn(subject.id, false),
+            excused: absencesIn(subject.id, true),
+          },
+          maxAbsences,
         };
       });
 

@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useClass, useClassStudents } from '@/features/classes/api'
 import { ClassNotInYear } from '@/features/classes/class-not-in-year'
 import { classInYear } from '@/features/classes/follow-year'
+import { ClassAbsencesTab } from '@/features/absences/class-absences-tab'
 import { Gradebook } from '@/features/grades/gradebook'
 import type { Student } from '@/features/students/api'
 import { useMyTeacherProfile } from '@/features/teachers/api'
@@ -27,7 +28,7 @@ import { TimetableGrid } from '@/features/timetable/timetable-grid'
 import { formatDate, fullName } from '@/lib/format'
 import { usePeriod } from '@/periods/period-context'
 
-const TABS = ['gradebook', 'students', 'timetable'] as const
+const TABS = ['gradebook', 'absences', 'students', 'timetable'] as const
 type Tab = (typeof TABS)[number]
 
 /**
@@ -113,9 +114,14 @@ export function MyClassPage() {
         }
       />
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="mb-2">
+      {/* The absences of the whole class are for the homeroom teacher only. */}
+      <Tabs
+        value={tab === 'absences' && !isHomeroom ? 'gradebook' : tab}
+        onValueChange={setTab}
+      >
+        <TabsList className="mb-2 h-auto max-w-full flex-wrap justify-start group-data-[orientation=horizontal]/tabs:h-auto [&>*]:h-[30px] [&>*]:flex-none">
           <TabsTrigger value="gradebook">Gradebook</TabsTrigger>
+          {isHomeroom && <TabsTrigger value="absences">Absences</TabsTrigger>}
           <TabsTrigger value="students">Students</TabsTrigger>
           <TabsTrigger value="timetable">Timetable</TabsTrigger>
         </TabsList>
@@ -148,6 +154,11 @@ export function MyClassPage() {
             )}
           />
         </TabsContent>
+        {isHomeroom && (
+          <TabsContent value="absences">
+            <ClassAbsencesTab classId={c.id} schoolYearId={c.schoolYear.id} />
+          </TabsContent>
+        )}
         <TabsContent value="students">
           <StudentsTab classId={c.id} />
         </TabsContent>
@@ -167,7 +178,7 @@ const studentColumns: Column<Student>[] = [
         {s.registrationNumber}
       </span>
     ),
-    className: 'w-24',
+    className: 'hidden w-24 @md:table-cell',
   },
   {
     header: 'Name',
@@ -182,7 +193,7 @@ const studentColumns: Column<Student>[] = [
   {
     header: 'Date of birth',
     cell: (s) => formatDate(s.dateOfBirth),
-    className: 'hidden whitespace-nowrap md:table-cell',
+    className: 'hidden whitespace-nowrap @xl:table-cell',
   },
 ]
 

@@ -1,0 +1,42 @@
+meta {
+  name: Absences in Mathematics (as teacher)
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/absences?studentId={{gradeStudentId}}&subjectId={{mathSubjectId}}&pageSize=50
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+params:query {
+  studentId: {{gradeStudentId}}
+  subjectId: {{mathSubjectId}}
+  pageSize: 50
+}
+
+script:post-response {
+  const absence = res.getBody().data.find((a) => a.date === bru.getVar("absenceDate"));
+  if (absence) bru.setVar("absenceId", absence.id);
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("The new absence, which the teacher may change", function () {
+    const absence = res.getBody().data.find((a) => a.date === bru.getVar("absenceDate"));
+    expect(absence.excused).to.equal(false);
+    expect(absence.canChange).to.equal(true);
+    expect(absence.recordedBy.lastName).to.equal("Ionescu");
+  });
+}
+
+docs {
+  Newest first, a page at a time. Filters: schoolYearId, semester, classId, subjectId, studentId, excused. `canChange` says whether the user may excuse or delete each one.
+}

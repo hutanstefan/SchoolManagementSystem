@@ -402,7 +402,12 @@ export class SchoolYearsService {
             name: true,
             homeroomTeacherId: true,
             subjects: {
-              select: { subjectId: true, teacherId: true, hoursPerWeek: true },
+              select: {
+                subjectId: true,
+                teacherId: true,
+                hoursPerWeek: true,
+                maxAbsences: true,
+              },
             },
           },
         });
@@ -426,6 +431,7 @@ export class SchoolYearsService {
                 create: source.subjects.map((s) => ({
                   subjectId: s.subjectId,
                   hoursPerWeek: s.hoursPerWeek,
+                  maxAbsences: s.maxAbsences,
                   teacherId: continuation ? s.teacherId : null,
                 })),
               },

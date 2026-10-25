@@ -50,7 +50,7 @@ export function ClassStudentsTab({
           {s.registrationNumber}
         </span>
       ),
-      className: 'w-24',
+      className: 'hidden w-24 @md:table-cell',
     },
     {
       header: 'Name',
@@ -65,7 +65,7 @@ export function ClassStudentsTab({
     {
       header: 'Date of birth',
       cell: (s) => formatDate(s.dateOfBirth),
-      className: 'hidden sm:table-cell',
+      className: 'hidden whitespace-nowrap @xl:table-cell',
     },
     {
       header: <span className="sr-only">Actions</span>,

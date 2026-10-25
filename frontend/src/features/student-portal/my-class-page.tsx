@@ -17,12 +17,19 @@ const subjectColumns: Column<ClassSubject>[] = [
     cell: (s) => (
       <div className="flex items-center gap-3">
         <SubjectIcon subject={s.subject} />
-        <span className="font-medium">{s.subject.name}</span>
+        <div className="min-w-0">
+          <div className="font-medium">{s.subject.name}</div>
+          {/* Narrow: the teacher under the subject. */}
+          <div className="text-muted-foreground text-xs @md:hidden">
+            {s.teacher ? fullName(s.teacher) : 'Not assigned yet'}
+          </div>
+        </div>
       </div>
     ),
   },
   {
     header: 'Teacher',
+    className: 'hidden @md:table-cell',
     cell: (s) =>
       s.teacher ? (
         fullName(s.teacher)
@@ -75,12 +82,13 @@ export function StudentClassPage() {
         title={`Class ${c.name}`}
         description={`Your class in ${c.schoolYear.name}, its subjects and teachers.`}
       />
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           label="Homeroom teacher"
           value={c.homeroomTeacher ? fullName(c.homeroomTeacher) : '—'}
           icon={Home}
           tone="amber"
+          className="sm:col-span-2 xl:col-span-1"
         />
         <StatCard
           label="Students"

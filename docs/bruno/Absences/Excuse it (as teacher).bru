@@ -1,0 +1,38 @@
+meta {
+  name: Excuse it (as teacher)
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/absences/{{absenceId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+body:json {
+  {
+    "excused": true,
+    "note": "Medical note"
+  }
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Excused, by whom and why", function () {
+    const absence = res.getBody();
+    expect(absence.excused).to.equal(true);
+    expect(absence.excuseNote).to.equal("Medical note");
+    expect(absence.excusedBy.lastName).to.equal("Ionescu");
+  });
+}
+
+docs {
+  `{ "excused": false }` takes the excuse back. Only unexcused absences count against the limit.
+}

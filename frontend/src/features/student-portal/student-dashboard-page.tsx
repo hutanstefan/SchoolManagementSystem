@@ -121,12 +121,12 @@ export function StudentDashboardPage() {
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-5">
+      <div className="grid gap-6 xl:grid-cols-5">
         <ChartCard
           title="Subject averages"
           description="Hover a bar for the details"
           action={<PassFailLegend className="hidden sm:flex" />}
-          className="lg:col-span-3"
+          className="xl:col-span-3"
           isEmpty={gradeCount === 0}
           emptyTitle="No grades yet"
           emptyDescription="Your averages appear here once you get grades."
@@ -147,7 +147,7 @@ export function StudentDashboardPage() {
           />
         </ChartCard>
 
-        <Card className="gap-0 py-0 lg:col-span-2">
+        <Card className="gap-0 py-0 xl:col-span-2">
           <SectionHeader
             title="Latest grades"
             action={
@@ -189,7 +189,7 @@ export function StudentDashboardPage() {
         <ChartCard
           title="My progress"
           description="Mean of all my grades so far"
-          className="lg:col-span-3"
+          className="xl:col-span-3"
           isEmpty={trend.length < 2}
           emptyTitle="Not enough grades yet"
           emptyDescription="The line appears after grades on two different days."
@@ -198,7 +198,7 @@ export function StudentDashboardPage() {
           <AverageTrendChart data={trend} />
         </ChartCard>
 
-        <Card className="gap-0 py-0 lg:col-span-2">
+        <Card className="gap-0 py-0 xl:col-span-2">
           <SectionHeader
             title="Today's lessons"
             action={
@@ -219,9 +219,9 @@ export function StudentDashboardPage() {
           )}
         </Card>
 
-        <LatestLectures className="lg:col-span-5" />
+        <LatestLectures className="xl:col-span-5" />
 
-        <Card className="gap-0 py-0 lg:col-span-5">
+        <Card className="gap-0 py-0 xl:col-span-5">
           <SectionHeader
             title="My profile"
             action={
@@ -232,7 +232,7 @@ export function StudentDashboardPage() {
               )
             }
           />
-          <dl className="grid gap-4 p-5 text-sm sm:grid-cols-3 lg:grid-cols-6">
+          <dl className="grid gap-4 p-5 text-sm sm:grid-cols-3 xl:grid-cols-6">
             <ProfileField label="Name" value={fullName(user)} />
             <ProfileField
               label="Reg. no. (nr. matricol)"

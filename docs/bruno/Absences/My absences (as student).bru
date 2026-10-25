@@ -1,0 +1,35 @@
+meta {
+  name: My absences (as student)
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/absences?excused=true&pageSize=50
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{studentToken}}
+}
+
+params:query {
+  excused: true
+  pageSize: 50
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Only their own, read-only", function () {
+    const data = res.getBody().data;
+    expect(data.length).to.be.greaterThan(0);
+    data.forEach((a) => {
+      expect(a.student.id).to.equal(bru.getVar("gradeStudentId"));
+      expect(a.excused).to.equal(true);
+      expect(a.canChange).to.equal(false);
+    });
+  });
+}

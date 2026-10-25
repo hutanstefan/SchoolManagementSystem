@@ -57,12 +57,22 @@ export function GradesPage() {
     {
       header: 'Date',
       cell: (g) => formatDate(g.date),
-      className: 'whitespace-nowrap',
+      className: 'hidden whitespace-nowrap @2xl:table-cell',
     },
     {
       header: 'Student',
+      className: 'w-full max-w-0',
+      // Narrow: the subject and the day under the name.
       cell: (g) => (
-        <PersonCell person={g.student}>
+        <PersonCell
+          person={g.student}
+          secondary={
+            <span className="@2xl:hidden">
+              <span className="@xl:hidden">{g.subject.name} · </span>
+              {formatDate(g.date)}
+            </span>
+          }
+        >
           <Link
             to={`/admin/students/${g.student.id}`}
             className="hover:underline"
@@ -76,10 +86,11 @@ export function GradesPage() {
       header: 'Class',
       cell: (g) =>
         g.class ? <Badge variant="secondary">{g.class.name}</Badge> : '—',
-      className: 'hidden sm:table-cell',
+      className: 'hidden @3xl:table-cell',
     },
     {
       header: 'Subject',
+      className: 'hidden @xl:table-cell',
       cell: (g) => (
         <span className="flex items-center gap-2">
           <SubjectDot color={g.subject.color} />
@@ -103,7 +114,7 @@ export function GradesPage() {
     {
       header: 'Teacher',
       cell: (g) => (g.teacher ? fullName(g.teacher) : '—'),
-      className: 'hidden lg:table-cell',
+      className: 'hidden @4xl:table-cell',
     },
     {
       header: <span className="sr-only">Actions</span>,

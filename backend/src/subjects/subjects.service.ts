@@ -67,13 +67,18 @@ export class SubjectsService {
       where: { id },
       select: {
         _count: {
-          select: { classSubjects: true, grades: true, lectures: true },
+          select: {
+            classSubjects: true,
+            grades: true,
+            lectures: true,
+            absences: true,
+          },
         },
       },
     });
     if (!subject) throw new NotFoundException('Subject not found');
 
-    const { classSubjects, grades, lectures } = subject._count;
+    const { classSubjects, grades, lectures, absences } = subject._count;
     if (classSubjects > 0 || grades > 0) {
       throw new ConflictException(
         `Subject is still taught in ${classSubjects} class(es) and has ${grades} grade(s). ` +
@@ -84,6 +89,12 @@ export class SubjectsService {
     if (lectures > 0) {
       throw new ConflictException(
         `Subject has ${lectures} lecture(s). Delete them first.`,
+      );
+    }
+
+    if (absences > 0) {
+      throw new ConflictException(
+        `Subject has ${absences} absence(s) on record. They stay in the students' history.`,
       );
     }
 

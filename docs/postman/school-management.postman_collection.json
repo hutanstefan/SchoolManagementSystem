@@ -55,6 +55,14 @@
     {
       "key": "auditId",
       "value": ""
+    },
+    {
+      "key": "absenceDate",
+      "value": ""
+    },
+    {
+      "key": "absenceId",
+      "value": ""
     }
   ],
   "item": [
@@ -4104,6 +4112,544 @@
                 }
               ]
             }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Absences",
+      "description": "Teachers take attendance in the subjects they teach; each subject of a class has a limit of unexcused absences per semester. The teacher who recorded an absence, the homeroom teacher and admins can excuse or delete it. Run Auth, Teaching assignments and Grades first. The absence is recorded on a Sunday of last week and deleted again at the end.",
+      "item": [
+        {
+          "name": "Take attendance (as teacher)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// The Sunday of last week, as YYYY-MM-DD.",
+                  "const day = new Date();",
+                  "day.setDate(day.getDate() - day.getDay() - 7);",
+                  "const pad = (n) => String(n).padStart(2, '0');",
+                  "pm.collectionVariables.set('absenceDate', `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('One student marked absent', () => pm.expect(pm.response.json()).to.eql({ recorded: 1, alreadyAbsent: 0 }));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/absences/attendance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "absences",
+                "attendance"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"classId\": \"{{gradeClassId}}\",\n  \"subjectId\": \"{{mathSubjectId}}\",\n  \"date\": \"{{absenceDate}}\",\n  \"studentIds\": [\n    \"{{gradeStudentId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The students who missed the lesson; the others were there. The date defaults to today and can't be in the future. Marking the same student twice the same day in the same subject counts once (`alreadyAbsent`)."
+          }
+        },
+        {
+          "name": "Take attendance again (counted once)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Already absent that day', () => pm.expect(pm.response.json()).to.eql({ recorded: 0, alreadyAbsent: 1 }));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/absences/attendance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "absences",
+                "attendance"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"classId\": \"{{gradeClassId}}\",\n  \"subjectId\": \"{{mathSubjectId}}\",\n  \"date\": \"{{absenceDate}}\",\n  \"studentIds\": [\n    \"{{gradeStudentId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Take attendance in a subject not taught (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Says why', () => pm.expect(pm.response.json().message).to.equal(\"You don't teach Physics in 9A\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/absences/attendance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "absences",
+                "attendance"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"classId\": \"{{gradeClassId}}\",\n  \"subjectId\": \"{{physicsSubjectId}}\",\n  \"studentIds\": [\n    \"{{gradeStudentId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Absences in Mathematics (as teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const absence = pm.response.json().data.find((a) => a.date === pm.collectionVariables.get('absenceDate'));",
+                  "if (absence) pm.collectionVariables.set('absenceId', absence.id);",
+                  "pm.test('The new absence, which the teacher may change', () => {",
+                  "  pm.expect(absence).to.include({ excused: false, canChange: true });",
+                  "  pm.expect(absence.recordedBy.lastName).to.equal('Ionescu');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/absences?studentId={{gradeStudentId}}&subjectId={{mathSubjectId}}&pageSize=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "absences"
+              ],
+              "query": [
+                {
+                  "key": "studentId",
+                  "value": "{{gradeStudentId}}"
+                },
+                {
+                  "key": "subjectId",
+                  "value": "{{mathSubjectId}}"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "50"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Newest first, a page at a time. Filters: schoolYearId, semester, classId, subjectId, studentId, excused. `canChange` says whether the user may excuse or delete each one."
+          }
+        },
+        {
+          "name": "Excuse it (as student, 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/absences/{{absenceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "absences",
+                "{{absenceId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"excused\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Excuse it (as teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Excused, by whom and why', () => {",
+                  "  const absence = pm.response.json();",
+                  "  pm.expect(absence).to.include({ excused: true, excuseNote: 'Medical note' });",
+                  "  pm.expect(absence.excusedBy.lastName).to.equal('Ionescu');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/absences/{{absenceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "absences",
+                "{{absenceId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"excused\": true,\n  \"note\": \"Medical note\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "`{ \"excused\": false }` takes the excuse back. Only unexcused absences count against the limit."
+          }
+        },
+        {
+          "name": "My absences (as student)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Only their own, read-only', () => {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.expect(data.length).to.be.above(0);",
+                  "  data.forEach((a) => {",
+                  "    pm.expect(a.student.id).to.equal(pm.collectionVariables.get('gradeStudentId'));",
+                  "    pm.expect(a).to.include({ excused: true, canChange: false });",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/absences?excused=true&pageSize=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "absences"
+              ],
+              "query": [
+                {
+                  "key": "excused",
+                  "value": "true"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "50"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Class absences (homeroom teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Every student, by subject, with the limits', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.class.name).to.equal('9A');",
+                  "  pm.expect(body.students.length).to.be.above(0);",
+                  "  const math = body.students[0].subjects.find((s) => s.subject.name === 'Mathematics');",
+                  "  pm.expect(math.maxAbsences).to.equal(14);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/classes/{{gradeClassId}}/absences",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "classes",
+                "{{gradeClassId}}",
+                "absences"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "The homeroom teacher and admins: each student's absences in the semester, by subject, with how many subjects they are over (`overLimit`) or close to (`nearLimit`, 80%) the limit."
+          }
+        },
+        {
+          "name": "Excuse a period (homeroom teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Nothing left to excuse that day', () => pm.expect(pm.response.json().excused).to.equal(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/absences/excuse",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "absences",
+                "excuse"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{gradeStudentId}}\",\n  \"from\": \"{{absenceDate}}\",\n  \"to\": \"{{absenceDate}}\",\n  \"note\": \"Medical note\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Every unexcused absence of the student between the two days, in every subject (a medical note for a week). The homeroom teacher and admins."
+          }
+        },
+        {
+          "name": "Delete the absence (as teacher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/absences/{{absenceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "absences",
+                "{{absenceId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "For an absence recorded by mistake. Allowed for the teacher who recorded it, the homeroom teacher and admins."
           }
         }
       ]

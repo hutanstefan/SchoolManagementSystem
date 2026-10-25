@@ -1,0 +1,32 @@
+meta {
+  name: Class absences (homeroom teacher)
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/classes/{{gradeClassId}}/absences
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Every student, by subject, with the limits", function () {
+    const body = res.getBody();
+    expect(body.class.name).to.equal("9A");
+    expect(body.students.length).to.be.greaterThan(0);
+    const math = body.students[0].subjects.find((s) => s.subject.name === "Mathematics");
+    expect(math.maxAbsences).to.equal(14);
+  });
+}
+
+docs {
+  The homeroom teacher and admins: each student's absences in the semester, by subject, with how many subjects they are over (`overLimit`) or close to (`nearLimit`, 80%) the limit.
+}

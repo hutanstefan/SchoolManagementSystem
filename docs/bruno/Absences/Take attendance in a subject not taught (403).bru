@@ -1,0 +1,32 @@
+meta {
+  name: Take attendance in a subject not taught (403)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/absences/attendance
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+body:json {
+  {
+    "classId": "{{gradeClassId}}",
+    "subjectId": "{{physicsSubjectId}}",
+    "studentIds": ["{{gradeStudentId}}"]
+  }
+}
+
+tests {
+  test("Status is 403", function () {
+    expect(res.getStatus()).to.equal(403);
+  });
+  test("Says why", function () {
+    expect(res.getBody().message).to.equal("You don't teach Physics in 9A");
+  });
+}

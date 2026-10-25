@@ -1,0 +1,14 @@
+meta {
+  name: Absences
+  seq: 16
+}
+
+docs {
+  Teachers take attendance in the subjects they teach; each subject of a class
+  has a limit of unexcused absences per semester. The teacher who recorded an
+  absence, the homeroom teacher and admins can excuse or delete it. Uses
+  `teacherToken` (Auth > Login as teacher), `studentToken` (Grades > Login as
+  student) and the ids found in Grades and Teaching assignments, so run those
+  first. The absence is recorded on a Sunday of last week (no lessons, so no seeded
+  absence that day) and deleted again at the end.
+}

@@ -22,6 +22,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SchoolYearsService } from '../school-years/school-years.service';
 import { serializableTransaction } from '../prisma/serializable-transaction';
 import { snapshotLessons } from '../timetable/lesson-snapshots';
+import { defaultMaxAbsences } from '../absences/limits';
 import { lessonSelect, toLesson } from '../timetable/lessons';
 import { TimetableConflictException } from '../timetable/timetable-conflict.exception';
 import { assertTeacherIsFreeAt } from '../timetable/timetable-conflicts';
@@ -33,6 +34,7 @@ import {
 const classSubjectSelect = {
   id: true,
   hoursPerWeek: true,
+  maxAbsences: true,
   subject: { select: subjectSummarySelect },
   teacher: { select: { ...personSelect, userId: true } },
 } as const satisfies Prisma.ClassSubjectSelect;
@@ -88,6 +90,10 @@ export class ClassSubjectsService {
         subjectId: dto.subjectId,
         teacherId: dto.teacherId,
         hoursPerWeek: dto.hoursPerWeek,
+        maxAbsences:
+          dto.maxAbsences === undefined
+            ? defaultMaxAbsences(dto.hoursPerWeek)
+            : dto.maxAbsences,
       },
       select: classSubjectSelect,
     });
@@ -190,7 +196,11 @@ export class ClassSubjectsService {
 
         const updated = await tx.classSubject.update({
           where: { id },
-          data: { teacherId: dto.teacherId, hoursPerWeek: dto.hoursPerWeek },
+          data: {
+            teacherId: dto.teacherId,
+            hoursPerWeek: dto.hoursPerWeek,
+            maxAbsences: dto.maxAbsences,
+          },
           select: classSubjectSelect,
         });
         const after = await snapshotLessons(tx, classIds);
@@ -279,6 +289,7 @@ function toSummary(row: ClassSubjectRow): ClassSubjectSummaryDto {
     subject: row.subject,
     teacher: toPerson(row.teacher),
     hoursPerWeek: row.hoursPerWeek,
+    maxAbsences: row.maxAbsences,
   };
 }
 

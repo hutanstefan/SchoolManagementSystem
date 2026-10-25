@@ -30,7 +30,7 @@ export function MyGradesPage() {
         description="Your grades and averages in every subject."
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="General average"
           value={report.data?.overallAverage ?? '—'}

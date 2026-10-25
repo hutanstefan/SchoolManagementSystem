@@ -15,6 +15,7 @@ import { PageHeader } from '@/components/page-header'
 import { ErrorState, LoadingBlock } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ClassAbsencesTab } from '@/features/absences/class-absences-tab'
 import { Gradebook } from '@/features/grades/gradebook'
 import { ClassTimetableEditor } from '@/features/timetable/class-timetable-editor'
 import { fullName } from '@/lib/format'
@@ -27,7 +28,13 @@ import { classInYear } from './follow-year'
 import { ClassStudentsTab } from './class-students-tab'
 import { ClassSubjectsTab } from './class-subjects-tab'
 
-const TABS = ['students', 'subjects', 'timetable', 'gradebook'] as const
+const TABS = [
+  'students',
+  'subjects',
+  'timetable',
+  'gradebook',
+  'absences',
+] as const
 type Tab = (typeof TABS)[number]
 
 export function ClassDetailPage() {
@@ -118,11 +125,12 @@ export function ClassDetailPage() {
       />
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="mb-2">
+        <TabsList className="mb-2 h-auto max-w-full flex-wrap justify-start group-data-[orientation=horizontal]/tabs:h-auto [&>*]:h-[30px] [&>*]:flex-none">
           <TabsTrigger value="students">Students</TabsTrigger>
           <TabsTrigger value="subjects">Subjects</TabsTrigger>
           <TabsTrigger value="timetable">Timetable</TabsTrigger>
           <TabsTrigger value="gradebook">Gradebook</TabsTrigger>
+          <TabsTrigger value="absences">Absences</TabsTrigger>
         </TabsList>
         <TabsContent value="students">
           <ClassStudentsTab classId={c.id} readOnly={readOnly} />
@@ -159,6 +167,9 @@ export function ClassDetailPage() {
               </>
             )}
           />
+        </TabsContent>
+        <TabsContent value="absences">
+          <ClassAbsencesTab classId={c.id} schoolYearId={c.schoolYear.id} />
         </TabsContent>
       </Tabs>
 

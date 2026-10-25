@@ -27,6 +27,7 @@ export function StatCard({
   icon: Icon,
   tone = 'indigo',
   isLoading,
+  className,
 }: {
   label: string
   /** Numbers count up; anything else is shown as is. */
@@ -36,9 +37,15 @@ export function StatCard({
   icon?: LucideIcon
   tone?: Tone
   isLoading?: boolean
+  className?: string
 }) {
   return (
-    <Card className="group hover:shadow-lifted relative gap-0 overflow-hidden p-5 transition-shadow">
+    <Card
+      className={cn(
+        'group hover:shadow-lifted relative gap-0 overflow-hidden p-5 transition-shadow',
+        className,
+      )}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-muted-foreground text-sm font-medium">{label}</p>

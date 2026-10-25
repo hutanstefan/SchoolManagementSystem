@@ -39,12 +39,14 @@ export function TeachersPage() {
   const columns: Column<Teacher>[] = [
     {
       header: 'Name',
+      // Takes the free width; long names and emails are cut with "…".
+      className: 'w-full max-w-0',
       cell: (t) => <PersonCell person={t} secondary={t.email} />,
     },
     {
       header: 'Added',
       cell: (t) => formatDate(t.createdAt),
-      className: 'hidden md:table-cell',
+      className: 'hidden whitespace-nowrap @lg:table-cell',
     },
     {
       header: <span className="sr-only">Actions</span>,

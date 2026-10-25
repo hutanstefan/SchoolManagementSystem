@@ -110,6 +110,7 @@ export class ClassesService {
           select: {
             id: true,
             hoursPerWeek: true,
+            maxAbsences: true,
             subject: { select: subjectSummarySelect },
             teacher: { select: personSelect },
           },
@@ -125,6 +126,7 @@ export class ClassesService {
         subject: cs.subject,
         teacher: toPerson(cs.teacher),
         hoursPerWeek: cs.hoursPerWeek,
+        maxAbsences: cs.maxAbsences,
       })),
       lineage: await this.lineageOf(user, id),
     };

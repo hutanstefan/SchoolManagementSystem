@@ -16,6 +16,7 @@ export const AUDITED_MODELS = new Set([
   'ClassSubject',
   'TimetableEntry',
   'Grade',
+  'Absence',
   'Conversation',
   'ConversationMember',
   'Lecture',
@@ -280,6 +281,17 @@ export function describe(
         ref('subjectId') && `in ${ref('subjectId')}`,
         ref('studentId') && `for ${ref('studentId')}`,
       );
+    case 'Absence': {
+      const date =
+        record.date instanceof Date
+          ? record.date.toISOString().slice(0, 10)
+          : text(record.date)?.slice(0, 10);
+      return join(
+        date,
+        ref('subjectId') && `in ${ref('subjectId')}`,
+        ref('studentId') && `for ${ref('studentId')}`,
+      );
+    }
     case 'Reexam':
       return join(
         text(record.grade),

@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/providers'
 import type { Lesson, Timetable } from './api'
@@ -30,12 +30,13 @@ describe('TimetableGrid', () => {
     const { unmount } = renderWithProviders(
       <TimetableGrid timetable={timetable} mode="class" />,
     )
-    expect(screen.getByText('Physics')).toBeInTheDocument()
-    expect(screen.getByText(/Aristita David · Lab 2/)).toBeInTheDocument()
+    const week = () => within(screen.getByRole('table'))
+    expect(week().getByText('Physics')).toBeInTheDocument()
+    expect(week().getByText(/Aristita David · Lab 2/)).toBeInTheDocument()
     unmount()
 
     renderWithProviders(<TimetableGrid timetable={timetable} mode="teacher" />)
-    expect(screen.getByText(/Class 9A · Lab 2/)).toBeInTheDocument()
+    expect(week().getByText(/Class 9A · Lab 2/)).toBeInTheDocument()
   })
 
   it('is read-only unless handlers are given', () => {
@@ -57,14 +58,25 @@ describe('TimetableGrid', () => {
       />,
     )
 
+    const week = within(screen.getByRole('table'))
     fireEvent.click(
-      screen.getByRole('button', {
+      week.getByRole('button', {
         name: 'Add a lesson on Friday, period 8',
       }),
     )
     expect(onEmptyCellClick).toHaveBeenCalledWith('FRIDAY', 8)
 
-    fireEvent.click(screen.getByRole('button', { name: /Physics/ }))
+    fireEvent.click(week.getByRole('button', { name: /Physics/ }))
     expect(onLessonClick).toHaveBeenCalledWith(lesson)
+  })
+
+  it('shows one day at a time where the week does not fit', () => {
+    renderWithProviders(<TimetableGrid timetable={timetable} mode="class" />)
+    const dayView = within(screen.getByTestId('timetable-day'))
+    fireEvent.click(dayView.getByRole('radio', { name: 'Tue' }))
+    expect(dayView.queryByText('Physics')).not.toBeInTheDocument()
+    expect(dayView.getAllByText('Free')).toHaveLength(4)
+    fireEvent.click(dayView.getByRole('radio', { name: 'Mon' }))
+    expect(dayView.getByText('Physics')).toBeInTheDocument()
   })
 })

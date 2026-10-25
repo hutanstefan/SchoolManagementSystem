@@ -30,7 +30,7 @@ export function LatestLectures({ className }: { className?: string }) {
           </Button>
         }
       />
-      <ul className="grid divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <ul className="grid grid-cols-1 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         {latest.map((lecture) => (
           <li key={lecture.id}>
             <button

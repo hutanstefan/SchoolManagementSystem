@@ -186,7 +186,7 @@ function StudentRow({
 
   return (
     <li className="flex flex-col gap-3 px-5 py-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 @2xl:flex-row @2xl:items-center">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <PersonAvatar person={student} />
           <div className="min-w-0">
@@ -221,7 +221,7 @@ function StudentRow({
           >
             <SelectTrigger
               className={cn(
-                'w-full sm:w-64',
+                'w-full @2xl:w-64',
                 outcome === null &&
                   'border-amber-500/50 bg-amber-500/5 text-amber-700 dark:text-amber-300',
               )}
@@ -249,7 +249,7 @@ function StudentRow({
         </div>
       </div>
       {canTakeReexams(student) && (
-        <div className="grid gap-2 sm:pl-12 lg:grid-cols-2">
+        <div className="grid gap-2 @2xl:pl-12 @4xl:grid-cols-2">
           {student.failedSubjects.map((subject) => (
             <ReexamInput
               key={subject.subject.id}
@@ -311,7 +311,8 @@ function ClassSection({
           </Badge>
         )}
       </div>
-      <ul className="divide-y">
+      {/* Laid out by its own width: the sidebar takes room on tablets. */}
+      <ul className="@container divide-y">
         {students.map((student) => (
           <StudentRow
             key={student.id}
@@ -480,7 +481,7 @@ export function CloseYearPage() {
 
       {/* In <body>: the page's enter animation would otherwise pin it to the page. */}
       {createPortal(
-        <div className="bg-background/85 supports-[backdrop-filter]:bg-background/70 fixed inset-x-0 bottom-0 z-20 border-t backdrop-blur-md md:left-64">
+        <div className="bg-background/85 supports-[backdrop-filter]:bg-background/70 fixed inset-x-0 bottom-0 z-20 border-t backdrop-blur-md lg:left-64">
           <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center md:px-8">
             <div className="flex flex-1 items-start gap-2">
               <Checkbox

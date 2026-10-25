@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { crossing } from '../absences/limits';
 import {
   DomainEvents,
+  type AbsencesRecordedEvent,
   type AssignmentsChangedEvent,
   type GradeChange,
   type GradesChangedEvent,
@@ -11,6 +13,8 @@ import {
 import { subjectAverage } from '../grades/averages';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  absenceAlert,
+  absenceMessage,
   assignmentMessage,
   gradeMessage,
   lectureMessage,
@@ -217,6 +221,66 @@ export class NotificationRulesListener {
           link: '/student/lectures',
         })),
       );
+    });
+  }
+
+  /**
+   * A student who comes close to (80%), or goes over, the absence limit of a
+   * subject hears about it once, and so does their homeroom teacher.
+   */
+  @OnEvent(DomainEvents.AbsencesRecorded)
+  async onAbsencesRecorded(event: AbsencesRecordedEvent): Promise<void> {
+    await this.safely('absence', async () => {
+      const max = event.maxAbsences;
+      if (max === null) return;
+      const steps = event.counts
+        .map((count) => ({
+          ...count,
+          step: crossing(count.before, count.after, max),
+        }))
+        .filter((count) => count.step !== null);
+      if (steps.length === 0) return;
+
+      const [subject, schoolClass, students] = await Promise.all([
+        this.prisma.subject.findUnique({
+          where: { id: event.subjectId },
+          select: { name: true },
+        }),
+        this.prisma.class.findUnique({
+          where: { id: event.classId },
+          select: { homeroomTeacher: { select: { userId: true } } },
+        }),
+        this.prisma.student.findMany({
+          where: { id: { in: steps.map((s) => s.studentId) } },
+          select: {
+            id: true,
+            userId: true,
+            user: { select: { firstName: true, lastName: true } },
+          },
+        }),
+      ]);
+      if (!subject) return;
+      const homeroomUserId = schoolClass?.homeroomTeacher?.userId;
+
+      const out: NewNotification[] = [];
+      for (const { studentId, after, step } of steps) {
+        const student = students.find((s) => s.id === studentId);
+        if (!student || !step) continue;
+        out.push({
+          userId: student.userId,
+          ...absenceMessage(step, subject.name, after, max),
+          link: '/student/grades',
+        });
+        if (homeroomUserId && homeroomUserId !== event.actorId) {
+          const name = `${student.user.firstName} ${student.user.lastName}`;
+          out.push({
+            userId: homeroomUserId,
+            ...absenceAlert(step, name, subject.name, after, max),
+            link: `/teacher/classes/${event.classId}?tab=absences`,
+          });
+        }
+      }
+      await this.notifications.notify(out);
     });
   }
 

@@ -1,4 +1,4 @@
-import { Lock, Plus } from 'lucide-react'
+import { CalendarX2, Lock, Plus } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { DataTable, type Column } from '@/components/data-table'
@@ -14,6 +14,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { AbsenceCountCell } from '@/features/absences/absence-count'
+import {
+  AttendanceDialog,
+  type AttendanceTarget,
+} from '@/features/absences/attendance-dialog'
+import {
+  StudentAbsencesDialog,
+  type StudentAbsencesTarget,
+} from '@/features/absences/student-absences-dialog'
 import type { ClassSubject } from '@/features/classes/api'
 import type { Semester } from '@/features/school-years/api'
 import { SubjectDot } from '@/features/subjects/subject-icon'
@@ -74,6 +83,10 @@ export function Gradebook({
       : undefined)
   const gradebook = useGradebook(classId, subjectId, semester)
   const [dialog, setDialog] = useState<GradeDialogState | null>(null)
+  const [attendance, setAttendance] = useState<AttendanceTarget | null>(null)
+  const [absencesOf, setAbsencesOf] = useState<StudentAbsencesTarget | null>(
+    null,
+  )
 
   if (subjects.length === 0) {
     return (
@@ -103,10 +116,58 @@ export function Gradebook({
       ? rounded.reduce((sum, value) => sum + value, 0) / rounded.length
       : null
 
+  const takeAttendance = () =>
+    data &&
+    setAttendance({
+      classId: data.class.id,
+      className: data.class.name,
+      subject: data.subject,
+      students: data.students.map((row) => ({
+        id: row.student.id,
+        name: fullName(row.student),
+        registrationNumber: row.registrationNumber,
+      })),
+      // Only an admin can be on another semester than the current one here.
+      semester:
+        data.period.semester !== data.period.schoolYear.currentSemester
+          ? data.period.semester
+          : undefined,
+    })
+
+  const averageOf = (row: Row) => (
+    <div className="flex items-center gap-2">
+      <AverageCell average={row.average} roundedAverage={row.roundedAverage} />
+      {!row.hasMinimumGrades && data && (
+        <MissingGradesHint
+          count={row.grades.length}
+          minimum={data.minimumGrades}
+        />
+      )}
+    </div>
+  )
+  const absenceCell = (row: Row) =>
+    data && (
+      <AbsenceCountCell
+        count={row.absences}
+        maxAbsences={data.maxAbsences}
+        label={`Absences of ${fullName(row.student)}`}
+        onClick={() =>
+          setAbsencesOf({
+            student: { id: row.student.id, name: fullName(row.student) },
+            subject: data.subject,
+            schoolYearId: data.period.schoolYear.id,
+            semester: data.period.semester,
+          })
+        }
+      />
+    )
+
+  // Narrow (phones, tablets with the sidebar): the average and absences go
+  // under the name, and the register number is left out.
   const columns: Column<Row>[] = [
     {
       header: 'Reg. no.',
-      className: 'w-24',
+      className: 'hidden w-24 @3xl:table-cell',
       cell: (row) => (
         <span className="text-muted-foreground whitespace-nowrap tabular-nums">
           {row.registrationNumber}
@@ -115,21 +176,29 @@ export function Gradebook({
     },
     {
       header: 'Student',
-      cell: (row) =>
-        studentLink ? (
-          <Link
-            to={studentLink(row.student.id)}
-            className="font-medium hover:underline"
-          >
-            {fullName(row.student)}
-          </Link>
-        ) : (
-          <span className="font-medium">{fullName(row.student)}</span>
-        ),
+      className: 'whitespace-normal',
+      cell: (row) => (
+        <>
+          {studentLink ? (
+            <Link
+              to={studentLink(row.student.id)}
+              className="font-medium hover:underline"
+            >
+              {fullName(row.student)}
+            </Link>
+          ) : (
+            <span className="font-medium">{fullName(row.student)}</span>
+          )}
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 @xl:hidden">
+            {averageOf(row)}
+            {absenceCell(row)}
+          </div>
+        </>
+      ),
     },
     {
       header: 'Grades',
-      className: 'min-w-44',
+      className: 'min-w-32 @xl:min-w-44',
       cell: (row) => (
         <div className="flex flex-wrap items-center gap-1.5">
           {row.grades.map((grade) => (
@@ -178,21 +247,13 @@ export function Gradebook({
     },
     {
       header: 'Average',
-      className: 'w-40',
-      cell: (row) => (
-        <div className="flex items-center gap-2">
-          <AverageCell
-            average={row.average}
-            roundedAverage={row.roundedAverage}
-          />
-          {!row.hasMinimumGrades && data && (
-            <MissingGradesHint
-              count={row.grades.length}
-              minimum={data.minimumGrades}
-            />
-          )}
-        </div>
-      ),
+      className: 'hidden w-40 @xl:table-cell',
+      cell: averageOf,
+    },
+    {
+      header: 'Absences',
+      className: 'hidden w-32 @xl:table-cell',
+      cell: absenceCell,
     },
   ]
 
@@ -226,6 +287,11 @@ export function Gradebook({
               disabled: !started.includes(s),
             }))}
           />
+          {data?.canTakeAttendance && (
+            <Button onClick={takeAttendance}>
+              <CalendarX2 aria-hidden /> Take attendance
+            </Button>
+          )}
           {canAdd && subjectId && actions?.(subjectId)}
           {readOnly && (
             <Badge variant="warning-soft" className="gap-1">
@@ -240,6 +306,11 @@ export function Gradebook({
             </span>
             <Badge variant="outline">{data.hoursPerWeek} h / week</Badge>
             <Badge variant="outline">min. {data.minimumGrades} grades</Badge>
+            <Badge variant="outline">
+              {data.maxAbsences === null
+                ? 'No absence limit'
+                : `max. ${data.maxAbsences} absences`}
+            </Badge>
             <Badge variant="secondary">
               Class average {formatAverage(classAverage)}
             </Badge>
@@ -256,6 +327,14 @@ export function Gradebook({
         emptyTitle="No students in this class"
       />
       <GradeDialog state={dialog} onClose={() => setDialog(null)} />
+      <AttendanceDialog
+        target={attendance}
+        onClose={() => setAttendance(null)}
+      />
+      <StudentAbsencesDialog
+        target={absencesOf}
+        onClose={() => setAbsencesOf(null)}
+      />
     </Card>
   )
 }

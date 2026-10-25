@@ -1,0 +1,45 @@
+meta {
+  name: Take attendance (as teacher)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/absences/attendance
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+body:json {
+  {
+    "classId": "{{gradeClassId}}",
+    "subjectId": "{{mathSubjectId}}",
+    "date": "{{absenceDate}}",
+    "studentIds": ["{{gradeStudentId}}"]
+  }
+}
+
+script:pre-request {
+  // The Sunday of last week, as YYYY-MM-DD.
+  const day = new Date();
+  day.setDate(day.getDate() - day.getDay() - 7);
+  const pad = (n) => String(n).padStart(2, "0");
+  bru.setVar("absenceDate", `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`);
+}
+
+tests {
+  test("Status is 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("One student marked absent", function () {
+    expect(res.getBody()).to.deep.equal({ recorded: 1, alreadyAbsent: 0 });
+  });
+}
+
+docs {
+  The students who missed the lesson; the others were there. The date defaults to today and can't be in the future. Marking the same student twice the same day in the same subject counts once (`alreadyAbsent`).
+}

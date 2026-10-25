@@ -5,6 +5,7 @@ import { DataTable, type Column } from '@/components/data-table'
 import { ClassTile } from '@/components/class-tile'
 import { PageHeader } from '@/components/page-header'
 import { PersonCell } from '@/components/person-avatar'
+import { fullName } from '@/lib/format'
 import { PaginationBar } from '@/components/pagination-bar'
 import { SearchInput } from '@/components/search-input'
 import { Button } from '@/components/ui/button'
@@ -18,18 +19,28 @@ import { ClassFormDialog } from './class-form-dialog'
 const columns: Column<SchoolClass>[] = [
   {
     header: 'Class',
+    className: 'w-full max-w-0 @md:w-auto @md:max-w-none',
     cell: (c) => (
       <div className="flex items-center gap-3">
         <ClassTile
           name={c.name}
           className="size-10 rounded-xl text-sm shadow-none"
         />
-        <ClassCaption schoolClass={c} />
+        <div className="min-w-0">
+          <ClassCaption schoolClass={c} />
+          {/* Narrow: the homeroom teacher's column is left out. */}
+          <p className="text-muted-foreground mt-0.5 truncate text-xs @md:hidden">
+            {c.homeroomTeacher
+              ? `Homeroom: ${fullName(c.homeroomTeacher)}`
+              : 'No homeroom teacher'}
+          </p>
+        </div>
       </div>
     ),
   },
   {
     header: 'Homeroom teacher',
+    className: 'hidden @md:table-cell',
     cell: (c) =>
       c.homeroomTeacher ? (
         <PersonCell person={c.homeroomTeacher} />

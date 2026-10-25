@@ -28,6 +28,19 @@ export class CreateClassSubjectDto {
   @Min(1)
   @Max(10)
   hoursPerWeek!: number;
+
+  /**
+   * Most unexcused absences a student may have in this subject in a
+   * semester (0-200), or null for no limit. When omitted: about a fifth of
+   * the semester's lessons (4 h/week -> 14).
+   * @example 14
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(200)
+  maxAbsences?: number | null;
 }
 
 export class UpdateClassSubjectDto {
@@ -46,6 +59,14 @@ export class UpdateClassSubjectDto {
   @Min(1)
   @Max(10)
   hoursPerWeek?: number;
+
+  /** Most unexcused absences per semester (0-200), or null for no limit. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(200)
+  maxAbsences?: number | null;
 
   /**
    * Lessons of this subject to take out of the timetable first, in the same

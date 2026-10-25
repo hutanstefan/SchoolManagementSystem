@@ -139,11 +139,17 @@ function What({ entry }: { entry: AuditLog }) {
       <div className="min-w-0">
         <div className="text-sm font-medium">{entry.action}</div>
         {entry.target && (
-          <div className="text-muted-foreground truncate text-xs">
+          <div className="text-muted-foreground line-clamp-2 text-xs [overflow-wrap:anywhere]">
             {entry.target}
           </div>
         )}
-        <div className="text-muted-foreground text-xs sm:hidden">
+        {/* Narrow: who and when, as their columns are left out. */}
+        <div className="text-muted-foreground text-xs @3xl:hidden">
+          <span className="@lg:hidden">
+            {entry.actor.name ??
+              (entry.kind === 'LOGIN_FAILED' ? 'Unknown' : 'Deleted user')}{' '}
+            ·{' '}
+          </span>
           {formatTimeAgo(entry.createdAt)}
         </div>
       </div>
@@ -204,7 +210,7 @@ export function ActivityPage() {
   const columns: Column<AuditLog>[] = [
     {
       header: 'When',
-      className: 'hidden sm:table-cell w-40',
+      className: 'hidden w-40 @3xl:table-cell',
       cell: (e) => (
         <div className="whitespace-nowrap">
           <div className="text-sm">{formatTimeAgo(e.createdAt)}</div>
@@ -216,18 +222,18 @@ export function ActivityPage() {
     },
     {
       header: 'Who',
-      className: 'w-40 sm:w-56',
+      className: 'hidden w-56 @lg:table-cell',
       cell: (e) => <Who entry={e} />,
     },
     { header: 'What', cell: (e) => <What entry={e} /> },
     {
       header: 'Area',
-      className: 'hidden lg:table-cell w-44',
+      className: 'hidden w-44 @4xl:table-cell',
       cell: (e) => <Badge variant="secondary">{e.category}</Badge>,
     },
     {
       header: <span className="sr-only">Changes</span>,
-      className: 'hidden sm:table-cell w-28 text-right',
+      className: 'hidden w-28 text-right @xl:table-cell',
       cell: (e) =>
         e.changeCount > 0 && (
           <span className="text-muted-foreground text-xs whitespace-nowrap">
@@ -252,7 +258,7 @@ export function ActivityPage() {
               onChange={filter(setSearch)}
               placeholder="Search people, actions, records"
             />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:flex">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:flex">
               <Select value={category} onValueChange={filter(setCategory)}>
                 <SelectTrigger className="w-full lg:w-48" aria-label="Area">
                   <SelectValue />

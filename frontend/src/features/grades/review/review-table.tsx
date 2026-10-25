@@ -95,10 +95,12 @@ export function ReviewTable<S>({
             <TableHead className="w-10">
               <span className="sr-only">Save</span>
             </TableHead>
-            <TableHead className="w-20">{sourceHeader}</TableHead>
-            <TableHead>Read</TableHead>
-            <TableHead className="w-56">Student</TableHead>
-            <TableHead className="w-28">Grade</TableHead>
+            <TableHead className="hidden w-20 @md:table-cell">
+              {sourceHeader}
+            </TableHead>
+            <TableHead className="hidden @3xl:table-cell">Read</TableHead>
+            <TableHead className="@3xl:w-56">Student</TableHead>
+            <TableHead className="w-20 @3xl:w-28">Grade</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -108,6 +110,31 @@ export function ReviewTable<S>({
               : []
             const sameDay = sameDayGrades(row, context)
             const label = `row ${index + 1}`
+            const read = (
+              <>
+                {renderRead(row)}
+                {problems[index]!.filter((p) => p !== 'same-day').map(
+                  (problem) => (
+                    <p
+                      key={problem}
+                      role="alert"
+                      className="text-destructive mt-1 text-xs font-medium"
+                    >
+                      {PROBLEM_TEXT[problem]}
+                    </p>
+                  ),
+                )}
+                {row.include && row.studentId && existing.length > 0 && (
+                  <ExistingGradesLine
+                    sameDay={sameDay}
+                    count={existing.length}
+                    decision={row.decision}
+                    date={effectiveDate(row, context)}
+                    onOpen={() => setDeciding(index)}
+                  />
+                )}
+              </>
+            )
             return (
               <TableRow
                 key={row.key}
@@ -122,31 +149,20 @@ export function ReviewTable<S>({
                     aria-label={`Save the grade of ${label}`}
                   />
                 </TableCell>
-                <TableCell>{renderSource(row)}</TableCell>
-                <TableCell className="whitespace-normal">
-                  {renderRead(row)}
-                  {problems[index]!.filter((p) => p !== 'same-day').map(
-                    (problem) => (
-                      <p
-                        key={problem}
-                        role="alert"
-                        className="text-destructive mt-1 text-xs font-medium"
-                      >
-                        {PROBLEM_TEXT[problem]}
-                      </p>
-                    ),
-                  )}
-                  {row.include && row.studentId && existing.length > 0 && (
-                    <ExistingGradesLine
-                      sameDay={sameDay}
-                      count={existing.length}
-                      decision={row.decision}
-                      date={effectiveDate(row, context)}
-                      onOpen={() => setDeciding(index)}
-                    />
-                  )}
+                <TableCell className="hidden @md:table-cell">
+                  {renderSource(row)}
                 </TableCell>
-                <TableCell>
+                <TableCell className="hidden whitespace-normal @3xl:table-cell">
+                  {read}
+                </TableCell>
+                <TableCell className="whitespace-normal">
+                  {/* Narrow: what was read goes above the pickers. */}
+                  <div className="mb-2 @3xl:hidden">
+                    <div className="text-muted-foreground mb-1 text-xs @md:hidden">
+                      {renderSource(row)}
+                    </div>
+                    {read}
+                  </div>
                   <Select
                     value={row.studentId ?? NONE}
                     onValueChange={(value) =>

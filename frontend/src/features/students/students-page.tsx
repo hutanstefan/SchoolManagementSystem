@@ -82,14 +82,33 @@ export function StudentsPage() {
           {s.registrationNumber}
         </span>
       ),
-      className: 'w-24',
+      className: 'hidden w-24 @2xl:table-cell',
     },
     {
       header: 'Name',
-      cell: (s) => <PersonCell person={s} secondary={s.email} />,
+      className: 'w-full max-w-0',
+      // Narrow: the class instead of the email (the Class column is left out).
+      cell: (s) => (
+        <PersonCell
+          person={s}
+          secondary={
+            <>
+              <span className="hidden @lg:inline">{s.email}</span>
+              <span className="@lg:hidden">
+                {s.class
+                  ? `Class ${s.class.name}`
+                  : s.graduatedIn
+                    ? `Graduated in ${s.graduatedIn}`
+                    : 'Not assigned'}
+              </span>
+            </>
+          }
+        />
+      ),
     },
     {
       header: 'Class',
+      className: 'hidden @lg:table-cell',
       cell: (s) =>
         s.class ? (
           <Badge variant="secondary">{s.class.name}</Badge>
@@ -104,7 +123,7 @@ export function StudentsPage() {
     {
       header: 'Date of birth',
       cell: (s) => formatDate(s.dateOfBirth),
-      className: 'hidden lg:table-cell',
+      className: 'hidden whitespace-nowrap @3xl:table-cell',
     },
     {
       header: <span className="sr-only">Actions</span>,

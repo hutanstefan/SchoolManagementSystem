@@ -57,7 +57,12 @@ function assignmentColumns(
       ),
     },
     {
-      header: 'Hours / week',
+      header: (
+        <>
+          <span className="@md:hidden">Hours</span>
+          <span className="hidden @md:inline">Hours / week</span>
+        </>
+      ),
       cell: (a) => a.hoursPerWeek,
       className: 'text-right tabular-nums',
     },

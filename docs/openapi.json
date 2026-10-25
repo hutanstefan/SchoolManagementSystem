@@ -4185,6 +4185,474 @@
         ]
       }
     },
+    "/api/absences": {
+      "get": {
+        "description": "Admins: every absence. Teachers: their homeroom classes, and the subjects they teach. Students: their own. The open year unless schoolYearId or classId says otherwise. `canChange` tells whether the user may excuse or delete each one.",
+        "operationId": "AbsencesController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "Items per page (max 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "semester",
+            "required": false,
+            "in": "query",
+            "description": "Both semesters when omitted.",
+            "schema": {
+              "type": "number",
+              "enum": [
+                1,
+                2
+              ]
+            }
+          },
+          {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "description": "The open year when omitted.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "classId",
+            "required": false,
+            "in": "query",
+            "description": "The students of this class (in its year).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "studentId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "excused",
+            "required": false,
+            "in": "query",
+            "description": "true: only excused; false: only unexcused.",
+            "schema": {
+              "type": "boolean",
+              "enum": [
+                true,
+                false
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedAbsencesDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Absences, newest first",
+        "tags": [
+          "Absences"
+        ]
+      }
+    },
+    "/api/classes/{id}/absences": {
+      "get": {
+        "description": "With how many subjects each student is over, or close to (80%), the limit. The class's homeroom teacher and admins.",
+        "operationId": "AbsencesController_forClass",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "semester",
+            "required": false,
+            "in": "query",
+            "description": "1 or 2. Defaults to the year's current semester (2 for a closed year).",
+            "schema": {
+              "type": "number",
+              "enum": [
+                1,
+                2
+              ]
+            }
+          },
+          {
+            "name": "schoolYearId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassAbsencesDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Absences of a class in a semester, by student and subject",
+        "tags": [
+          "Absences"
+        ]
+      }
+    },
+    "/api/absences/attendance": {
+      "post": {
+        "description": "In a subject the teacher teaches in the class (admins: any), in the current semester. One absence per student, subject and day. A student who comes close to, or goes over, the limit is notified, and so is the homeroom teacher.",
+        "operationId": "AbsencesController_takeAttendance",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TakeAttendanceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The school year is closed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Take attendance: record the students absent from a lesson",
+        "tags": [
+          "Absences"
+        ]
+      }
+    },
+    "/api/absences/excuse": {
+      "post": {
+        "description": "Every unexcused absence of the open year in that period, in every subject, e.g. for a medical note. The homeroom teacher and admins.",
+        "operationId": "AbsencesController_excuseRange",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExcuseAbsencesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExcuseResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Excuse a student's absences between two days",
+        "tags": [
+          "Absences"
+        ]
+      }
+    },
+    "/api/absences/{id}": {
+      "patch": {
+        "description": "The teacher who recorded it, the homeroom teacher and admins, in the open year.",
+        "operationId": "AbsencesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAbsenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AbsenceDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Excuse an absence, or take the excuse back",
+        "tags": [
+          "Absences"
+        ]
+      },
+      "delete": {
+        "description": "The teacher who recorded it, the homeroom teacher and admins, in the open year.",
+        "operationId": "AbsencesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete an absence (recorded by mistake)",
+        "tags": [
+          "Absences"
+        ]
+      }
+    },
     "/api/classes/{id}/grade-scans": {
       "post": {
         "description": "An AI model (Gemini or Claude, see AI_PROVIDER) reads the student name and the final grade on each photo and matches the name to a student of the class. Nothing is saved and the photos are not stored: review the result, then save the grades with POST /classes/:id/grades. Without an AI key the results are simulated (mode \"demo\"). Teachers can only scan tests of a subject they teach in the class.",
@@ -7114,6 +7582,7 @@
           "Teaching assignments",
           "Timetable",
           "Grades",
+          "Absences",
           "Grade scans (AI)",
           "Grade imports (Excel)",
           "Chat",
@@ -8034,13 +8503,20 @@
           "hoursPerWeek": {
             "type": "number",
             "example": 4
+          },
+          "maxAbsences": {
+            "type": "number",
+            "nullable": true,
+            "description": "Most unexcused absences per semester; null: no limit.",
+            "example": 14
           }
         },
         "required": [
           "classSubjectId",
           "subject",
           "teacher",
-          "hoursPerWeek"
+          "hoursPerWeek",
+          "maxAbsences"
         ]
       },
       "ClassInYearDto": {
@@ -8294,6 +8770,14 @@
             "example": 4,
             "minimum": 1,
             "maximum": 10
+          },
+          "maxAbsences": {
+            "type": "number",
+            "nullable": true,
+            "description": "Most unexcused absences a student may have in this subject in a\nsemester (0-200), or null for no limit. When omitted: about a fifth of\nthe semester's lessons (4 h/week -> 14).",
+            "example": 14,
+            "minimum": 0,
+            "maximum": 200
           }
         },
         "required": [
@@ -8316,6 +8800,13 @@
             "example": 3,
             "minimum": 1,
             "maximum": 10
+          },
+          "maxAbsences": {
+            "type": "number",
+            "nullable": true,
+            "description": "Most unexcused absences per semester (0-200), or null for no limit.",
+            "minimum": 0,
+            "maximum": 200
           },
           "removeLessonIds": {
             "description": "Lessons of this subject to take out of the timetable first, in the same\ntransaction (resolves an HOURS_BELOW_SCHEDULED conflict).",
@@ -8665,6 +9156,24 @@
           "teacher"
         ]
       },
+      "AbsenceCountDto": {
+        "type": "object",
+        "properties": {
+          "unexcused": {
+            "type": "number",
+            "description": "Count against the limit.",
+            "example": 3
+          },
+          "excused": {
+            "type": "number",
+            "example": 2
+          }
+        },
+        "required": [
+          "unexcused",
+          "excused"
+        ]
+      },
       "SubjectGradesDto": {
         "type": "object",
         "properties": {
@@ -8710,6 +9219,20 @@
             "type": "boolean",
             "nullable": true,
             "description": "Whether the student has at least the minimum number of grades."
+          },
+          "absences": {
+            "description": "Absences in the subject that semester.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AbsenceCountDto"
+              }
+            ]
+          },
+          "maxAbsences": {
+            "type": "number",
+            "nullable": true,
+            "description": "Most unexcused absences allowed; null: no limit (or not taught in the class).",
+            "example": 14
           }
         },
         "required": [
@@ -8719,7 +9242,9 @@
           "average",
           "roundedAverage",
           "minimumGrades",
-          "hasMinimumGrades"
+          "hasMinimumGrades",
+          "absences",
+          "maxAbsences"
         ]
       },
       "StudentGradesReportDto": {
@@ -9237,6 +9762,14 @@
           },
           "hasMinimumGrades": {
             "type": "boolean"
+          },
+          "absences": {
+            "description": "Absences in this subject in the semester.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AbsenceCountDto"
+              }
+            ]
           }
         },
         "required": [
@@ -9245,7 +9778,8 @@
           "grades",
           "average",
           "roundedAverage",
-          "hasMinimumGrades"
+          "hasMinimumGrades",
+          "absences"
         ]
       },
       "GradebookDto": {
@@ -9281,6 +9815,16 @@
             "type": "number",
             "example": 5
           },
+          "maxAbsences": {
+            "type": "number",
+            "nullable": true,
+            "description": "Most unexcused absences per semester; null: no limit.",
+            "example": 14
+          },
+          "canTakeAttendance": {
+            "type": "boolean",
+            "description": "The user can take attendance here (records absences)."
+          },
           "students": {
             "type": "array",
             "items": {
@@ -9296,7 +9840,344 @@
           "teacher",
           "hoursPerWeek",
           "minimumGrades",
+          "maxAbsences",
+          "canTakeAttendance",
           "students"
+        ]
+      },
+      "AbsenceUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The user id."
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName"
+        ]
+      },
+      "AbsenceDto": {
+        "type": "object",
+        "properties": {
+          "semester": {
+            "enum": [
+              1,
+              2
+            ],
+            "type": "number"
+          },
+          "id": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-10-20"
+          },
+          "student": {
+            "$ref": "#/components/schemas/PersonSummaryDto"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "recordedBy": {
+            "nullable": true,
+            "description": "Who recorded it; null if that user was deleted.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AbsenceUserDto"
+              }
+            ]
+          },
+          "excused": {
+            "type": "boolean"
+          },
+          "excusedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "excusedBy": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AbsenceUserDto"
+              }
+            ]
+          },
+          "excuseNote": {
+            "type": "string",
+            "nullable": true,
+            "example": "Medical note"
+          },
+          "canChange": {
+            "type": "boolean",
+            "description": "The user can excuse or delete it: who recorded it, the homeroom teacher, an admin (open year only)."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "semester",
+          "id",
+          "date",
+          "student",
+          "subject",
+          "recordedBy",
+          "excused",
+          "excusedAt",
+          "excusedBy",
+          "excuseNote",
+          "canChange",
+          "createdAt"
+        ]
+      },
+      "PaginatedAbsencesDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Newest first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AbsenceDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "SubjectAbsencesDto": {
+        "type": "object",
+        "properties": {
+          "unexcused": {
+            "type": "number",
+            "description": "Count against the limit.",
+            "example": 3
+          },
+          "excused": {
+            "type": "number",
+            "example": 2
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectSummaryDto"
+          },
+          "maxAbsences": {
+            "type": "number",
+            "nullable": true,
+            "description": "Null: no limit.",
+            "example": 14
+          }
+        },
+        "required": [
+          "unexcused",
+          "excused",
+          "subject",
+          "maxAbsences"
+        ]
+      },
+      "ClassAbsenceRowDto": {
+        "type": "object",
+        "properties": {
+          "student": {
+            "$ref": "#/components/schemas/PersonSummaryDto"
+          },
+          "registrationNumber": {
+            "type": "string",
+            "example": "2026-0042"
+          },
+          "total": {
+            "description": "All subjects together.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AbsenceCountDto"
+              }
+            ]
+          },
+          "subjects": {
+            "description": "Every subject of the class, the ones with absences or a limit.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectAbsencesDto"
+            }
+          },
+          "overLimit": {
+            "type": "number",
+            "description": "Subjects where the unexcused absences are over the limit."
+          },
+          "nearLimit": {
+            "type": "number",
+            "description": "Subjects where they are close to it (80% or more), not over."
+          }
+        },
+        "required": [
+          "student",
+          "registrationNumber",
+          "total",
+          "subjects",
+          "overLimit",
+          "nearLimit"
+        ]
+      },
+      "ClassAbsencesDto": {
+        "type": "object",
+        "properties": {
+          "class": {
+            "$ref": "#/components/schemas/ClassSummaryDto"
+          },
+          "period": {
+            "$ref": "#/components/schemas/PeriodDto"
+          },
+          "readOnly": {
+            "type": "boolean",
+            "description": "True when nothing can be changed: a closed year."
+          },
+          "students": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassAbsenceRowDto"
+            }
+          }
+        },
+        "required": [
+          "class",
+          "period",
+          "readOnly",
+          "students"
+        ]
+      },
+      "TakeAttendanceDto": {
+        "type": "object",
+        "properties": {
+          "semester": {
+            "description": "Admins only: the semester it counts for, e.g. a forgotten absence of\nan ended semester. Teachers record in the current semester.",
+            "enum": [
+              1,
+              2
+            ],
+            "type": "number"
+          },
+          "classId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "description": "The day of the lesson; today when omitted.",
+            "example": "2026-10-20"
+          },
+          "studentIds": {
+            "description": "The students who were absent (the others were there).",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "classId",
+          "subjectId",
+          "studentIds"
+        ]
+      },
+      "AttendanceResultDto": {
+        "type": "object",
+        "properties": {
+          "recorded": {
+            "type": "number",
+            "description": "Absences recorded now.",
+            "example": 3
+          },
+          "alreadyAbsent": {
+            "type": "number",
+            "description": "Students who already had an absence that day in this subject.",
+            "example": 0
+          }
+        },
+        "required": [
+          "recorded",
+          "alreadyAbsent"
+        ]
+      },
+      "ExcuseAbsencesDto": {
+        "type": "object",
+        "properties": {
+          "studentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "from": {
+            "type": "string",
+            "description": "First day (inclusive).",
+            "example": "2026-10-12"
+          },
+          "to": {
+            "type": "string",
+            "description": "Last day (inclusive).",
+            "example": "2026-10-16"
+          },
+          "note": {
+            "type": "string",
+            "example": "Medical note",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "studentId",
+          "from",
+          "to"
+        ]
+      },
+      "ExcuseResultDto": {
+        "type": "object",
+        "properties": {
+          "excused": {
+            "type": "number",
+            "description": "Absences excused now.",
+            "example": 5
+          }
+        },
+        "required": [
+          "excused"
+        ]
+      },
+      "UpdateAbsenceDto": {
+        "type": "object",
+        "properties": {
+          "excused": {
+            "type": "boolean",
+            "description": "true excuses the absence, false takes the excuse back."
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why, e.g. \"Medical note\". Ignored when taking the excuse back.",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "excused"
         ]
       },
       "ScannedTestDto": {
@@ -9598,7 +10479,9 @@
           "TIMETABLE_CHANGED",
           "ASSIGNMENT_CHANGED",
           "HOMEROOM_ALERT",
-          "LECTURE_SHARED"
+          "LECTURE_SHARED",
+          "ABSENCE_WARNING",
+          "ABSENCE_LIMIT"
         ]
       },
       "NotificationDto": {

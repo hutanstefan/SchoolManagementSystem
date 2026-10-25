@@ -48,14 +48,14 @@ const columns: Column<SubjectYear>[] = [
   },
   {
     header: 'Annual',
-    className: 'text-center',
+    className: 'hidden text-center @md:table-cell',
     cell: (row) => (
       <span className="tabular-nums">{formatAverage(row.annual)}</span>
     ),
   },
   {
     header: 'Re-exam',
-    className: 'hidden text-center sm:table-cell',
+    className: 'hidden text-center @lg:table-cell',
     cell: (row) => <GradeBox value={row.reexamGrade} />,
   },
   {

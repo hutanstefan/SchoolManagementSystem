@@ -12,6 +12,7 @@ import * as bcrypt from 'bcrypt';
 import {
   GradeAction,
   LectureAccessAction,
+  Prisma,
   PrismaClient,
   Role,
   SchoolYearStatus,
@@ -21,8 +22,11 @@ import {
   YearOutcome,
   type ClassSubject,
 } from '../src/generated/prisma/client';
+import { defaultMaxAbsences } from '../src/absences/limits';
 import { yearResult } from '../src/school-years/promotion';
 import {
+  absenceAlert,
+  absenceMessage,
   assignmentMessage,
   gradeMessage,
   lectureMessage,
@@ -191,6 +195,9 @@ const levels = new Faker({ locale: base });
 /** Everything about last school year (names included) has its own generator too. */
 const past = new Faker({ locale: [ro, en, base] });
 
+/** And so do absences: adding them changed nothing else. */
+const missing = new Faker({ locale: base });
+
 /** Grades skew towards 7-10, like in a real class. */
 function randomGradeValue(generator: Faker = faker): number {
   return generator.helpers.weightedArrayElement([
@@ -340,6 +347,7 @@ async function clearDatabase(): Promise<void> {
   }
   await prisma.lecture.deleteMany();
   await prisma.auditLog.deleteMany();
+  await prisma.absence.deleteMany();
   // Order matters because of foreign keys.
   await prisma.gradeHistory.deleteMany();
   await prisma.grade.deleteMany();
@@ -474,6 +482,7 @@ async function main(): Promise<void> {
           subjectId: subjects.get(subject.name)!,
           teacherId: teacherIds[teacherIndex],
           hoursPerWeek: subject.hoursPerWeek,
+          maxAbsences: defaultMaxAbsences(subject.hoursPerWeek),
         },
       });
       classSubjects.push({
@@ -691,6 +700,15 @@ async function main(): Promise<void> {
   console.log(
     `Lectures: ${lectures.lectures} PDFs shared with ${lectures.readers} students.`,
   );
+  console.log('Recording absences...');
+  const absences = await seedAbsences({
+    thisYearId: thisYear.id,
+    yearStart,
+    today,
+  });
+  console.log(
+    `Absences: ${absences.total} (${absences.excused} excused), ${absences.alerts} students close to or over a limit.`,
+  );
   console.log(
     `Done: 1 admin, ${teacherIds.length} teachers, ${classIds.length} classes, ` +
       `${subjects.size} subjects, ${classSubjects.length} teaching assignments, ` +
@@ -877,6 +895,7 @@ async function seedLastYear(options: {
           subjectId: cs.subjectId,
           teacherId: cs.teacherId,
           hoursPerWeek: cs.hoursPerWeek,
+          maxAbsences: defaultMaxAbsences(cs.hoursPerWeek),
         },
       });
       subjects.push({ ...row, room: options.rooms.get(cs.id) ?? 'Room 101' });
@@ -1530,3 +1549,140 @@ const SUBJECT_RGB: Record<SubjectColor, [number, number, number]> = {
   TEAL: [13, 148, 136],
   SKY: [2, 132, 199],
 };
+
+/**
+ * Absences of semester 1 so far: most students miss a lesson now and then,
+ * a few miss many. Some are excused (a medical note, by the homeroom
+ * teacher). The demo student is close to the limit in Mathematics and a
+ * classmate is over it in English, with the notifications the app sent.
+ */
+async function seedAbsences(options: {
+  thisYearId: string;
+  yearStart: Date;
+  today: Date;
+}): Promise<{ total: number; excused: number; alerts: number }> {
+  missing.seed(2026);
+  const day = 24 * 60 * 60 * 1000;
+  const schoolDays: Date[] = [];
+  for (
+    let time = options.yearStart.getTime();
+    time < options.today.getTime() - day;
+    time += day
+  ) {
+    const date = new Date(time);
+    const weekday = date.getUTCDay();
+    if (weekday !== 0 && weekday !== 6) {
+      schoolDays.push(new Date(date.toISOString().slice(0, 10)));
+    }
+  }
+
+  const classes = await prisma.class.findMany({
+    where: { schoolYearId: options.thisYearId },
+    select: {
+      name: true,
+      homeroomTeacher: { select: { userId: true } },
+      enrollments: {
+        select: {
+          student: {
+            select: {
+              id: true,
+              userId: true,
+              user: { select: { email: true, firstName: true, lastName: true } },
+            },
+          },
+        },
+        orderBy: { student: { registrationNumber: 'asc' } },
+      },
+      subjects: {
+        select: {
+          subjectId: true,
+          maxAbsences: true,
+          subject: { select: { name: true } },
+          teacher: { select: { userId: true } },
+        },
+      },
+    },
+  });
+
+  // Planned on purpose, so the demo shows a warning and a student over a limit.
+  const planned = new Map<string, number>(); // "<student email>|<subject>" -> unexcused
+  planned.set(`student@${EMAIL_DOMAIN}|Mathematics`, 12);
+  const classmate = classes
+    .find((c) => c.name === '9A')
+    ?.enrollments.find((e) => e.student.user.email !== `student@${EMAIL_DOMAIN}`);
+  if (classmate) planned.set(`${classmate.student.user.email}|English`, 9);
+
+  const rows: Prisma.AbsenceCreateManyInput[] = [];
+  const alerts: Prisma.NotificationCreateManyInput[] = [];
+  for (const schoolClass of classes) {
+    for (const { student } of schoolClass.enrollments) {
+      for (const cs of schoolClass.subjects) {
+        const fixed = planned.get(`${student.user.email}|${cs.subject.name}`);
+        const roll = missing.number.float();
+        const unexcused =
+          fixed ??
+          (roll < 0.55
+            ? 0
+            : roll < 0.85
+              ? missing.number.int({ min: 1, max: 2 })
+              : missing.number.int({ min: 3, max: 5 }));
+        const excused =
+          fixed !== undefined
+            ? 2
+            : missing.number.float() < 0.3
+              ? missing.number.int({ min: 1, max: 3 })
+              : 0;
+        const days = missing.helpers.arrayElements(
+          schoolDays,
+          Math.min(unexcused + excused, schoolDays.length),
+        );
+        days.forEach((date, index) => {
+          const isExcused = index >= unexcused;
+          rows.push({
+            studentId: student.id,
+            subjectId: cs.subjectId,
+            schoolYearId: options.thisYearId,
+            semester: 1,
+            date,
+            recordedById: cs.teacher?.userId ?? null,
+            createdAt: new Date(date.getTime() + 9 * 60 * 60 * 1000),
+            ...(isExcused && {
+              excused: true,
+              excusedAt: new Date(date.getTime() + 3 * day),
+              excusedById: schoolClass.homeroomTeacher?.userId ?? null,
+              excuseNote: 'Medical note',
+            }),
+          });
+        });
+
+        // What the app would have sent when the limit came close or was passed.
+        if (fixed !== undefined && cs.maxAbsences !== null) {
+          const step = fixed > cs.maxAbsences ? 'over' : 'warning';
+          const name = `${student.user.firstName} ${student.user.lastName}`;
+          const createdAt = new Date(options.today.getTime() - day);
+          alerts.push({
+            userId: student.userId,
+            ...absenceMessage(step, cs.subject.name, fixed, cs.maxAbsences),
+            link: '/student/grades',
+            createdAt,
+          });
+          if (schoolClass.homeroomTeacher) {
+            alerts.push({
+              userId: schoolClass.homeroomTeacher.userId,
+              ...absenceAlert(step, name, cs.subject.name, fixed, cs.maxAbsences),
+              link: '/teacher/classes',
+              createdAt,
+            });
+          }
+        }
+      }
+    }
+  }
+  await prisma.absence.createMany({ data: rows, skipDuplicates: true });
+  await prisma.notification.createMany({ data: alerts });
+  return {
+    total: rows.length,
+    excused: rows.filter((row) => row.excused).length,
+    alerts: alerts.filter((a) => a.link === '/student/grades').length,
+  };
+}

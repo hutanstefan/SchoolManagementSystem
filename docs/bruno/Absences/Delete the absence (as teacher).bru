@@ -1,0 +1,25 @@
+meta {
+  name: Delete the absence (as teacher)
+  type: http
+  seq: 10
+}
+
+delete {
+  url: {{baseUrl}}/absences/{{absenceId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+tests {
+  test("Status is 204", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  For an absence recorded by mistake. Allowed for the teacher who recorded it, the homeroom teacher and admins.
+}

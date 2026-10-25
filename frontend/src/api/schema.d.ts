@@ -841,6 +841,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/absences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Absences, newest first
+         * @description Admins: every absence. Teachers: their homeroom classes, and the subjects they teach. Students: their own. The open year unless schoolYearId or classId says otherwise. `canChange` tells whether the user may excuse or delete each one.
+         */
+        get: operations["AbsencesController_findAll"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/classes/{id}/absences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Absences of a class in a semester, by student and subject
+         * @description With how many subjects each student is over, or close to (80%), the limit. The class's homeroom teacher and admins.
+         */
+        get: operations["AbsencesController_forClass"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/absences/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take attendance: record the students absent from a lesson
+         * @description In a subject the teacher teaches in the class (admins: any), in the current semester. One absence per student, subject and day. A student who comes close to, or goes over, the limit is notified, and so is the homeroom teacher.
+         */
+        post: operations["AbsencesController_takeAttendance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/absences/excuse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Excuse a student's absences between two days
+         * @description Every unexcused absence of the open year in that period, in every subject, e.g. for a medical note. The homeroom teacher and admins.
+         */
+        post: operations["AbsencesController_excuseRange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/absences/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete an absence (recorded by mistake)
+         * @description The teacher who recorded it, the homeroom teacher and admins, in the open year.
+         */
+        delete: operations["AbsencesController_remove"];
+        options?: never;
+        head?: never;
+        /**
+         * Excuse an absence, or take the excuse back
+         * @description The teacher who recorded it, the homeroom teacher and admins, in the open year.
+         */
+        patch: operations["AbsencesController_update"];
+        trace?: never;
+    };
     "/api/classes/{id}/grade-scans": {
         parameters: {
             query?: never;
@@ -1608,7 +1712,7 @@ export interface components {
         /** @enum {string} */
         AuditKind: "CHANGE" | "LOGIN" | "LOGOUT" | "LOGIN_FAILED";
         /** @enum {string} */
-        AuditCategory: "Auth" | "School years" | "Students" | "Teachers" | "Classes" | "Subjects" | "Teaching assignments" | "Timetable" | "Grades" | "Grade scans (AI)" | "Grade imports (Excel)" | "Chat" | "Lectures" | "System";
+        AuditCategory: "Auth" | "School years" | "Students" | "Teachers" | "Classes" | "Subjects" | "Teaching assignments" | "Timetable" | "Grades" | "Absences" | "Grade scans (AI)" | "Grade imports (Excel)" | "Chat" | "Lectures" | "System";
         AuditActorDto: {
             role: components["schemas"]["Role"] | null;
             /** @description The user id; null for failed logins or once the user was deleted. */
@@ -1957,6 +2061,11 @@ export interface components {
             teacher: components["schemas"]["PersonSummaryDto"] | null;
             /** @example 4 */
             hoursPerWeek: number;
+            /**
+             * @description Most unexcused absences per semester; null: no limit.
+             * @example 14
+             */
+            maxAbsences: number | null;
         };
         ClassInYearDto: {
             id: string;
@@ -2064,6 +2173,13 @@ export interface components {
              * @example 4
              */
             hoursPerWeek: number;
+            /**
+             * @description Most unexcused absences a student may have in this subject in a
+             *     semester (0-200), or null for no limit. When omitted: about a fifth of
+             *     the semester's lessons (4 h/week -> 14).
+             * @example 14
+             */
+            maxAbsences?: number | null;
         };
         UpdateClassSubjectDto: {
             /**
@@ -2076,6 +2192,8 @@ export interface components {
              * @example 3
              */
             hoursPerWeek?: number;
+            /** @description Most unexcused absences per semester (0-200), or null for no limit. */
+            maxAbsences?: number | null;
             /**
              * @description Lessons of this subject to take out of the timetable first, in the same
              *     transaction (resolves an HOURS_BELOW_SCHEDULED conflict).
@@ -2209,6 +2327,15 @@ export interface components {
             date: string;
             teacher: components["schemas"]["PersonSummaryDto"] | null;
         };
+        AbsenceCountDto: {
+            /**
+             * @description Count against the limit.
+             * @example 3
+             */
+            unexcused: number;
+            /** @example 2 */
+            excused: number;
+        };
         SubjectGradesDto: {
             subject: components["schemas"]["SubjectSummaryDto"];
             /** @description Current teacher of the subject in the student's class. */
@@ -2232,6 +2359,13 @@ export interface components {
             minimumGrades: number | null;
             /** @description Whether the student has at least the minimum number of grades. */
             hasMinimumGrades: boolean | null;
+            /** @description Absences in the subject that semester. */
+            absences: components["schemas"]["AbsenceCountDto"];
+            /**
+             * @description Most unexcused absences allowed; null: no limit (or not taught in the class).
+             * @example 14
+             */
+            maxAbsences: number | null;
         };
         StudentGradesReportDto: {
             student: components["schemas"]["PersonSummaryDto"];
@@ -2433,6 +2567,8 @@ export interface components {
             /** @example 9 */
             roundedAverage: number | null;
             hasMinimumGrades: boolean;
+            /** @description Absences in this subject in the semester. */
+            absences: components["schemas"]["AbsenceCountDto"];
         };
         GradebookDto: {
             class: components["schemas"]["ClassSummaryDto"];
@@ -2448,7 +2584,141 @@ export interface components {
             hoursPerWeek: number;
             /** @example 5 */
             minimumGrades: number;
+            /**
+             * @description Most unexcused absences per semester; null: no limit.
+             * @example 14
+             */
+            maxAbsences: number | null;
+            /** @description The user can take attendance here (records absences). */
+            canTakeAttendance: boolean;
             students: components["schemas"]["GradebookRowDto"][];
+        };
+        AbsenceUserDto: {
+            /** @description The user id. */
+            id: string;
+            firstName: string;
+            lastName: string;
+        };
+        AbsenceDto: {
+            /** @enum {number} */
+            semester: 1 | 2;
+            id: string;
+            /** @example 2026-10-20 */
+            date: string;
+            student: components["schemas"]["PersonSummaryDto"];
+            subject: components["schemas"]["SubjectSummaryDto"];
+            /** @description Who recorded it; null if that user was deleted. */
+            recordedBy: components["schemas"]["AbsenceUserDto"] | null;
+            excused: boolean;
+            /** Format: date-time */
+            excusedAt: string | null;
+            excusedBy: components["schemas"]["AbsenceUserDto"] | null;
+            /** @example Medical note */
+            excuseNote: string | null;
+            /** @description The user can excuse or delete it: who recorded it, the homeroom teacher, an admin (open year only). */
+            canChange: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PaginatedAbsencesDto: {
+            /** @description Newest first. */
+            data: components["schemas"]["AbsenceDto"][];
+            meta: components["schemas"]["PaginationMetaDto"];
+        };
+        SubjectAbsencesDto: {
+            /**
+             * @description Count against the limit.
+             * @example 3
+             */
+            unexcused: number;
+            /** @example 2 */
+            excused: number;
+            subject: components["schemas"]["SubjectSummaryDto"];
+            /**
+             * @description Null: no limit.
+             * @example 14
+             */
+            maxAbsences: number | null;
+        };
+        ClassAbsenceRowDto: {
+            student: components["schemas"]["PersonSummaryDto"];
+            /** @example 2026-0042 */
+            registrationNumber: string;
+            /** @description All subjects together. */
+            total: components["schemas"]["AbsenceCountDto"];
+            /** @description Every subject of the class, the ones with absences or a limit. */
+            subjects: components["schemas"]["SubjectAbsencesDto"][];
+            /** @description Subjects where the unexcused absences are over the limit. */
+            overLimit: number;
+            /** @description Subjects where they are close to it (80% or more), not over. */
+            nearLimit: number;
+        };
+        ClassAbsencesDto: {
+            class: components["schemas"]["ClassSummaryDto"];
+            period: components["schemas"]["PeriodDto"];
+            /** @description True when nothing can be changed: a closed year. */
+            readOnly: boolean;
+            students: components["schemas"]["ClassAbsenceRowDto"][];
+        };
+        TakeAttendanceDto: {
+            /**
+             * @description Admins only: the semester it counts for, e.g. a forgotten absence of
+             *     an ended semester. Teachers record in the current semester.
+             * @enum {number}
+             */
+            semester?: 1 | 2;
+            /** Format: uuid */
+            classId: string;
+            /** Format: uuid */
+            subjectId: string;
+            /**
+             * @description The day of the lesson; today when omitted.
+             * @example 2026-10-20
+             */
+            date?: string;
+            /** @description The students who were absent (the others were there). */
+            studentIds: string[];
+        };
+        AttendanceResultDto: {
+            /**
+             * @description Absences recorded now.
+             * @example 3
+             */
+            recorded: number;
+            /**
+             * @description Students who already had an absence that day in this subject.
+             * @example 0
+             */
+            alreadyAbsent: number;
+        };
+        ExcuseAbsencesDto: {
+            /** Format: uuid */
+            studentId: string;
+            /**
+             * @description First day (inclusive).
+             * @example 2026-10-12
+             */
+            from: string;
+            /**
+             * @description Last day (inclusive).
+             * @example 2026-10-16
+             */
+            to: string;
+            /** @example Medical note */
+            note?: string;
+        };
+        ExcuseResultDto: {
+            /**
+             * @description Absences excused now.
+             * @example 5
+             */
+            excused: number;
+        };
+        UpdateAbsenceDto: {
+            /** @description true excuses the absence, false takes the excuse back. */
+            excused: boolean;
+            /** @description Why, e.g. "Medical note". Ignored when taking the excuse back. */
+            note?: string | null;
         };
         ScannedTestDto: {
             /**
@@ -2572,7 +2842,7 @@ export interface components {
             skippedRows: number;
         };
         /** @enum {string} */
-        NotificationType: "GRADE_ADDED" | "GRADE_CHANGED" | "GRADE_REMOVED" | "TIMETABLE_CHANGED" | "ASSIGNMENT_CHANGED" | "HOMEROOM_ALERT" | "LECTURE_SHARED";
+        NotificationType: "GRADE_ADDED" | "GRADE_CHANGED" | "GRADE_REMOVED" | "TIMETABLE_CHANGED" | "ASSIGNMENT_CHANGED" | "HOMEROOM_ALERT" | "LECTURE_SHARED" | "ABSENCE_WARNING" | "ABSENCE_LIMIT";
         NotificationDto: {
             type: components["schemas"]["NotificationType"];
             id: string;
@@ -5613,6 +5883,268 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AbsencesController_findAll: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page (max 100). */
+                pageSize?: number;
+                /** @description Both semesters when omitted. */
+                semester?: 1 | 2;
+                /** @description The open year when omitted. */
+                schoolYearId?: string;
+                /** @description The students of this class (in its year). */
+                classId?: string;
+                subjectId?: string;
+                studentId?: string;
+                /** @description true: only excused; false: only unexcused. */
+                excused?: true | false;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedAbsencesDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AbsencesController_forClass: {
+        parameters: {
+            query?: {
+                /** @description 1 or 2. Defaults to the year's current semester (2 for a closed year). */
+                semester?: 1 | 2;
+                schoolYearId?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassAbsencesDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AbsencesController_takeAttendance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TakeAttendanceDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceResultDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description The school year is closed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AbsencesController_excuseRange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExcuseAbsencesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExcuseResultDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AbsencesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    AbsencesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAbsenceDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AbsenceDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

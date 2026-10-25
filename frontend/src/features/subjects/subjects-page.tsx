@@ -83,7 +83,7 @@ export function SubjectsPage() {
     },
     {
       header: 'Look',
-      className: 'hidden sm:table-cell',
+      className: 'hidden @md:table-cell',
       cell: (s) => (
         <span className="text-muted-foreground inline-flex items-center gap-2 text-sm">
           <span

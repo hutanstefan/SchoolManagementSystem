@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClassSubject } from '@/features/classes/api'
 import { renderWithProviders } from '@/test/providers'
@@ -24,6 +25,8 @@ const data: GradebookData = {
   teacher: { id: 't-1', firstName: 'Mihai', lastName: 'Ionescu' },
   hoursPerWeek: 4,
   minimumGrades: 5,
+  maxAbsences: 14,
+  canTakeAttendance: true,
   students: [
     {
       student: { id: 'st-1', firstName: 'Ana', lastName: 'Matei' },
@@ -45,6 +48,7 @@ const data: GradebookData = {
       average: 6.5,
       roundedAverage: 7,
       hasMinimumGrades: false,
+      absences: { unexcused: 12, excused: 1 },
     },
   ],
 }
@@ -60,6 +64,7 @@ const subjects: ClassSubject[] = [
     subject: { id: 's-1', name: 'Mathematics', color: 'INDIGO', icon: 'BOOK' },
     teacher: { id: 't-1', firstName: 'Mihai', lastName: 'Ionescu' },
     hoursPerWeek: 4,
+    maxAbsences: 14,
   },
 ]
 
@@ -76,8 +81,8 @@ describe('Gradebook', () => {
       />,
     )
     expect(screen.getByText('Ana Matei')).toBeInTheDocument()
-    expect(screen.getByText('6.50')).toBeInTheDocument()
-    expect(screen.getByLabelText('Not enough grades')).toBeInTheDocument()
+    expect(screen.getAllByText('6.50')[0]).toBeInTheDocument()
+    expect(screen.getAllByLabelText('Not enough grades')[0]).toBeInTheDocument()
     expect(screen.getByText('min. 5 grades')).toBeInTheDocument()
   })
 
@@ -113,5 +118,31 @@ describe('Gradebook', () => {
     expect(
       screen.queryByRole('button', { name: /Add a grade/ }),
     ).not.toBeInTheDocument()
+  })
+
+  it('shows the absences against the limit, and takes attendance', async () => {
+    renderWithProviders(
+      <Gradebook
+        classId="c-1"
+        subjects={subjects}
+        canAddGrades={() => true}
+        canEditGrade={() => true}
+      />,
+    )
+    expect(screen.getByText('max. 14 absences')).toBeInTheDocument()
+    const [count] = screen.getAllByRole('button', {
+      name: 'Absences of Ana Matei',
+    })
+    expect(count).toHaveTextContent('12/14')
+    expect(count).toHaveTextContent('+1 exc.')
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /Take attendance/ }),
+    )
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('Everyone is present')
+    await userEvent.click(screen.getByRole('checkbox'))
+    expect(dialog).toHaveTextContent('1 absent of 1')
+    expect(screen.getByRole('button', { name: 'Mark 1 absent' })).toBeEnabled()
   })
 })

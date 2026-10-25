@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useEffect, useRef, useState } from 'react'
+import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { DataTable, type Column } from '@/components/data-table'
@@ -27,6 +27,7 @@ import {
   type AssignmentConflictState,
 } from './assignment-conflict-dialog'
 import { SubjectIcon } from '@/features/subjects/subject-icon'
+import { defaultMaxAbsences } from '@/features/absences/limits'
 
 /** Subjects taught in the class, who teaches them and how many hours. */
 export function ClassSubjectsTab({
@@ -68,12 +69,20 @@ export function ClassSubjectsTab({
       cell: (a) => (
         <div className="flex items-center gap-3">
           <SubjectIcon subject={a.subject} />
-          <span className="font-medium">{a.subject.name}</span>
+          <div className="min-w-0">
+            <div className="font-medium">{a.subject.name}</div>
+            {/* Narrow: the teacher and the hours under the name. */}
+            <div className="text-muted-foreground text-xs whitespace-normal @xl:hidden">
+              {a.teacher ? fullName(a.teacher) : 'No teacher'} ·{' '}
+              {a.hoursPerWeek} h / week
+            </div>
+          </div>
         </div>
       ),
     },
     {
       header: 'Teacher',
+      className: 'hidden @xl:table-cell',
       cell: (a) =>
         a.teacher ? (
           fullName(a.teacher)
@@ -84,11 +93,21 @@ export function ClassSubjectsTab({
     {
       header: 'Hours / week',
       cell: (a) => a.hoursPerWeek,
-      className: 'text-right tabular-nums',
+      className: 'hidden text-right tabular-nums @xl:table-cell',
+    },
+    {
+      header: 'Max absences',
+      className: 'hidden text-right @3xl:table-cell',
+      cell: (a) =>
+        a.maxAbsences === null ? (
+          <span className="text-muted-foreground">No limit</span>
+        ) : (
+          <span className="tabular-nums">{a.maxAbsences}</span>
+        ),
     },
     {
       header: 'In timetable',
-      className: 'hidden text-right sm:table-cell',
+      className: 'hidden text-right @2xl:table-cell',
       cell: (a) => {
         const count = scheduled.get(a.classSubjectId) ?? 0
         return (
@@ -127,9 +146,10 @@ export function ClassSubjectsTab({
 
   return (
     <Card className="gap-0 py-0">
-      <div className="flex items-center justify-between gap-4 border-b p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
         <p className="text-muted-foreground text-sm">
-          The minimum number of grades per term is hours per week + 1.
+          The minimum number of grades per term is hours per week + 1. Absence
+          limits are per semester and count only unexcused absences.
         </p>
         {!readOnly && (
           <Button size="sm" onClick={() => openForm(null)}>
@@ -187,6 +207,16 @@ const schema = z.object({
     .int('Whole hours only')
     .min(1, 'At least 1')
     .max(10, 'At most 10'),
+  /** Empty: no limit. */
+  maxAbsences: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value === '' || /^\d+$/.test(value),
+      'Whole numbers only',
+    )
+    .transform((value) => (value === '' ? null : Number(value)))
+    .refine((value) => value === null || value <= 200, 'At most 200'),
 })
 type Values = z.input<typeof schema>
 type Output = z.output<typeof schema>
@@ -210,8 +240,22 @@ function ClassSubjectDialog({
   const update = useUpdateClassSubject({ handlesConflicts: true })
   const form = useForm<Values, unknown, Output>({
     resolver: zodResolver(schema),
-    defaultValues: { subjectId: '', teacherId: null, hoursPerWeek: '1' },
+    defaultValues: {
+      subjectId: '',
+      teacherId: null,
+      hoursPerWeek: '1',
+      maxAbsences: String(defaultMaxAbsences(1)),
+    },
   })
+  // The limit follows the hours (a fifth of the lessons) until it is changed
+  // by hand, or if it was already set to something else.
+  const followsHours = useRef(true)
+  const hours = useWatch({ control: form.control, name: 'hoursPerWeek' })
+  useEffect(() => {
+    const value = Number(hours)
+    if (!followsHours.current || !Number.isInteger(value) || value < 1) return
+    form.setValue('maxAbsences', String(defaultMaxAbsences(value)))
+  }, [hours, form])
 
   useEffect(() => {
     if (open) {
@@ -219,7 +263,16 @@ function ClassSubjectDialog({
         subjectId: assignment?.subject.id ?? '',
         teacherId: assignment?.teacher?.id ?? null,
         hoursPerWeek: String(assignment?.hoursPerWeek ?? 1),
+        maxAbsences:
+          assignment === null
+            ? String(defaultMaxAbsences(1))
+            : assignment.maxAbsences === null
+              ? ''
+              : String(assignment.maxAbsences),
       })
+      followsHours.current =
+        assignment === null ||
+        assignment.maxAbsences === defaultMaxAbsences(assignment.hoursPerWeek)
     }
   }, [open, assignment, form])
 
@@ -234,6 +287,7 @@ function ClassSubjectDialog({
       const body = {
         teacherId: values.teacherId,
         hoursPerWeek: values.hoursPerWeek,
+        maxAbsences: values.maxAbsences,
       }
       try {
         await update.mutateAsync({ id: assignment.classSubjectId, body })
@@ -286,15 +340,35 @@ function ClassSubjectDialog({
           label: fullName(t),
         }))}
       />
-      <TextField
-        control={form.control}
-        name="hoursPerWeek"
-        label="Hours per week"
-        type="number"
-        min={1}
-        max={10}
-        inputMode="numeric"
-      />
+      <div className="grid grid-cols-2 gap-4">
+        <TextField
+          control={form.control}
+          name="hoursPerWeek"
+          label="Hours per week"
+          type="number"
+          min={1}
+          max={10}
+          inputMode="numeric"
+        />
+        <TextField
+          control={form.control}
+          name="maxAbsences"
+          label="Max absences"
+          type="number"
+          min={0}
+          max={200}
+          inputMode="numeric"
+          placeholder="No limit"
+          onInput={() => {
+            followsHours.current = false
+          }}
+        />
+      </div>
+      <p className="text-muted-foreground -mt-2 text-sm">
+        Unexcused absences allowed per semester. By default a fifth of the
+        lessons ({defaultMaxAbsences(4)} for 4 hours a week); empty for no
+        limit.
+      </p>
     </FormDialog>
   )
 }

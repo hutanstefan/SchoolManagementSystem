@@ -1,5 +1,7 @@
 import {
   BookOpenText,
+  CalendarX2,
+  OctagonAlert,
   CalendarClock,
   ClipboardCheck,
   ClipboardX,
@@ -37,6 +39,14 @@ const LOOK: Record<NotificationType, { icon: LucideIcon; className: string }> =
     HOMEROOM_ALERT: {
       icon: TriangleAlert,
       className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    },
+    ABSENCE_WARNING: {
+      icon: CalendarX2,
+      className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    },
+    ABSENCE_LIMIT: {
+      icon: OctagonAlert,
+      className: 'bg-destructive/10 text-destructive dark:text-red-300',
     },
     LECTURE_SHARED: {
       icon: BookOpenText,

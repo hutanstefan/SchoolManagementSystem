@@ -10,6 +10,7 @@ export const AUDIT_CATEGORIES: AuditCategory[] = [
   'Teaching assignments',
   'Timetable',
   'Grades',
+  'Absences',
   'Grade scans (AI)',
   'Grade imports (Excel)',
   'Chat',

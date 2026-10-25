@@ -1,0 +1,37 @@
+meta {
+  name: Excuse a period (homeroom teacher)
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/absences/excuse
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+body:json {
+  {
+    "studentId": "{{gradeStudentId}}",
+    "from": "{{absenceDate}}",
+    "to": "{{absenceDate}}",
+    "note": "Medical note"
+  }
+}
+
+tests {
+  test("Status is 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Nothing left to excuse that day", function () {
+    expect(res.getBody().excused).to.equal(0);
+  });
+}
+
+docs {
+  Every unexcused absence of the student between the two days, in every subject (a medical note for a week). The homeroom teacher and admins.
+}

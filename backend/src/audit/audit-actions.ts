@@ -14,6 +14,7 @@ export const AUDIT_CATEGORIES = [
   'Teaching assignments',
   'Timetable',
   'Grades',
+  'Absences',
   'Grade scans (AI)',
   'Grade imports (Excel)',
   'Chat',
@@ -101,6 +102,11 @@ export const AUDIT_ACTIONS: Record<string, AuditAction | null> = {
   'POST /api/classes/{id}/grades': a('Grades', 'Gave grades to a class'),
   'PATCH /api/grades/{id}': a('Grades', 'Changed a grade'),
   'DELETE /api/grades/{id}': a('Grades', 'Deleted a grade'),
+
+  'POST /api/absences/attendance': a('Absences', 'Took attendance'),
+  'POST /api/absences/excuse': a('Absences', 'Excused absences'),
+  'PATCH /api/absences/{id}': a('Absences', 'Changed an absence'),
+  'DELETE /api/absences/{id}': a('Absences', 'Deleted an absence'),
 
   'POST /api/classes/{id}/grade-scans': a(
     'Grade scans (AI)',

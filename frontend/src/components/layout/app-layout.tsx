@@ -138,7 +138,7 @@ function Layout() {
 
   return (
     <div className="flex min-h-svh">
-      <aside className="bg-sidebar sticky top-0 hidden h-svh w-64 shrink-0 flex-col border-r md:flex">
+      <aside className="bg-sidebar sticky top-0 hidden h-svh w-64 shrink-0 flex-col border-r lg:flex">
         <div className="flex h-16 items-center px-5">
           <Brand />
         </div>
@@ -155,7 +155,7 @@ function Layout() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden"
+                className="lg:hidden"
                 aria-label="Open menu"
               >
                 <Menu />

@@ -105,6 +105,8 @@ export class ClassSubjectSummaryDto {
   teacher!: PersonSummaryDto | null;
   /** @example 4 */
   hoursPerWeek!: number;
+  /** Most unexcused absences per semester; null: no limit. @example 14 */
+  maxAbsences!: number | null;
 }
 
 /** The same class in one school year. */

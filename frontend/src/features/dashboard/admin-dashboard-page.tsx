@@ -31,7 +31,16 @@ const gradeColumns: Column<Grade>[] = [
   {
     header: 'Student',
     cell: (g) => (
-      <PersonCell person={g.student}>
+      <PersonCell
+        person={g.student}
+        secondary={
+          // Narrow: the subject under the name (its column is left out).
+          <span className="@md:hidden">
+            {g.subject.name}
+            {g.class && ` · ${g.class.name}`}
+          </span>
+        }
+      >
         <Link
           to={`/admin/students/${g.student.id}`}
           className="hover:underline"
@@ -43,6 +52,7 @@ const gradeColumns: Column<Grade>[] = [
   },
   {
     header: 'Subject',
+    className: 'hidden @md:table-cell',
     cell: (g) => (
       <span className="flex items-center gap-2">
         <SubjectDot color={g.subject.color} />
@@ -71,7 +81,7 @@ const gradeColumns: Column<Grade>[] = [
   {
     header: 'Date',
     cell: (g) => formatDate(g.date),
-    className: 'hidden whitespace-nowrap sm:table-cell',
+    className: 'hidden whitespace-nowrap @lg:table-cell',
   },
 ]
 
@@ -192,12 +202,12 @@ export function AdminDashboardPage() {
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-5">
+      <div className="grid gap-6 xl:grid-cols-5">
         <ChartCard
           title="Grade distribution"
           description={`Every grade given in semester ${semester}`}
           action={<PassFailLegend className="hidden sm:flex" />}
-          className="lg:col-span-3"
+          className="xl:col-span-3"
           {...chartState}
         >
           {stats.data && (
@@ -211,7 +221,7 @@ export function AdminDashboardPage() {
               ? 'Grades given per week that semester'
               : 'Grades given per week'
           }
-          className="lg:col-span-2"
+          className="xl:col-span-2"
           {...chartState}
         >
           {stats.data && <ActivityChart data={stats.data.activity} />}
@@ -220,7 +230,7 @@ export function AdminDashboardPage() {
         <ChartCard
           title="Class averages"
           description="Mean of the students' subject averages"
-          className="lg:col-span-2"
+          className="xl:col-span-2"
           {...chartState}
         >
           {stats.data && (
@@ -239,7 +249,7 @@ export function AdminDashboardPage() {
         <ChartCard
           title="Subject averages"
           description="Across every class that studies the subject"
-          className="lg:col-span-3"
+          className="xl:col-span-3"
           {...chartState}
         >
           {stats.data && (
@@ -256,7 +266,7 @@ export function AdminDashboardPage() {
           )}
         </ChartCard>
 
-        <Card className="gap-0 py-0 lg:col-span-3">
+        <Card className="gap-0 py-0 xl:col-span-3">
           <SectionHeader
             title="Latest grades"
             action={
@@ -275,7 +285,7 @@ export function AdminDashboardPage() {
             emptyTitle="No grades yet"
           />
         </Card>
-        <Card className="gap-0 py-0 lg:col-span-2">
+        <Card className="gap-0 py-0 xl:col-span-2">
           <SectionHeader
             title="Classes"
             action={

@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AbsencesModule } from './absences/absences.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
@@ -50,6 +51,7 @@ import { TimetableModule } from './timetable/timetable.module';
     ClassSubjectsModule,
     TimetableModule,
     GradesModule,
+    AbsencesModule,
     GradeScansModule,
     GradeImportsModule,
     NotificationsModule,

@@ -1,0 +1,33 @@
+meta {
+  name: Take attendance again (counted once)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/absences/attendance
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{teacherToken}}
+}
+
+body:json {
+  {
+    "classId": "{{gradeClassId}}",
+    "subjectId": "{{mathSubjectId}}",
+    "date": "{{absenceDate}}",
+    "studentIds": ["{{gradeStudentId}}"]
+  }
+}
+
+tests {
+  test("Status is 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Already absent that day", function () {
+    expect(res.getBody()).to.deep.equal({ recorded: 0, alreadyAbsent: 1 });
+  });
+}

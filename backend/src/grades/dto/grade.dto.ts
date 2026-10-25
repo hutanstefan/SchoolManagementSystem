@@ -22,6 +22,7 @@ import {
   PersonSummaryDto,
   SubjectSummaryDto,
 } from '../../common/dto/summaries.dto';
+import { AbsenceCountDto } from '../../absences/dto/absence.dto';
 import { IsNotFutureDate } from '../../common/validators/is-not-future-date.validator';
 import { GradeAction, Role, YearOutcome } from '../../generated/prisma/enums';
 import {
@@ -269,6 +270,10 @@ export class SubjectGradesDto {
   minimumGrades!: number | null;
   /** Whether the student has at least the minimum number of grades. */
   hasMinimumGrades!: boolean | null;
+  /** Absences in the subject that semester. */
+  absences!: AbsenceCountDto;
+  /** Most unexcused absences allowed; null: no limit (or not taught in the class). @example 14 */
+  maxAbsences!: number | null;
 }
 
 export class StudentGradesReportDto {
@@ -299,6 +304,8 @@ export class GradebookRowDto {
   /** @example 9 */
   roundedAverage!: number | null;
   hasMinimumGrades!: boolean;
+  /** Absences in this subject in the semester. */
+  absences!: AbsenceCountDto;
 }
 
 /** One subject of one class: every student with their grades and average. */
@@ -316,6 +323,10 @@ export class GradebookDto {
   hoursPerWeek!: number;
   /** @example 5 */
   minimumGrades!: number;
+  /** Most unexcused absences per semester; null: no limit. @example 14 */
+  maxAbsences!: number | null;
+  /** The user can take attendance here (records absences). */
+  canTakeAttendance!: boolean;
   students!: GradebookRowDto[];
 }
 

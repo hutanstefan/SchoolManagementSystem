@@ -245,3 +245,51 @@ export function lectureMessage(
     body: `${teacherName ?? 'Your teacher'} shared it with you. Open it from Lectures.`,
   };
 }
+
+// ---------------------------------------------------------------- absences
+
+/** For the student: close to, or over, the absence limit of a subject. */
+export function absenceMessage(
+  step: 'warning' | 'over',
+  subjectName: string,
+  unexcused: number,
+  maxAbsences: number,
+): Message {
+  if (step === 'over') {
+    return {
+      type: 'ABSENCE_LIMIT',
+      title: `Over the absence limit in ${subjectName}`,
+      body: `${unexcused} unexcused absences; the limit is ${maxAbsences}. Talk to your homeroom teacher.`,
+    };
+  }
+  const left = maxAbsences - unexcused;
+  return {
+    type: 'ABSENCE_WARNING',
+    title: `${unexcused} of ${maxAbsences} absences in ${subjectName}`,
+    body:
+      left === 0
+        ? 'One more unexcused absence and you go over the limit.'
+        : `${left} more unexcused ${left === 1 ? 'absence' : 'absences'} and you reach the limit.`,
+  };
+}
+
+/** For the homeroom teacher: a student of their class is close to, or over, a limit. */
+export function absenceAlert(
+  step: 'warning' | 'over',
+  studentName: string,
+  subjectName: string,
+  unexcused: number,
+  maxAbsences: number,
+): Message {
+  return step === 'over'
+    ? {
+        type: 'ABSENCE_LIMIT',
+        title: `${studentName} is over the absence limit in ${subjectName}`,
+        body: `${unexcused} unexcused absences; the limit is ${maxAbsences}.`,
+      }
+    : {
+        type: 'ABSENCE_WARNING',
+        title: `${studentName}: ${unexcused} of ${maxAbsences} absences in ${subjectName}`,
+        body: 'Close to the limit of unexcused absences.',
+      };
+}

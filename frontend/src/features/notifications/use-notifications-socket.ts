@@ -13,6 +13,8 @@ const AFFECTS: Record<NotificationType, QueryKey[]> = {
   HOMEROOM_ALERT: [queryKeys.grades.all],
   TIMETABLE_CHANGED: [queryKeys.timetable.all],
   LECTURE_SHARED: [queryKeys.lectures.all],
+  ABSENCE_WARNING: [queryKeys.absences.all, queryKeys.grades.all],
+  ABSENCE_LIMIT: [queryKeys.absences.all, queryKeys.grades.all],
   ASSIGNMENT_CHANGED: [
     queryKeys.teachers.me,
     queryKeys.classes.all,

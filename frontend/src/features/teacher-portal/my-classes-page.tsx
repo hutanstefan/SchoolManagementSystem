@@ -43,7 +43,7 @@ export function MyClassesPage() {
         }
       />
       {profile.isPending ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 3 }, (_, index) => (
             <Skeleton key={index} className="h-48 rounded-xl" />
           ))}
@@ -64,7 +64,7 @@ export function MyClassesPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {taught.map((c) => (
             <ClassCard
               key={c.id}
@@ -166,7 +166,7 @@ function ClassCard({
           </p>
         )}
       </CardContent>
-      <CardFooter className="gap-2">
+      <CardFooter className="flex-wrap gap-2">
         <Button asChild size="sm">
           <Link to={`/teacher/classes/${c.id}?tab=gradebook`}>
             <ClipboardList aria-hidden /> Gradebook

@@ -36,6 +36,10 @@ enum NotificationType {
   HOMEROOM_ALERT
   /// A teacher shared a lecture (PDF) with the student.
   LECTURE_SHARED
+  /// A student is close to the absence limit of a subject.
+  ABSENCE_WARNING
+  /// A student went over the absence limit of a subject.
+  ABSENCE_LIMIT
 }
 
 enum ConversationType {
@@ -165,6 +169,8 @@ model User {
   lectureAccessEvents  LectureAccessEvent[]
   /// What this user did (the activity log).
   auditLogs            AuditLog[]
+  absencesRecorded     Absence[]            @relation("AbsenceRecordedBy")
+  absencesExcused      Absence[]            @relation("AbsenceExcusedBy")
 
   @@map("users")
 }
@@ -181,6 +187,7 @@ model Student {
   /// The class the student was in, in each school year.
   enrollments   Enrollment[]
   grades        Grade[]
+  absences      Absence[]
   gradeHistory  GradeHistory[]
   reexams       Reexam[]
   /// Lectures shared with the student.
@@ -263,6 +270,7 @@ model SchoolYear {
   classes     Class[]
   enrollments Enrollment[]
   grades      Grade[]
+  absences    Absence[]
   reexams     Reexam[]
 
   @@map("school_years")
@@ -314,6 +322,7 @@ model Subject {
   icon          SubjectIcon    @default(BOOK)
   classSubjects ClassSubject[]
   grades        Grade[]
+  absences      Absence[]
   reexams       Reexam[]
   lectures      Lecture[]
 
@@ -331,6 +340,8 @@ model ClassSubject {
   /// Null while the position is vacant (or after the teacher was deleted).
   teacherId    String? @map("teacher_id") @db.Uuid
   hoursPerWeek Int     @map("hours_per_week") @db.SmallInt
+  /// Most unexcused absences allowed in a semester; null: no limit.
+  maxAbsences  Int?    @map("max_absences") @db.SmallInt
 
   class            Class            @relation(fields: [classId], references: [id], onDelete: Cascade)
   /// A subject that is still taught in some class cannot be deleted.
@@ -389,6 +400,40 @@ model Grade {
   @@index([schoolYearId, semester])
   @@index([teacherId])
   @@map("grades")
+}
+
+/// A student missed a lesson: at most one per subject and day. Counted per
+/// semester against the subject's limit (class_subjects.max_absences) until
+/// it is excused.
+model Absence {
+  id           String    @id @default(uuid()) @db.Uuid
+  studentId    String    @map("student_id") @db.Uuid
+  subjectId    String    @map("subject_id") @db.Uuid
+  schoolYearId String    @map("school_year_id") @db.Uuid
+  semester     Int       @db.SmallInt
+  date         DateTime  @db.Date
+  /// Who recorded it; null if that user was deleted.
+  recordedById String?   @map("recorded_by_id") @db.Uuid
+  excused      Boolean   @default(false)
+  excusedAt    DateTime? @map("excused_at")
+  excusedById  String?   @map("excused_by_id") @db.Uuid
+  /// Why it was excused, e.g. "Medical note".
+  excuseNote   String?   @map("excuse_note")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /// A subject that still has absences cannot be deleted.
+  subject    Subject    @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  schoolYear SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Restrict)
+  recordedBy User?      @relation("AbsenceRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  excusedBy  User?      @relation("AbsenceExcusedBy", fields: [excusedById], references: [id], onDelete: SetNull)
+
+  @@unique([studentId, subjectId, date])
+  @@index([schoolYearId, semester, subjectId])
+  @@index([studentId, schoolYearId, semester])
+  @@index([recordedById])
+  @@index([excusedById])
+  @@map("absences")
 }
 
 /// Audit log of every grade change. Rows are never updated or deleted by the app.

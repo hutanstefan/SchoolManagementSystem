@@ -42,7 +42,16 @@ const gradeColumns: Column<Grade>[] = [
   {
     header: 'Student',
     cell: (g) => (
-      <PersonCell person={g.student}>
+      <PersonCell
+        person={g.student}
+        secondary={
+          // Narrow: the subject under the name (its column is left out).
+          <span className="@md:hidden">
+            {g.subject.name}
+            {g.class && ` · ${g.class.name}`}
+          </span>
+        }
+      >
         <Link
           to={`/teacher/students/${g.student.id}`}
           className="hover:underline"
@@ -54,6 +63,7 @@ const gradeColumns: Column<Grade>[] = [
   },
   {
     header: 'Subject',
+    className: 'hidden @md:table-cell',
     cell: (g) => (
       <span>
         {g.subject.name}
@@ -79,7 +89,7 @@ const gradeColumns: Column<Grade>[] = [
   {
     header: 'Date',
     cell: (g) => formatDate(g.date),
-    className: 'hidden whitespace-nowrap sm:table-cell',
+    className: 'hidden whitespace-nowrap @lg:table-cell',
   },
 ]
 
@@ -185,7 +195,7 @@ export function TeacherDashboardPage() {
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-5">
+      <div className="grid gap-6 xl:grid-cols-5">
         <ChartCard
           title="Averages by class"
           description={
@@ -193,7 +203,7 @@ export function TeacherDashboardPage() {
               ? `Mean of the students' averages in ${rows[0]!.subject.name}`
               : "Mean of the students' averages in each subject you teach"
           }
-          className="lg:col-span-3"
+          className="xl:col-span-3"
           isEmpty={rows.length === 0}
           emptyTitle="No classes yet"
           emptyDescription="The administrator assigns teachers to classes."
@@ -215,7 +225,7 @@ export function TeacherDashboardPage() {
           />
         </ChartCard>
 
-        <Card className="gap-0 py-0 lg:col-span-2">
+        <Card className="gap-0 py-0 xl:col-span-2">
           <SectionHeader
             title="Today's lessons"
             action={
@@ -244,7 +254,7 @@ export function TeacherDashboardPage() {
           title="Grade distribution"
           description="Grades in your subjects"
           action={<PassFailLegend className="hidden sm:flex" />}
-          className="lg:col-span-3"
+          className="xl:col-span-3"
           isEmpty={gradeCount === 0}
           emptyTitle="No grades yet"
           {...chartState}
@@ -254,7 +264,7 @@ export function TeacherDashboardPage() {
           )}
         </ChartCard>
 
-        <Card className="gap-0 py-0 lg:col-span-2">
+        <Card className="gap-0 py-0 xl:col-span-2">
           <SectionHeader
             title="Needs attention"
             description="Open the gradebook to catch up"
@@ -312,7 +322,7 @@ export function TeacherDashboardPage() {
           )}
         </Card>
 
-        <Card className="gap-0 py-0 lg:col-span-5">
+        <Card className="gap-0 py-0 xl:col-span-5">
           <SectionHeader
             title="Latest grades in your classes"
             action={

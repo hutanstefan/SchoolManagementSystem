@@ -11,6 +11,7 @@ export const DomainEvents = {
   AssignmentsChanged: 'assignments.changed',
   SessionEnded: 'session.ended',
   LectureShared: 'lecture.shared',
+  AbsencesRecorded: 'absences.recorded',
 } as const;
 
 export interface GradeChange {
@@ -99,4 +100,15 @@ export interface LectureSharedEvent {
   subjectName: string;
   teacherName: string | null;
   studentIds: string[];
+}
+
+/** Absences were recorded in one subject of a class (attendance). */
+export interface AbsencesRecordedEvent {
+  actorId: string;
+  classId: string;
+  subjectId: string;
+  /** The limit of unexcused absences per semester; null: none. */
+  maxAbsences: number | null;
+  /** Each student's unexcused absences in the subject and semester, before and after. */
+  counts: { studentId: string; before: number; after: number }[];
 }
