@@ -37,23 +37,31 @@ export class StudentsService {
   async findAll(query: StudentQueryDto): Promise<Paginated<StudentDto>> {
     const year = await this.years.resolveYear(query.schoolYearId);
     const inYear = { schoolYearId: year.id };
-    const where: Prisma.StudentWhereInput = {
-      ...(query.classId && {
-        enrollments: { some: { ...inYear, classId: query.classId } },
-      }),
-      // Without a class that year, graduates (who left) excepted.
-      ...(query.unassigned === true && {
-        enrollments: { none: inYear },
-        NOT: {
-          enrollments: {
-            some: {
-              outcome: YearOutcome.GRADUATED,
-              schoolYear: { startYear: { lt: year.startYear } },
-            },
-          },
+    /** Finished the last grade before that year: they left the school. */
+    const graduated: Prisma.StudentWhereInput = {
+      enrollments: {
+        some: {
+          outcome: YearOutcome.GRADUATED,
+          schoolYear: { startYear: { lt: year.startYear } },
         },
-      }),
-      ...(query.unassigned === false && { enrollments: { some: inYear } }),
+      },
+    };
+    const filters: Prisma.StudentWhereInput[] = [
+      ...(query.classId
+        ? [{ enrollments: { some: { ...inYear, classId: query.classId } } }]
+        : []),
+      // Without a class that year, graduates (who left) excepted.
+      ...(query.unassigned === true
+        ? [{ enrollments: { none: inYear } }, { NOT: graduated }]
+        : []),
+      ...(query.unassigned === false
+        ? [{ enrollments: { some: inYear } }]
+        : []),
+      ...(query.graduated === true ? [graduated] : []),
+      ...(query.graduated === false ? [{ NOT: graduated }] : []),
+    ];
+    const where: Prisma.StudentWhereInput = {
+      ...(filters.length > 0 && { AND: filters }),
       ...(query.search && {
         OR: [
           // "2026-0042", "2026-42" or part of one, like "0042".

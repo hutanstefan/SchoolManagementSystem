@@ -65,6 +65,15 @@ export class StudentQueryDto extends PaginationQueryDto {
   @ToBoolean()
   @IsIn([true, false])
   unassigned?: boolean;
+
+  /**
+   * true: only the students who graduated before that year (they left the
+   * school); false: everyone else.
+   */
+  @IsOptional()
+  @ToBoolean()
+  @IsIn([true, false])
+  graduated?: boolean;
 }
 
 export class StudentDto {

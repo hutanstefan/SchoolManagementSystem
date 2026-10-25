@@ -120,6 +120,35 @@ describe('Students (e2e)', () => {
       );
     });
 
+    it('filters graduates, who are no longer counted as unassigned', async () => {
+      const { body } = await asAdmin(
+        api().get('/api/students?graduated=true&pageSize=100'),
+      ).expect(200);
+      expect(body.meta.total).toBe(10);
+      expect(
+        body.data.every(
+          (s: { class: unknown; graduatedIn: string | null }) =>
+            s.class === null && s.graduatedIn !== null,
+        ),
+      ).toBe(true);
+
+      const ids = new Set(body.data.map((s: { id: string }) => s.id));
+      const { body: unassigned } = await asAdmin(
+        api().get('/api/students?unassigned=true&pageSize=100'),
+      ).expect(200);
+      expect(unassigned.data.some((s: { id: string }) => ids.has(s.id))).toBe(
+        false,
+      );
+
+      const { body: rest } = await asAdmin(
+        api().get('/api/students?graduated=false&pageSize=1'),
+      ).expect(200);
+      const { body: all } = await asAdmin(
+        api().get('/api/students?pageSize=1'),
+      ).expect(200);
+      expect(rest.meta.total).toBe(all.meta.total - 10);
+    });
+
     it('rejects an invalid page size', async () => {
       await asAdmin(api().get('/api/students?pageSize=1000')).expect(400);
     });

@@ -3398,6 +3398,11 @@ export interface operations {
                 classId?: string;
                 /** @description Only students without a class that year (graduates excluded). */
                 unassigned?: true | false;
+                /**
+                 * @description true: only the students who graduated before that year (they left the
+                 *     school); false: everyone else.
+                 */
+                graduated?: true | false;
                 /** @description Case-insensitive text search. */
                 search?: string;
             };

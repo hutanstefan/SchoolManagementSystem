@@ -770,6 +770,19 @@
             }
           },
           {
+            "name": "graduated",
+            "required": false,
+            "in": "query",
+            "description": "true: only the students who graduated before that year (they left the\nschool); false: everyone else.",
+            "schema": {
+              "type": "boolean",
+              "enum": [
+                true,
+                false
+              ]
+            }
+          },
+          {
             "name": "search",
             "required": false,
             "in": "query",

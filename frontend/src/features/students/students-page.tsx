@@ -14,6 +14,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -31,6 +32,7 @@ import { StudentFormDialog } from './student-form-dialog'
 
 const ALL = 'all'
 const UNASSIGNED = 'unassigned'
+const GRADUATED = 'graduated'
 
 export function StudentsPage() {
   const navigate = useNavigate()
@@ -52,14 +54,16 @@ export function StudentsPage() {
     pageSize: 20,
     sort: 'lastName',
     search: debouncedSearch || undefined,
-    ...(classFilter === UNASSIGNED && !isArchived
-      ? { unassigned: true }
-      : classFilter !== ALL && classFilter !== UNASSIGNED
-        ? { classId: classFilter }
-        : // A closed year lists the students who were in a class that year.
-          isArchived
-          ? { unassigned: false }
-          : {}),
+    ...(classFilter === GRADUATED
+      ? { graduated: true }
+      : classFilter === UNASSIGNED && !isArchived
+        ? { unassigned: true }
+        : classFilter !== ALL && classFilter !== UNASSIGNED
+          ? { classId: classFilter }
+          : // A closed year lists the students who were in a class that year.
+            isArchived
+            ? { unassigned: false }
+            : {}),
   }
   const students = useStudents(query)
   const classes = useAllClasses()
@@ -176,6 +180,8 @@ export function StudentsPage() {
               {!isArchived && (
                 <SelectItem value={UNASSIGNED}>Not assigned</SelectItem>
               )}
+              <SelectItem value={GRADUATED}>Graduated</SelectItem>
+              <SelectSeparator />
               {classes.data?.data.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.name}

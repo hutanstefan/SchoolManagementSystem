@@ -350,7 +350,7 @@ All endpoints are under `/api`. "Teacher (own)" means a teacher only sees the cl
 | POST   | `/auth/login`                             | Public                                    | Log in, returns a JWT (max 5 attempts/min)                                                                |
 | GET    | `/auth/me`                                | Any logged-in                             | The current user with their role and profile                                                              |
 | POST   | `/auth/logout`                            | Any logged-in                             | Log out: revokes every token of the user (all devices)                                                    |
-| GET    | `/students`                               | Admin                                     | List students (paginated, search by name, email or reg. no., class filter)                                |
+| GET    | `/students`                               | Admin                                     | List students (paginated, search by name, email or reg. no., class, `unassigned` or `graduated` filter)   |
 | POST   | `/students`                               | Admin                                     | Create a student account, optionally in a class                                                           |
 | GET    | `/students/:id`                           | Admin                                     | Student details                                                                                           |
 | PATCH  | `/students/:id`                           | Admin                                     | Update a student, move or unassign, reset password                                                        |
