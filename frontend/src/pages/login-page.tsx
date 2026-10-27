@@ -229,7 +229,7 @@ export function LoginPage() {
           </Form>
 
           <section
-            className="rise mt-10"
+            className="rise mt-10 hidden"
             style={{ '--delay': '160ms' } as CSSProperties}
             aria-labelledby="demo-accounts"
           >
@@ -290,7 +290,7 @@ const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: ClipboardList,
     title: 'Gradebook with live averages',
-    text: 'Romanian rules built in: minimum grades, rounding, report cards.',
+    text: 'Minimum grades, rounding, report cards.',
   },
   {
     icon: CalendarRange,
@@ -310,7 +310,7 @@ const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: ScanLine,
     title: 'Grade a test from a photo',
-    text: 'AI reads the paper; the teacher reviews before saving.',
+    text: 'AI reads the paper and the teacher reviews before saving.',
   },
 ]
 
@@ -368,7 +368,7 @@ function BrandPanel() {
         className="rise relative text-sm text-white/60"
         style={{ '--delay': '480ms' } as CSSProperties}
       >
-        One account per person · administrators, teachers and students
+        School Management Demo Application
       </p>
     </aside>
   )

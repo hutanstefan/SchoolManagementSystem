@@ -35,11 +35,13 @@ A full-stack web application for managing students, teachers, classes and grades
 
 ## Quick start with Docker
 
-One command builds and starts everything: database, migrations with demo data, API and web app.
+One command builds and starts everything: database, migrations with demo data, API and web app. `MAKE SURE YOU HAVE DOCKER INSTALLED/OPEN BEFORE RUNING THE COMMAND`
 
 ```bash
 docker compose up --build
 ```
+
+If Docker fails with a bind error, it means another program is running on port 5432—most probably a local PostgreSQL service. Stop the existing postgres.exe process to free up the port for the container.
 
 Open **http://localhost:8080** and log in with one of the [test accounts](#test-credentials). The API docs are at http://localhost:8080/api/docs.
 
