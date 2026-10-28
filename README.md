@@ -2,8 +2,6 @@
 
 A full-stack web application for managing students, teachers, classes and grades, with role-based access for **Administrators**, **Teachers** and **Students**.
 
-> Work in progress. This README grows with every feature.
-
 ## Tech stack
 
 | Layer    | Technology                                                                                                 |
@@ -41,7 +39,7 @@ One command builds and starts everything: database, migrations with demo data, A
 docker compose up --build
 ```
 
-If Docker fails with a bind error, it means another program is running on port 5432—most probably a local PostgreSQL service. Stop the existing postgres.exe process to free up the port for the container.
+If Docker fails with a bind error, it means another program is running on port 5432—most probably a local PostgreSQL service. Stop the existing postgres.exe process to free up the port for the container or change the port in the docker-compose.yml for the PostgreSQL.
 
 Open **http://localhost:8080** and log in with one of the [test accounts](#test-credentials). The API docs are at http://localhost:8080/api/docs.
 
